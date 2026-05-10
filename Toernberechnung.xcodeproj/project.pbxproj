@@ -21,6 +21,7 @@
 		7C79AFFF3EA4324647CDAA69 /* DWDService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B461EC20F7C1C18357672F9 /* DWDService.swift */; };
 		7E714DDD9E68F69232D4A767 /* RoutePlanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */; };
 		B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */; };
+		B069F8AFF73E9CFBD3BB93B0 /* Toernberechnung.docc in Sources */ = {isa = PBXBuildFile; fileRef = B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */; };
 		BA89B835246BA7901CC3EA4C /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
 		BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */; };
 		D2BAFB3D7C28E3062E4784F1 /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
@@ -62,6 +63,7 @@
 		96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SharedUI.swift"; sourceTree = "<group>"; };
 		9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToernberechnungApp.swift; sourceTree = "<group>"; };
 		9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+InitialData.swift"; sourceTree = "<group>"; };
+		B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Toernberechnung.docc; sourceTree = "<group>"; };
 		B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Weather.swift"; sourceTree = "<group>"; };
 		B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TideDataProvider.swift; sourceTree = "<group>"; };
 		BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TidalHeightStrategy.swift; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 			isa = PBXGroup;
 			children = (
 				2D96FAFEC88A7B5407880B6B /* Info.plist */,
+				B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */,
 				9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */,
 			);
 			path = Toernberechnung;
@@ -323,6 +326,7 @@
 				DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */,
 				2E5D6CF2857614B287146E8D /* TidalHeightStrategy.swift in Sources */,
 				D49DFE01FB1CF2EEB8323297 /* TideDataProvider.swift in Sources */,
+				B069F8AFF73E9CFBD3BB93B0 /* Toernberechnung.docc in Sources */,
 				B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */,
 				73A27DD5E9AD6ECD2E0A9118 /* WaddenSeaCatalog.swift in Sources */,
 			);
