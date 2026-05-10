@@ -150,10 +150,15 @@ jobs:
 
       - name: Build DocC
         run: |
-          xcodebuild docbuild -scheme Toernberechnung \
+          xcodebuild docbuild \
+            -project Toernberechnung.xcodeproj \
+            -scheme Toernberechnung \
             -derivedDataPath /tmp/docbuild \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            DOCC_EXTRACT_EXTENSION_API=YES \
+            DOCC_EXTRACT_API=YES \
+            | xcpretty
 
           $(xcrun --find docc) process-archive \
             transform-for-static-hosting \
