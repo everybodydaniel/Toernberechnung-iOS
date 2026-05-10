@@ -85,23 +85,12 @@ extension ContentView {
     func logbookGlassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
-        return Group {
-            if #available(iOS 26.0, *) {
-                content()
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .glassEffect(.regular.tint(Color.glassTint.opacity(0.3)).interactive(), in: shape)
-                    .overlay { shape.stroke(.white.opacity(0.5), lineWidth: 1) }
-                    .shadow(color: Color.appPrimary.opacity(0.08), radius: 18, y: 10)
-            } else {
-                content()
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.ultraThinMaterial, in: shape)
-                    .overlay { shape.stroke(.white.opacity(0.68), lineWidth: 1) }
-                    .shadow(color: Color.appPrimary.opacity(0.08), radius: 18, y: 10)
-            }
-        }
+        return content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.ultraThinMaterial, in: shape)
+            .overlay { shape.stroke(.white.opacity(0.68), lineWidth: 1) }
+            .shadow(color: Color.appPrimary.opacity(0.08), radius: 18, y: 10)
     }
 
     func logbookMetricChip(_ value: String, icon: String) -> some View {
