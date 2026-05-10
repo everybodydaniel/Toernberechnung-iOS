@@ -29,7 +29,6 @@ targets:
       - path: Toernberechnung/Views/ContentView+InitialData.swift
       - path: Toernberechnung/Views/ContentView+RouteDetail.swift
       - path: Toernberechnung/Views/MapView.swift
-      - path: Toernberechnung/Views/PeilplanPDFView.swift
       - path: Toernberechnung/Engine/RoutePlanModels.swift
       - path: Toernberechnung/Engine/TidalHeightStrategy.swift
       - path: Toernberechnung/Engine/RouteCalculationService.swift

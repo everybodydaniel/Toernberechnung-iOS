@@ -1,0 +1,115 @@
+# ──────────────────────────────────────────────
+# SwiftLint-Konfiguration – Toernberechnung iOS
+# ──────────────────────────────────────────────
+
+# Nur den eigenen Quellcode prüfen
+included:
+  - Toernberechnung
+  - ToernberechnungTests
+
+# Generierte Dateien & Dependencies ausschließen
+excluded:
+  - Toernberechnung.xcodeproj
+  - .build
+  - DerivedData
+  - Pods
+
+# ── Aktivierte optionale Regeln ──────────────
+opt_in_rules:
+  - empty_count                    # .count == 0 → .isEmpty
+  - closure_spacing                # Einheitliche Closure-Formatierung
+  - contains_over_first_not_nil    # .contains statt .first != nil
+  - discouraged_optional_boolean   # Optional<Bool> vermeiden
+  - empty_string                   # "" → .isEmpty
+  - fatal_error_message            # fatalError braucht eine Nachricht
+  - first_where                    # .first(where:) statt .filter().first
+  - modifier_order                 # Einheitliche Modifier-Reihenfolge
+  - overridden_super_call          # super aufrufen
+  - private_action                 # IBActions sollen private sein
+  - redundant_nil_coalescing       # Redundantes ?? nil entfernen
+  - sorted_first_last              # .sorted().first → .min()
+  - yoda_condition                 # Keine Yoda-Bedingungen (42 == x)
+  - unowned_variable_capture       # unowned statt weak wo sicher
+
+# ── Deaktivierte Regeln ──────────────────────
+disabled_rules:
+  - trailing_whitespace            # Zu viel Noise bei Leerzeilen
+  - todo                           # TODOs sollen erlaubt bleiben
+  - opening_brace                  # XcodeGen-Stil kollidiert teilweise
+
+# ── Regel-Konfiguration ─────────────────────
+
+# Zeilenlänge: Warnung bei 140, Fehler bei 200
+line_length:
+  warning: 140
+  error: 200
+  ignores_urls: true
+  ignores_function_declarations: false
+  ignores_comments: true
+
+# Typ-Body-Länge (Klassen/Structs)
+type_body_length:
+  warning: 350
+  error: 500
+
+# Funktions-Body-Länge
+function_body_length:
+  warning: 60
+  error: 100
+
+# Datei-Länge
+file_length:
+  warning: 500
+  error: 800
+  ignore_comment_only_lines: true
+
+# Funktionsparameter-Anzahl
+function_parameter_count:
+  warning: 6
+  error: 8
+
+# Typ-Namenlänge
+type_name:
+  min_length: 3
+  max_length:
+    warning: 50
+    error: 60
+  allowed_symbols: ["_"]
+
+# Identifier-Namenlänge
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
+  excluded:
+    - id
+    - x
+    - y
+    - i
+    - j
+    - n
+    - cg
+    - hw
+    - lt
+    - f
+
+# Verschachtelungstiefe
+nesting:
+  type_level: 3
+  function_level: 5
+
+# Cyclomatic Complexity
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+# Large Tuple
+large_tuple:
+  warning: 3
+  error: 4
+
+# Reporter (für CI)
+reporter: "xcode"

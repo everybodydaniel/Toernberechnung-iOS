@@ -1,0 +1,26 @@
+# ── Xcode ─────────────────────────────
+DerivedData/
+*.xcworkspace
+xcuserdata/
+*.xcscmblueprint
+
+# ── Build ─────────────────────────────
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ── Dependencies ──────────────────────
+vendor/bundle/
+.bundle/
+
+# ── Fastlane ──────────────────────────
+fastlane/report.xml
+fastlane/test_output/
+fastlane/screenshots/
+fastlane/Preview.html
+
+# ── macOS ─────────────────────────────
+.DS_Store
+*.swp
+*~

@@ -1,0 +1,40 @@
+# ──────────────────────────────────────────────
+# Fastlane – Toernberechnung iOS
+# ──────────────────────────────────────────────
+# Installation:  gem install fastlane
+# Ausführung:    bundle exec fastlane lint
+#                bundle exec fastlane test
+# ──────────────────────────────────────────────
+
+default_platform(:ios)
+
+platform :ios do
+
+  # ── Lane: SwiftLint ────────────────────────
+  desc "Führt SwiftLint auf dem gesamten Projekt aus"
+  lane :lint do
+    swiftlint(
+      mode: :lint,
+      config_file: ".swiftlint.yml",
+      raise_if_swiftlint_error: true,
+      ignore_exit_status: false
+    )
+    UI.success("✅ SwiftLint: Keine Verstöße gefunden.")
+  end
+
+  # ── Lane: Unit Tests ──────────────────────
+  desc "Baut das Projekt und führt alle Unit Tests aus"
+  lane :test do
+    scan(
+      project: "Toernberechnung.xcodeproj",
+      scheme: "Toernberechnung",
+      devices: ["iPhone 16"],
+      clean: true,
+      code_coverage: true,
+      output_types: "junit,html",
+      output_directory: "fastlane/test_output"
+    )
+    UI.success("✅ Tests: Alle Tests bestanden.")
+  end
+
+end

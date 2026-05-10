@@ -1,0 +1,158 @@
+# ──────────────────────────────────────────────────────────────
+# GitHub Actions CI – Toernberechnung iOS
+# ──────────────────────────────────────────────────────────────
+# Trigger: Push & Pull Request auf main
+# Jobs:    1. SwiftLint   2. Build & Test   3. SonarCloud (Platzhalter)
+# ──────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ─────────────────────────────────────────
+  # Job 1: SwiftLint
+  # ─────────────────────────────────────────
+  swiftlint:
+    name: 🧹 SwiftLint
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
+
+  # ─────────────────────────────────────────
+  # Job 2: Build & Test
+  # ─────────────────────────────────────────
+  build-and-test:
+    name: 🏗️ Build & Test
+    runs-on: macos-latest
+    needs: swiftlint
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Show Xcode Version
+        run: xcodebuild -version
+
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Toernberechnung.xcodeproj \
+            -scheme Toernberechnung
+
+      - name: Build Project
+        run: |
+          xcodebuild build \
+            -project Toernberechnung.xcodeproj \
+            -scheme Toernberechnung \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color
+
+      - name: Run Unit Tests
+        run: |
+          xcodebuild test \
+            -project Toernberechnung.xcodeproj \
+            -scheme Toernberechnung \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            -enableCodeCoverage YES \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color --report junit
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/
+          retention-days: 14
+
+  # ─────────────────────────────────────────
+  # Job 3: SonarCloud
+  # ─────────────────────────────────────────
+  sonarcloud:
+    name: 📊 SonarCloud Scan
+    runs-on: macos-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=everybodydaniel_Toernberechnung-iOS
+            -Dsonar.organization=everybodydaniel
+            -Dsonar.sources=Toernberechnung
+            -Dsonar.tests=ToernberechnungTests
+            -Dsonar.swift.coverage.reportPaths=build/reports/coverage.xml
+
+  # ─────────────────────────────────────────
+  # Job 4: DocC → GitHub Pages
+  # ─────────────────────────────────────────
+  deploy-docs:
+    name: 📚 Deploy DocC
+    runs-on: macos-latest
+    needs: build-and-test
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build DocC
+        run: |
+          xcodebuild docbuild -scheme Toernberechnung \
+            -derivedDataPath /tmp/docbuild \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO
+
+          $(xcrun --find docc) process-archive \
+            transform-for-static-hosting \
+            /tmp/docbuild/Build/Products/Debug-iphoneos/Toernberechnung.doccarchive \
+            --output-path ./docs-out \
+            --hosting-base-path Toernberechnung-iOS
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs-out
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+    

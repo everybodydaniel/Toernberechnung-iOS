@@ -20,7 +20,6 @@
 		7ACB055CB43EB4F54C5C362D /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA10C24AE4955C3606CFDDB5 /* MapView.swift */; };
 		7C79AFFF3EA4324647CDAA69 /* DWDService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B461EC20F7C1C18357672F9 /* DWDService.swift */; };
 		7E714DDD9E68F69232D4A767 /* RoutePlanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */; };
-		909EDFBC44B38E687BC5EFB4 /* PeilplanPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6807B40092E59DBC573484BB /* PeilplanPDFView.swift */; };
 		B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */; };
 		BA89B835246BA7901CC3EA4C /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
 		BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */; };
@@ -54,12 +53,11 @@
 		334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Tides.swift"; sourceTree = "<group>"; };
 		41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+MapTab.swift"; sourceTree = "<group>"; };
 		4653D4F082EF987F05C20FDA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Logbook.swift"; sourceTree = "<group>"; };
-		6807B40092E59DBC573484BB /* PeilplanPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeilplanPDFView.swift; sourceTree = "<group>"; };
 		77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Crew.swift"; sourceTree = "<group>"; };
 		77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteCalculationService.swift; sourceTree = "<group>"; };
-		86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ToernberechnungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B461EC20F7C1C18357672F9 /* DWDService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DWDService.swift; sourceTree = "<group>"; };
 		96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SharedUI.swift"; sourceTree = "<group>"; };
 		9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToernberechnungApp.swift; sourceTree = "<group>"; };
@@ -146,7 +144,6 @@
 				334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */,
 				B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */,
 				EA10C24AE4955C3606CFDDB5 /* MapView.swift */,
-				6807B40092E59DBC573484BB /* PeilplanPDFView.swift */,
 			);
 			name = Views;
 			path = Toernberechnung/Views;
@@ -192,6 +189,7 @@
 				5A3ED586CABFBC9D80BD773E /* Sources */,
 				E4337355A333B575A9F51FF4 /* Resources */,
 				0F1C9302500CEF5CDD861275 /* Frameworks */,
+				CBCBB1472FB115B900447DAB /* SwiftLint */,
 			);
 			buildRules = (
 			);
@@ -232,9 +230,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
+				LastUpgradeCheck = 2640;
 			};
 			buildConfigurationList = 60BF1BC7BCD405F7C03BD6AB /* Build configuration list for PBXProject "Toernberechnung" */;
 			developmentRegion = en;
@@ -279,6 +275,27 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		CBCBB1472FB115B900447DAB /* SwiftLint */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = SwiftLint;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if command -v swiftlint >/dev/null 2>&1; then\n  swiftlint lint --config \"${SRCROOT}/.swiftlint.yml\"\nelse\n  echo \"warning: SwiftLint ist nicht installiert. Bitte 'brew install swiftlint' ausführen.\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		5A3ED586CABFBC9D80BD773E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -297,7 +314,6 @@
 				7C79AFFF3EA4324647CDAA69 /* DWDService.swift in Sources */,
 				7ACB055CB43EB4F54C5C362D /* MapView.swift in Sources */,
 				1A0BEF78EAEE470A2C851AB0 /* PassageWindowScanner.swift in Sources */,
-				909EDFBC44B38E687BC5EFB4 /* PeilplanPDFView.swift in Sources */,
 				EBF4D6ECA5179A5486582306 /* RouteCalculationService.swift in Sources */,
 				7E714DDD9E68F69232D4A767 /* RoutePlanModels.swift in Sources */,
 				69F5BB2092DC89486E00BCA2 /* RoutePlannerViewModel.swift in Sources */,
@@ -384,6 +400,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -396,6 +413,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -459,6 +477,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -478,6 +497,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
