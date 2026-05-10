@@ -50,6 +50,15 @@ targets:
         product: MapLibre
       - package: ZIPFoundation
         product: ZIPFoundation
+    postCompileScripts:
+      - name: SwiftLint
+        script: |
+          if command -v swiftlint >/dev/null 2>&1; then
+            swiftlint lint --config "${SRCROOT}/.swiftlint.yml"
+          else
+            echo "warning: SwiftLint ist nicht installiert. Bitte 'brew install swiftlint' ausführen."
+          fi
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.ios
