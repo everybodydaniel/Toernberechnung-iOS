@@ -123,54 +123,54 @@ jobs:
             -X
 
   # ─────────────────────────────────────────
-  # Job 4: DocC → GitHub Pages
+  # Job 4: DocC → GitHub Pages (Temporarily disabled)
   # ─────────────────────────────────────────
-  deploy-docs:
-    name: 📚 Deploy DocC
-    runs-on: macos-latest
-    needs: build-and-test
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - name: Select Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-
-      - name: Resolve Swift Packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung
-
-      - name: Build DocC
-        run: |
-          xcodebuild docbuild \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
-            -derivedDataPath /tmp/docbuild \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            CODE_SIGNING_ALLOWED=NO \
-            DOCC_EXTRACT_EXTENSION_API=YES \
-            DOCC_EXTRACT_API=YES \
-            | xcpretty
-
-          $(xcrun --find docc) process-archive \
-            transform-for-static-hosting \
-            /tmp/docbuild/Build/Products/Debug-iphonesimulator/Toernberechnung.doccarchive \
-            --output-path ./docs-out \
-            --hosting-base-path Toernberechnung-iOS
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        with:
-          path: ./docs-out
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+  # deploy-docs:
+  #   name: 📚 Deploy DocC
+  #   runs-on: macos-latest
+  #   needs: build-and-test
+  #   permissions:
+  #     pages: write
+  #     id-token: write
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+  #
+  #     - name: Select Xcode Version
+  #       run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+  #
+  #     - name: Resolve Swift Packages
+  #       run: |
+  #         xcodebuild -resolvePackageDependencies \
+  #           -project Toernberechnung.xcodeproj \
+  #           -scheme Toernberechnung
+  #
+  #     - name: Build DocC
+  #       run: |
+  #         xcodebuild docbuild \
+  #           -project Toernberechnung.xcodeproj \
+  #           -scheme Toernberechnung \
+  #           -derivedDataPath /tmp/docbuild \
+  #           -destination 'platform=iOS Simulator,name=iPhone 16' \
+  #           CODE_SIGNING_ALLOWED=NO \
+  #           DOCC_EXTRACT_EXTENSION_API=YES \
+  #           DOCC_EXTRACT_API=YES \
+  #           | xcpretty
+  #
+  #         $(xcrun --find docc) process-archive \
+  #           transform-for-static-hosting \
+  #           /tmp/docbuild/Build/Products/Debug-iphonesimulator/Toernberechnung.doccarchive \
+  #           --output-path ./docs-out \
+  #           --hosting-base-path Toernberechnung-iOS
+  #
+  #     - name: Upload Pages Artifact
+  #       uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+  #       with:
+  #         path: ./docs-out
+  #
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
