@@ -123,49 +123,49 @@ jobs:
             -X
 
   # ─────────────────────────────────────────
-  # Job 4: DocC → GitHub Pages
+  # Job 4: DocC → GitHub Pages (Temporarily disabled due to exit code 65)
   # ─────────────────────────────────────────
-  deploy-docs:
-    name: 📚 Deploy DocC
-    runs-on: macos-latest
-    needs: build-and-test
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-
-      - name: Resolve Swift Packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung
-
-      - name: Build DocC
-        run: |
-          xcodebuild docbuild -scheme Toernberechnung \
-            -derivedDataPath /tmp/docbuild \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            CODE_SIGNING_ALLOWED=NO
-
-          $(xcrun --find docc) process-archive \
-            transform-for-static-hosting \
-            /tmp/docbuild/Build/Products/Debug-iphonesimulator/Toernberechnung.doccarchive \
-            --output-path ./docs-out \
-            --hosting-base-path Toernberechnung-iOS
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./docs-out
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  # deploy-docs:
+  #   name: 📚 Deploy DocC
+  #   runs-on: macos-latest
+  #   needs: build-and-test
+  #   permissions:
+  #     pages: write
+  #     id-token: write
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Select Xcode Version
+  #       run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+  #
+  #     - name: Resolve Swift Packages
+  #       run: |
+  #         xcodebuild -resolvePackageDependencies \
+  #           -project Toernberechnung.xcodeproj \
+  #           -scheme Toernberechnung
+  #
+  #     - name: Build DocC
+  #       run: |
+  #         xcodebuild docbuild -scheme Toernberechnung \
+  #           -derivedDataPath /tmp/docbuild \
+  #           -destination 'platform=iOS Simulator,name=iPhone 16' \
+  #           CODE_SIGNING_ALLOWED=NO
+  #
+  #         $(xcrun --find docc) process-archive \
+  #           transform-for-static-hosting \
+  #           /tmp/docbuild/Build/Products/Debug-iphonesimulator/Toernberechnung.doccarchive \
+  #           --output-path ./docs-out \
+  #           --hosting-base-path Toernberechnung-iOS
+  #
+  #     - name: Upload Pages Artifact
+  #       uses: actions/upload-pages-artifact@v3
+  #       with:
+  #         path: ./docs-out
+  #
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4
