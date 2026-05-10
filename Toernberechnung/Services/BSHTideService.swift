@@ -51,6 +51,7 @@ actor BSHTideService {
 
     private let baseURL = "https://gezeiten.bsh.de/data"
     private var cache: [String: (TideReading, Date)] = [:]
+    private var eventCache: [String: ([TideEvent], Date)] = [:]
     private let cacheLifetime: TimeInterval = 12 * 3600
 
     func fetch(for harbour: HarbourOption, around date: Date = .now, force: Bool = false) async throws -> TideReading {
@@ -80,6 +81,38 @@ actor BSHTideService {
         )
         cache[cacheKey] = (reading, .now)
         return reading
+    }
+
+    func highWaters(for stationID: String, around date: Date, force: Bool = false) async throws -> [TideEvent] {
+        let allEvents = try await yearlyEvents(for: stationID, around: date, force: force)
+        let windowStart = date.addingTimeInterval(-14 * 3600)
+        let windowEnd = date.addingTimeInterval(14 * 3600)
+
+        return allEvents.filter {
+            $0.type == "HW" && $0.time >= windowStart && $0.time <= windowEnd
+        }
+    }
+
+    private func yearlyEvents(for stationID: String, around date: Date, force: Bool) async throws -> [TideEvent] {
+        let cacheKey = "\(stationID)-\(Calendar.current.component(.year, from: date))"
+        if !force, let cached = eventCache[cacheKey], Date().timeIntervalSince(cached.1) < cacheLifetime {
+            return cached.0
+        }
+
+        guard let url = URL(string: "\(baseURL)/DE_\(stationID.leftPadding(toLength: 5, withPad: "_"))_tides.json") else {
+            throw BSHTideError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw BSHTideError.badResponse
+        }
+
+        let payload = try JSONDecoder().decode(BSHTidePayload.self, from: data)
+        let events = payload.events(around: date)
+        guard !events.isEmpty else { throw BSHTideError.emptyPayload }
+        eventCache[cacheKey] = (events, .now)
+        return events
     }
 }
 

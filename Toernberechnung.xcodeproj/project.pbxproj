@@ -8,39 +8,72 @@
 
 /* Begin PBXBuildFile section */
 		055AB2CDFD8FADEF8B8FC3E6 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = A2C302E94658AD9ABA1622FE /* MapLibre */; };
-		160CCBA5A8B37C747C1E4D08 /* ContentView+Logbook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C07520773D68541E40D2328 /* ContentView+Logbook.swift */; };
-		3A729AA1302A3CF3B41C6ED4 /* SeaRoutePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E1EBE6FDA2B138B663AE99 /* SeaRoutePlanner.swift */; };
+		08EE46604BBABD5BF8E74522 /* ContentView+Crew.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */; };
+		1A0BEF78EAEE470A2C851AB0 /* PassageWindowScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF51E2BE9460F831E95F3631 /* PassageWindowScanner.swift */; };
+		2E5D6CF2857614B287146E8D /* TidalHeightStrategy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */; };
+		2F17F8E1AE1CC501F580EC41 /* ContentView+Tides.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */; };
+		341D4D819FF47AEA79150034 /* ContentView+RouteDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */; };
+		4016C38D4688B7BB0A45EDD7 /* ContentView+SharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */; };
 		461698973EC983552F171EE5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4653D4F082EF987F05C20FDA /* ContentView.swift */; };
-		668B34C81B56D8A865A11093 /* ContentView+Weather.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35966BF8CBFB5044E7B76A99 /* ContentView+Weather.swift */; };
-		6B2E84F5E10B69ED9AB6CD57 /* ContentView+MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE10224673C54CDBFC7070C /* ContentView+MapTab.swift */; };
+		69F5BB2092DC89486E00BCA2 /* RoutePlannerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */; };
+		73A27DD5E9AD6ECD2E0A9118 /* WaddenSeaCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD559185A21CCD913BF3C85 /* WaddenSeaCatalog.swift */; };
 		7ACB055CB43EB4F54C5C362D /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA10C24AE4955C3606CFDDB5 /* MapView.swift */; };
 		7C79AFFF3EA4324647CDAA69 /* DWDService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B461EC20F7C1C18357672F9 /* DWDService.swift */; };
-		8DF7D58ADFC5BD43BAFD2993 /* PassageCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 058D8EE6E9FB0984D1AAEFAB /* PassageCalculator.swift */; };
-		9F2F9D62EE021E1F3585AB24 /* ContentView+Crew.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0408A4CE7FEDC41BAF39F935 /* ContentView+Crew.swift */; };
+		7E714DDD9E68F69232D4A767 /* RoutePlanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */; };
+		909EDFBC44B38E687BC5EFB4 /* PeilplanPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6807B40092E59DBC573484BB /* PeilplanPDFView.swift */; };
 		B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */; };
-		BE31C633EECFEC330E4FB83B /* ContentView+InitialData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00FC2AACAFA9F419700D8303 /* ContentView+InitialData.swift */; };
-		D2A7A065EACD75FD6364D8BB /* BSHTideService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D628C75CFF8F921AC72D422 /* BSHTideService.swift */; };
-		D451879F1D7F01FC3C5DA845 /* ContentView+SharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECE037F17F8ECAB1FBC45D0 /* ContentView+SharedUI.swift */; };
-		E33FFE296AD0257B0E19FDCF /* ContentView+Tides.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E05533CCA2177E3AA0872A /* ContentView+Tides.swift */; };
+		BA89B835246BA7901CC3EA4C /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
+		BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */; };
+		D2BAFB3D7C28E3062E4784F1 /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
+		D49DFE01FB1CF2EEB8323297 /* TideDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */; };
+		D69BD48913D7A75D79EEA619 /* ContentView+Logbook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */; };
+		DCEE953FBF73EECE6EACB04E /* ContentView+MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */; };
+		DE31F81D793F4E62C48EDAA1 /* RouteCalculationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E72ED92078B23A111163BBB9 /* RouteCalculationTests.swift */; };
+		DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */; };
+		EBF4D6ECA5179A5486582306 /* RouteCalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */; };
+		F139CCBE12014D4F550A1213 /* BSHTideService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */; };
+		F241C1AC3877E8623BDB0315 /* ContentView+InitialData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */; };
 		FB73398DACA9BE2DDB0F2F78 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 1EA7A3199597B12C10A6C77F /* ZIPFoundation */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		848AF5F6503A33144E010E2E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FB83BDC6A5DA8A5D96C85872 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F9D9C3365B426B92A441223;
+			remoteInfo = Toernberechnung;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		00FC2AACAFA9F419700D8303 /* ContentView+InitialData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+InitialData.swift"; sourceTree = "<group>"; };
-		0408A4CE7FEDC41BAF39F935 /* ContentView+Crew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Crew.swift"; sourceTree = "<group>"; };
-		058D8EE6E9FB0984D1AAEFAB /* PassageCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassageCalculator.swift; sourceTree = "<group>"; };
-		35966BF8CBFB5044E7B76A99 /* ContentView+Weather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Weather.swift"; sourceTree = "<group>"; };
+		19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+RouteDetail.swift"; sourceTree = "<group>"; };
+		23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlannerViewModel.swift; sourceTree = "<group>"; };
+		2D96FAFEC88A7B5407880B6B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanModels.swift; sourceTree = "<group>"; };
+		334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Tides.swift"; sourceTree = "<group>"; };
+		41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+MapTab.swift"; sourceTree = "<group>"; };
 		4653D4F082EF987F05C20FDA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		5ECE037F17F8ECAB1FBC45D0 /* ContentView+SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SharedUI.swift"; sourceTree = "<group>"; };
-		7C07520773D68541E40D2328 /* ContentView+Logbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Logbook.swift"; sourceTree = "<group>"; };
+		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Logbook.swift"; sourceTree = "<group>"; };
+		6807B40092E59DBC573484BB /* PeilplanPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeilplanPDFView.swift; sourceTree = "<group>"; };
+		77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Crew.swift"; sourceTree = "<group>"; };
+		77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteCalculationService.swift; sourceTree = "<group>"; };
+		86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B461EC20F7C1C18357672F9 /* DWDService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DWDService.swift; sourceTree = "<group>"; };
-		8D628C75CFF8F921AC72D422 /* BSHTideService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideService.swift; sourceTree = "<group>"; };
+		96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SharedUI.swift"; sourceTree = "<group>"; };
 		9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToernberechnungApp.swift; sourceTree = "<group>"; };
-		CBE10224673C54CDBFC7070C /* ContentView+MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+MapTab.swift"; sourceTree = "<group>"; };
-		D4E05533CCA2177E3AA0872A /* ContentView+Tides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Tides.swift"; sourceTree = "<group>"; };
-		E2E1EBE6FDA2B138B663AE99 /* SeaRoutePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeaRoutePlanner.swift; sourceTree = "<group>"; };
+		9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+InitialData.swift"; sourceTree = "<group>"; };
+		B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Weather.swift"; sourceTree = "<group>"; };
+		B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TideDataProvider.swift; sourceTree = "<group>"; };
+		BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TidalHeightStrategy.swift; sourceTree = "<group>"; };
+		CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeaRoutePlanner.swift; sourceTree = "<group>"; };
+		CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideService.swift; sourceTree = "<group>"; };
+		E72ED92078B23A111163BBB9 /* RouteCalculationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteCalculationTests.swift; sourceTree = "<group>"; };
 		EA10C24AE4955C3606CFDDB5 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		EF51E2BE9460F831E95F3631 /* PassageWindowScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassageWindowScanner.swift; sourceTree = "<group>"; };
+		F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = wadden_sea_catalog.json; sourceTree = "<group>"; };
+		FCD559185A21CCD913BF3C85 /* WaddenSeaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaddenSeaCatalog.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +92,7 @@
 		18DEA961666D7FCBAE02D751 /* Toernberechnung */ = {
 			isa = PBXGroup;
 			children = (
+				2D96FAFEC88A7B5407880B6B /* Info.plist */,
 				9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */,
 			);
 			path = Toernberechnung;
@@ -67,8 +101,9 @@
 		893ABB9A87C56D39B0255B2A /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */,
 				8B461EC20F7C1C18357672F9 /* DWDService.swift */,
-				8D628C75CFF8F921AC72D422 /* BSHTideService.swift */,
+				B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */,
 			);
 			name = Services;
 			path = Toernberechnung/Services;
@@ -77,25 +112,41 @@
 		A5EED1EBBDC132C9A0D8F2E3 /* Engine */ = {
 			isa = PBXGroup;
 			children = (
-				058D8EE6E9FB0984D1AAEFAB /* PassageCalculator.swift */,
-				E2E1EBE6FDA2B138B663AE99 /* SeaRoutePlanner.swift */,
+				EF51E2BE9460F831E95F3631 /* PassageWindowScanner.swift */,
+				77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */,
+				2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */,
+				23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */,
+				CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */,
+				BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */,
+				FCD559185A21CCD913BF3C85 /* WaddenSeaCatalog.swift */,
 			);
 			name = Engine;
 			path = Toernberechnung/Engine;
+			sourceTree = "<group>";
+		};
+		B0CD8BA9F5D07A19DED7B89B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */,
+			);
+			name = Resources;
+			path = Toernberechnung/Resources;
 			sourceTree = "<group>";
 		};
 		D439D35983ED21D420788A42 /* Views */ = {
 			isa = PBXGroup;
 			children = (
 				4653D4F082EF987F05C20FDA /* ContentView.swift */,
-				00FC2AACAFA9F419700D8303 /* ContentView+InitialData.swift */,
-				CBE10224673C54CDBFC7070C /* ContentView+MapTab.swift */,
-				35966BF8CBFB5044E7B76A99 /* ContentView+Weather.swift */,
-				D4E05533CCA2177E3AA0872A /* ContentView+Tides.swift */,
-				0408A4CE7FEDC41BAF39F935 /* ContentView+Crew.swift */,
-				7C07520773D68541E40D2328 /* ContentView+Logbook.swift */,
-				5ECE037F17F8ECAB1FBC45D0 /* ContentView+SharedUI.swift */,
+				77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */,
+				9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */,
+				55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */,
+				41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */,
+				19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */,
+				96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */,
+				334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */,
+				B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */,
 				EA10C24AE4955C3606CFDDB5 /* MapView.swift */,
+				6807B40092E59DBC573484BB /* PeilplanPDFView.swift */,
 			);
 			name = Views;
 			path = Toernberechnung/Views;
@@ -105,16 +156,27 @@
 			isa = PBXGroup;
 			children = (
 				4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */,
+				86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DF62DFC93AE71B30E327780D /* ToernberechnungTests */ = {
+			isa = PBXGroup;
+			children = (
+				E72ED92078B23A111163BBB9 /* RouteCalculationTests.swift */,
+			);
+			path = ToernberechnungTests;
 			sourceTree = "<group>";
 		};
 		E96675114EBFA982570F53B9 = {
 			isa = PBXGroup;
 			children = (
 				A5EED1EBBDC132C9A0D8F2E3 /* Engine */,
+				B0CD8BA9F5D07A19DED7B89B /* Resources */,
 				893ABB9A87C56D39B0255B2A /* Services */,
 				18DEA961666D7FCBAE02D751 /* Toernberechnung */,
+				DF62DFC93AE71B30E327780D /* ToernberechnungTests */,
 				D439D35983ED21D420788A42 /* Views */,
 				DA0B1B119FC3DEDB38C5A818 /* Products */,
 			);
@@ -128,6 +190,7 @@
 			buildConfigurationList = 79E7B60BA827BD5CCF02527F /* Build configuration list for PBXNativeTarget "Toernberechnung" */;
 			buildPhases = (
 				5A3ED586CABFBC9D80BD773E /* Sources */,
+				E4337355A333B575A9F51FF4 /* Resources */,
 				0F1C9302500CEF5CDD861275 /* Frameworks */,
 			);
 			buildRules = (
@@ -143,6 +206,25 @@
 			productReference = 4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */;
 			productType = "com.apple.product-type.application";
 		};
+		DB274558A4EDC412F15CF557 /* ToernberechnungTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 14ABF9BA1D55FDF1B9144D10 /* Build configuration list for PBXNativeTarget "ToernberechnungTests" */;
+			buildPhases = (
+				EF70C3700B8C35C55308D1A5 /* Sources */,
+				1CAD7B40BF399DA167B0315A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CC1FC300FABAE83C60301DDC /* PBXTargetDependency */,
+			);
+			name = ToernberechnungTests;
+			packageProductDependencies = (
+			);
+			productName = ToernberechnungTests;
+			productReference = 86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -151,6 +233,8 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = 60BF1BC7BCD405F7C03BD6AB /* Build configuration list for PBXProject "Toernberechnung" */;
 			developmentRegion = en;
@@ -171,35 +255,98 @@
 			projectRoot = "";
 			targets = (
 				5F9D9C3365B426B92A441223 /* Toernberechnung */,
+				DB274558A4EDC412F15CF557 /* ToernberechnungTests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1CAD7B40BF399DA167B0315A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BA89B835246BA7901CC3EA4C /* wadden_sea_catalog.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E4337355A333B575A9F51FF4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D2BAFB3D7C28E3062E4784F1 /* wadden_sea_catalog.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5A3ED586CABFBC9D80BD773E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F139CCBE12014D4F550A1213 /* BSHTideService.swift in Sources */,
+				08EE46604BBABD5BF8E74522 /* ContentView+Crew.swift in Sources */,
+				F241C1AC3877E8623BDB0315 /* ContentView+InitialData.swift in Sources */,
+				D69BD48913D7A75D79EEA619 /* ContentView+Logbook.swift in Sources */,
+				DCEE953FBF73EECE6EACB04E /* ContentView+MapTab.swift in Sources */,
+				341D4D819FF47AEA79150034 /* ContentView+RouteDetail.swift in Sources */,
+				4016C38D4688B7BB0A45EDD7 /* ContentView+SharedUI.swift in Sources */,
+				2F17F8E1AE1CC501F580EC41 /* ContentView+Tides.swift in Sources */,
+				BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */,
 				461698973EC983552F171EE5 /* ContentView.swift in Sources */,
-				BE31C633EECFEC330E4FB83B /* ContentView+InitialData.swift in Sources */,
-				6B2E84F5E10B69ED9AB6CD57 /* ContentView+MapTab.swift in Sources */,
-				668B34C81B56D8A865A11093 /* ContentView+Weather.swift in Sources */,
-				E33FFE296AD0257B0E19FDCF /* ContentView+Tides.swift in Sources */,
-				9F2F9D62EE021E1F3585AB24 /* ContentView+Crew.swift in Sources */,
-				160CCBA5A8B37C747C1E4D08 /* ContentView+Logbook.swift in Sources */,
-				D451879F1D7F01FC3C5DA845 /* ContentView+SharedUI.swift in Sources */,
 				7C79AFFF3EA4324647CDAA69 /* DWDService.swift in Sources */,
-				D2A7A065EACD75FD6364D8BB /* BSHTideService.swift in Sources */,
 				7ACB055CB43EB4F54C5C362D /* MapView.swift in Sources */,
-				8DF7D58ADFC5BD43BAFD2993 /* PassageCalculator.swift in Sources */,
-				3A729AA1302A3CF3B41C6ED4 /* SeaRoutePlanner.swift in Sources */,
+				1A0BEF78EAEE470A2C851AB0 /* PassageWindowScanner.swift in Sources */,
+				909EDFBC44B38E687BC5EFB4 /* PeilplanPDFView.swift in Sources */,
+				EBF4D6ECA5179A5486582306 /* RouteCalculationService.swift in Sources */,
+				7E714DDD9E68F69232D4A767 /* RoutePlanModels.swift in Sources */,
+				69F5BB2092DC89486E00BCA2 /* RoutePlannerViewModel.swift in Sources */,
+				DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */,
+				2E5D6CF2857614B287146E8D /* TidalHeightStrategy.swift in Sources */,
+				D49DFE01FB1CF2EEB8323297 /* TideDataProvider.swift in Sources */,
 				B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */,
+				73A27DD5E9AD6ECD2E0A9118 /* WaddenSeaCatalog.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF70C3700B8C35C55308D1A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DE31F81D793F4E62C48EDAA1 /* RouteCalculationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		CC1FC300FABAE83C60301DDC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F9D9C3365B426B92A441223 /* Toernberechnung */;
+			targetProxy = 848AF5F6503A33144E010E2E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		44FF027F3FF086A55461674A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.toernberechnung.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Toernberechnung.app/Toernberechnung";
+			};
+			name = Debug;
+		};
 		7B283D9CB555D3A5CEFE6786 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -261,7 +408,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L9T7RPMW5H;
 				INFOPLIST_FILE = Toernberechnung/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -338,13 +484,31 @@
 			};
 			name = Debug;
 		};
+		BBD622153CF0A820BDBD1D41 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.toernberechnung.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Toernberechnung.app/Toernberechnung";
+			};
+			name = Release;
+		};
 		D9B0878ED90FEE17364456D3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L9T7RPMW5H;
 				INFOPLIST_FILE = Toernberechnung/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -362,6 +526,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		14ABF9BA1D55FDF1B9144D10 /* Build configuration list for PBXNativeTarget "ToernberechnungTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				44FF027F3FF086A55461674A /* Debug */,
+				BBD622153CF0A820BDBD1D41 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		60BF1BC7BCD405F7C03BD6AB /* Build configuration list for PBXProject "Toernberechnung" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

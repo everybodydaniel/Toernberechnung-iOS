@@ -13,14 +13,14 @@ struct HarbourOption: Identifiable, Hashable {
     let tideStationName: String
 
     static let options: [HarbourOption] = [
-        .init(id: "borkum_harbor", name: "Borkum, Fischerbalje", latitude: 53.558, longitude: 6.748, chartDepth: 3.0, weatherStationID: "K1083", weatherStationName: "BORKUM", tideStationID: "101P", tideStationName: "Borkum, Fischerbalje"),
-        .init(id: "emden_harbor", name: "Emden, Hafen", latitude: 53.3372, longitude: 7.1892, chartDepth: 5.0, weatherStationID: "10203", weatherStationName: "EMDEN", tideStationID: "507P", tideStationName: "Emden, Große Seeschleuse"),
-        .init(id: "juist_harbor", name: "Juist, Hafen", latitude: 53.677, longitude: 6.993, chartDepth: 1.8, weatherStationID: "E5307", weatherStationName: "OSTFR. KUESTE", tideStationID: "794P", tideStationName: "Juist, Hafen"),
-        .init(id: "norderney_harbor", name: "Norderney, Hafen", latitude: 53.694, longitude: 7.157, chartDepth: 2.5, weatherStationID: "10113", weatherStationName: "NORDERNEY", tideStationID: "111P", tideStationName: "Norderney, Riffgat"),
-        .init(id: "baltrum_harbor", name: "Baltrum, Hafen", latitude: 53.724, longitude: 7.370, chartDepth: 1.2, weatherStationID: "E5344", weatherStationName: "BALTRUM", tideStationID: "784P", tideStationName: "Baltrum, Westende"),
-        .init(id: "langeoog_harbor", name: "Langeoog, Hafen", latitude: 53.748, longitude: 7.497, chartDepth: 1.5, weatherStationID: "E025", weatherStationName: "DORNUM", tideStationID: "781P", tideStationName: "Langeoog, Hafeneinfahrt"),
-        .init(id: "spiekeroog_harbor", name: "Spiekeroog, Hafen", latitude: 53.770, longitude: 7.687, chartDepth: 1.0, weatherStationID: "E031", weatherStationName: "SPIEKEROOG (SWN)", tideStationID: "779P", tideStationName: "Spiekeroog"),
-        .init(id: "wangerooge_harbor", name: "Wangerooge, Hafen", latitude: 53.776, longitude: 7.868, chartDepth: 1.4, weatherStationID: "E5408", weatherStationName: "WANGEROOGE", tideStationID: "777P", tideStationName: "Wangerooge, Hafen")
+        .init(id: "borkum_harbor", name: "Borkum, Fischerbalje", latitude: 53.5606, longitude: 6.7502, chartDepth: 3.0, weatherStationID: "K1083", weatherStationName: "BORKUM", tideStationID: "101P", tideStationName: "Borkum, Fischerbalje"),
+        .init(id: "emden_harbor", name: "Emden, Hafen", latitude: 53.3421, longitude: 7.1852, chartDepth: 5.0, weatherStationID: "10203", weatherStationName: "EMDEN", tideStationID: "507P", tideStationName: "Emden, Große Seeschleuse"),
+        .init(id: "juist_harbor", name: "Juist, Hafen", latitude: 53.6722, longitude: 6.9982, chartDepth: 1.8, weatherStationID: "E5307", weatherStationName: "OSTFR. KUESTE", tideStationID: "794P", tideStationName: "Juist, Hafen"),
+        .init(id: "norderney_harbor", name: "Norderney, Hafen", latitude: 53.7024, longitude: 7.1637, chartDepth: 2.5, weatherStationID: "10113", weatherStationName: "NORDERNEY", tideStationID: "111P", tideStationName: "Norderney, Riffgat"),
+        .init(id: "baltrum_harbor", name: "Baltrum, Hafen", latitude: 53.7229, longitude: 7.3669, chartDepth: 1.2, weatherStationID: "E5344", weatherStationName: "BALTRUM", tideStationID: "784P", tideStationName: "Baltrum, Westende"),
+        .init(id: "langeoog_harbor", name: "Langeoog, Hafen", latitude: 53.7263, longitude: 7.4968, chartDepth: 1.5, weatherStationID: "E025", weatherStationName: "DORNUM", tideStationID: "781P", tideStationName: "Langeoog, Hafeneinfahrt"),
+        .init(id: "spiekeroog_harbor", name: "Spiekeroog, Hafen", latitude: 53.7632, longitude: 7.6955, chartDepth: 1.0, weatherStationID: "E031", weatherStationName: "SPIEKEROOG (SWN)", tideStationID: "779P", tideStationName: "Spiekeroog"),
+        .init(id: "wangerooge_harbor", name: "Wangerooge, Hafen", latitude: 53.7755, longitude: 7.8683, chartDepth: 1.4, weatherStationID: "E5408", weatherStationName: "WANGEROOGE", tideStationID: "777P", tideStationName: "Wangerooge, Hafen")
     ]
 
     static func byID(_ id: String) -> HarbourOption {

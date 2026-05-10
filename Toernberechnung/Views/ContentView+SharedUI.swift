@@ -244,13 +244,9 @@ struct SettingsSheet: View {
     @AppStorage("boatType") private var boatType = "Segelyacht"
     @AppStorage("boatCallsign") private var boatCallsign = ""
     @AppStorage("boatDraft") private var boatDraft = "1.1"
+    @AppStorage("safetyMargin") private var safetyMargin = "0.0"
     @AppStorage("boatLength") private var boatLength = "10.5"
     @AppStorage("appearanceMode") private var appearanceMode = "system"
-    @AppStorage("distanceUnit") private var distanceUnit = "nm"
-    @AppStorage("depthUnit") private var depthUnit = "m"
-    @AppStorage("speedUnit") private var speedUnit = "kn"
-    @AppStorage("temperatureUnit") private var temperatureUnit = "c"
-    @AppStorage("timeFormat") private var timeFormat = "24h"
 
     private let boatTypes = ["Segelyacht", "Motoryacht", "Katamaran", "Jolle", "Arbeitsboot"]
     private let appearanceOptions = [("system", "System"), ("light", "Hell"), ("dark", "Dunkel")]
@@ -263,7 +259,6 @@ struct SettingsSheet: View {
                     profileSection
                     boatSection
                     appearanceSection
-                    unitsSection
                     sourcesSection
                     legalSection
                 }
@@ -343,6 +338,9 @@ struct SettingsSheet: View {
                 settingsTextField("Tiefgang (m)", text: $boatDraft, icon: "arrow.down.to.line", keyboard: .decimalPad)
                 settingsTextField("Länge (m)", text: $boatLength, icon: "ruler", keyboard: .decimalPad)
             }
+            HStack(spacing: 10) {
+                settingsTextField("Sicherheitsmarge (m)", text: $safetyMargin, icon: "shield.checkered", keyboard: .decimalPad)
+            }
         }
     }
 
@@ -355,40 +353,6 @@ struct SettingsSheet: View {
             }
             .pickerStyle(.segmented)
 
-        }
-    }
-
-    private var unitsSection: some View {
-        settingsSection(title: "Einheiten", icon: "ruler.fill") {
-            Picker("Distanz", selection: $distanceUnit) {
-                Text("nm").tag("nm")
-                Text("km").tag("km")
-            }
-            .pickerStyle(.segmented)
-
-            Picker("Tiefe", selection: $depthUnit) {
-                Text("m").tag("m")
-                Text("ft").tag("ft")
-            }
-            .pickerStyle(.segmented)
-
-            Picker("Geschwindigkeit", selection: $speedUnit) {
-                Text("kn").tag("kn")
-                Text("km/h").tag("kmh")
-            }
-            .pickerStyle(.segmented)
-
-            Picker("Temperatur", selection: $temperatureUnit) {
-                Text("°C").tag("c")
-                Text("°F").tag("f")
-            }
-            .pickerStyle(.segmented)
-
-            Picker("Zeitformat", selection: $timeFormat) {
-                Text("24 h").tag("24h")
-                Text("12 h").tag("12h")
-            }
-            .pickerStyle(.segmented)
         }
     }
 

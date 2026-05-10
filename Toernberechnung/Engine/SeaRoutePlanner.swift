@@ -117,45 +117,71 @@ enum SeaRoutePlanner {
     }
 
     private static let harbourMapCoordinates: [String: CLLocationCoordinate2D] = [
-        "borkum_harbor": .init(latitude: 53.565, longitude: 6.765),
+        "borkum_harbor": .init(latitude: 53.5650, longitude: 6.7650),
         "emden_harbor": .init(latitude: 53.3372, longitude: 7.1892),
-        "juist_harbor": .init(latitude: 53.666, longitude: 6.980),
-        "norderney_harbor": .init(latitude: 53.684, longitude: 7.155),
-        "baltrum_harbor": .init(latitude: 53.707, longitude: 7.365),
-        "langeoog_harbor": .init(latitude: 53.732, longitude: 7.500),
-        "spiekeroog_harbor": .init(latitude: 53.752, longitude: 7.690),
-        "wangerooge_harbor": .init(latitude: 53.762, longitude: 7.870)
+        "juist_harbor": .init(latitude: 53.6660, longitude: 6.9800),
+        "norderney_harbor": .init(latitude: 53.6840, longitude: 7.1550),
+        "baltrum_harbor": .init(latitude: 53.7070, longitude: 7.3650),
+        "langeoog_harbor": .init(latitude: 53.7320, longitude: 7.5000),
+        "spiekeroog_harbor": .init(latitude: 53.7520, longitude: 7.6900),
+        "wangerooge_harbor": .init(latitude: 53.7620, longitude: 7.8700)
     ]
 
     private static let harbourNodeIDs: [String: String] = [
-        "borkum_harbor": "borkum_access",
-        "emden_harbor": "emden_access",
-        "juist_harbor": "juist_access",
-        "norderney_harbor": "norderney_access",
-        "baltrum_harbor": "baltrum_access",
-        "langeoog_harbor": "langeoog_access",
-        "spiekeroog_harbor": "spiekeroog_access",
-        "wangerooge_harbor": "wangerooge_access"
+        "borkum_harbor": "borkum_harbor",
+        "emden_harbor": "emden_harbor",
+        "juist_harbor": "juist_harbor",
+        "norderney_harbor": "norderney_harbor",
+        "baltrum_harbor": "baltrum_harbor",
+        "langeoog_harbor": "langeoog_harbor",
+        "spiekeroog_harbor": "spiekeroog_harbor",
+        "wangerooge_harbor": "wangerooge_harbor"
     ]
 
     private static let nodes: [String: Node] = {
         let all: [Node] = [
-            .init(id: "emden_access", coordinate: .init(latitude: 53.3372, longitude: 7.1892), links: ["ems_west"]),
-            .init(id: "ems_west", coordinate: .init(latitude: 53.425, longitude: 6.945), links: ["emden_access", "ems_outer", "borkum_access"]),
-            .init(id: "ems_outer", coordinate: .init(latitude: 53.535, longitude: 6.840), links: ["ems_west", "borkum_access", "juist_west"]),
-            .init(id: "borkum_access", coordinate: .init(latitude: 53.565, longitude: 6.765), links: ["ems_west", "ems_outer"]),
-            .init(id: "juist_west", coordinate: .init(latitude: 53.632, longitude: 6.890), links: ["ems_outer", "juist_access"]),
-            .init(id: "juist_access", coordinate: .init(latitude: 53.666, longitude: 6.980), links: ["juist_west", "norderney_west"]),
-            .init(id: "norderney_west", coordinate: .init(latitude: 53.666, longitude: 7.085), links: ["juist_access", "norderney_access"]),
-            .init(id: "norderney_access", coordinate: .init(latitude: 53.684, longitude: 7.155), links: ["norderney_west", "baltrum_west"]),
-            .init(id: "baltrum_west", coordinate: .init(latitude: 53.695, longitude: 7.275), links: ["norderney_access", "baltrum_access"]),
-            .init(id: "baltrum_access", coordinate: .init(latitude: 53.707, longitude: 7.365), links: ["baltrum_west", "langeoog_west"]),
-            .init(id: "langeoog_west", coordinate: .init(latitude: 53.720, longitude: 7.440), links: ["baltrum_access", "langeoog_access"]),
-            .init(id: "langeoog_access", coordinate: .init(latitude: 53.732, longitude: 7.500), links: ["langeoog_west", "spiekeroog_west"]),
-            .init(id: "spiekeroog_west", coordinate: .init(latitude: 53.744, longitude: 7.610), links: ["langeoog_access", "spiekeroog_access"]),
-            .init(id: "spiekeroog_access", coordinate: .init(latitude: 53.752, longitude: 7.690), links: ["spiekeroog_west", "wangerooge_west"]),
-            .init(id: "wangerooge_west", coordinate: .init(latitude: 53.758, longitude: 7.785), links: ["spiekeroog_access", "wangerooge_access"]),
-            .init(id: "wangerooge_access", coordinate: .init(latitude: 53.762, longitude: 7.870), links: ["wangerooge_west"])
+            .init(id: "emden_harbor", coordinate: .init(latitude: 53.3372, longitude: 7.1892), links: ["emden_outer"]),
+            .init(id: "emden_outer", coordinate: .init(latitude: 53.3375, longitude: 7.1705), links: ["emden_harbor", "emden_ems_east"]),
+            .init(id: "emden_ems_east", coordinate: .init(latitude: 53.3340, longitude: 7.1200), links: ["emden_outer", "emden_ems_west"]),
+            .init(id: "emden_ems_west", coordinate: .init(latitude: 53.3320, longitude: 7.0600), links: ["emden_ems_east", "knock_reach"]),
+            .init(id: "knock_reach", coordinate: .init(latitude: 53.3420, longitude: 6.9950), links: ["emden_ems_west", "ems_fairway_west"]),
+            .init(id: "ems_fairway_west", coordinate: .init(latitude: 53.3850, longitude: 6.9150), links: ["knock_reach", "ems_outer"]),
+            .init(id: "ems_outer", coordinate: .init(latitude: 53.5050, longitude: 6.8000), links: ["ems_fairway_west", "borkum_reede", "osterems"]),
+
+            .init(id: "borkum_harbor", coordinate: .init(latitude: 53.5650, longitude: 6.7650), links: ["borkum_reede"]),
+            .init(id: "borkum_reede", coordinate: .init(latitude: 53.5570, longitude: 6.7680), links: ["borkum_harbor", "ems_outer", "osterems"]),
+            .init(id: "osterems", coordinate: .init(latitude: 53.5550, longitude: 6.8550), links: ["ems_outer", "borkum_reede", "osterems_north"]),
+            .init(id: "osterems_north", coordinate: .init(latitude: 53.5850, longitude: 6.8900), links: ["osterems", "memmert_west"]),
+            .init(id: "memmert_west", coordinate: .init(latitude: 53.6100, longitude: 6.9400), links: ["osterems_north", "juist_south_west"]),
+
+            .init(id: "juist_harbor", coordinate: .init(latitude: 53.6660, longitude: 6.9800), links: ["juist_west"]),
+            .init(id: "juist_west", coordinate: .init(latitude: 53.6630, longitude: 6.9850), links: ["juist_south_west", "juist_harbor", "juist_south_east"]),
+            .init(id: "juist_south_west", coordinate: .init(latitude: 53.6350, longitude: 6.9850), links: ["memmert_west", "juist_west", "juist_south_east"]),
+            .init(id: "juist_south_east", coordinate: .init(latitude: 53.6450, longitude: 7.0400), links: ["juist_south_west", "juist_west", "norderney_watt_west"]),
+            .init(id: "norderney_watt_west", coordinate: .init(latitude: 53.6550, longitude: 7.0800), links: ["juist_south_east", "memmert_watt"]),
+            .init(id: "memmert_watt", coordinate: .init(latitude: 53.6650, longitude: 7.1200), links: ["norderney_watt_west", "norderney_south_west"]),
+
+            .init(id: "norderney_harbor", coordinate: .init(latitude: 53.6840, longitude: 7.1550), links: ["norderney_south_west"]),
+            .init(id: "norderney_south_west", coordinate: .init(latitude: 53.6840, longitude: 7.1450), links: ["memmert_watt", "norderney_harbor", "norderney_east"]),
+            .init(id: "norderney_east", coordinate: .init(latitude: 53.6900, longitude: 7.2500), links: ["norderney_south_west", "baltrum_west"]),
+
+            .init(id: "baltrum_harbor", coordinate: .init(latitude: 53.7070, longitude: 7.3650), links: ["baltrum_south"]),
+            .init(id: "baltrum_west", coordinate: .init(latitude: 53.7040, longitude: 7.3100), links: ["norderney_east", "baltrum_south"]),
+            .init(id: "baltrum_south", coordinate: .init(latitude: 53.7160, longitude: 7.3500), links: ["baltrum_west", "baltrum_harbor", "baltrum_east"]),
+            .init(id: "baltrum_east", coordinate: .init(latitude: 53.7140, longitude: 7.4250), links: ["baltrum_south", "langeoog_west"]),
+
+            .init(id: "langeoog_harbor", coordinate: .init(latitude: 53.7320, longitude: 7.5000), links: ["langeoog_west"]),
+            .init(id: "langeoog_west", coordinate: .init(latitude: 53.7200, longitude: 7.4700), links: ["baltrum_east", "langeoog_harbor", "langeoog_east"]),
+            .init(id: "langeoog_east", coordinate: .init(latitude: 53.7250, longitude: 7.5550), links: ["langeoog_west", "spiekeroog_west"]),
+
+            .init(id: "spiekeroog_harbor", coordinate: .init(latitude: 53.7520, longitude: 7.6900), links: ["spiekeroog_south"]),
+            .init(id: "spiekeroog_west", coordinate: .init(latitude: 53.7420, longitude: 7.6400), links: ["langeoog_east", "spiekeroog_south"]),
+            .init(id: "spiekeroog_south", coordinate: .init(latitude: 53.7550, longitude: 7.6850), links: ["spiekeroog_west", "spiekeroog_harbor", "spiekeroog_east"]),
+            .init(id: "spiekeroog_east", coordinate: .init(latitude: 53.7550, longitude: 7.7450), links: ["spiekeroog_south", "wangerooge_west"]),
+
+            .init(id: "wangerooge_harbor", coordinate: .init(latitude: 53.7620, longitude: 7.8700), links: ["wangerooge_south"]),
+            .init(id: "wangerooge_west", coordinate: .init(latitude: 53.7650, longitude: 7.8100), links: ["spiekeroog_east", "wangerooge_south"]),
+            .init(id: "wangerooge_south", coordinate: .init(latitude: 53.7720, longitude: 7.8550), links: ["wangerooge_west", "wangerooge_harbor"])
         ]
         return Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
     }()

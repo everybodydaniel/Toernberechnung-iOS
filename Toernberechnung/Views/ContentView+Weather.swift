@@ -34,6 +34,7 @@ extension ContentView {
                         Button {
                             weatherRegionID = harbour.id
                             weatherReading = reading
+                            syncRouteWeatherStatus()
                         } label: {
                             HStack(spacing: 9) {
                                 Image(systemName: reading?.current.icon ?? "cloud.sun.fill")
@@ -398,6 +399,7 @@ extension ContentView {
         if !force, !islandWeather.isEmpty {
             await MainActor.run {
                 weatherReading = islandWeather[selectedID]
+                syncRouteWeatherStatus()
                 weatherLoading = false
             }
             return
@@ -421,6 +423,9 @@ extension ContentView {
                 await MainActor.run {
                     islandWeather[harbour.id] = reading
                     if harbour.id == selectedID { weatherReading = reading }
+                    if harbour.id == viewModel.destinationHarbourID {
+                        viewModel.updateWeatherStatus(RoutePlannerViewModel.assessWeatherStatus(for: reading))
+                    }
                     upsertWeatherSnapshot(reading, for: harbour)
                     try? modelContext.save()
                 }
@@ -432,6 +437,7 @@ extension ContentView {
         await MainActor.run {
             weatherLoading = false
             weatherReading = islandWeather[selectedID] ?? weatherReading
+            syncRouteWeatherStatus()
             if loadedCount == 0 {
                 weatherError = failures.first ?? "Für die ostfriesischen Inseln konnten keine DWD-Daten geladen werden."
                 writeAudit(action: "FETCH", source: "weather", statement: "FETCH DWD MOSMIX_L island weather bundle", status: "error")
@@ -440,6 +446,13 @@ extension ContentView {
                 writeAudit(action: "READ", source: "weather", statement: "SELECT island, current_summary, data_age FROM weather_snapshots WHERE area = 'ostfriesische_inseln'", status: "ok")
             }
         }
+    }
+
+    @MainActor
+    func syncRouteWeatherStatus() {
+        let routeReading = islandWeather[viewModel.destinationHarbourID]
+            ?? (weatherRegionID == viewModel.destinationHarbourID ? weatherReading : nil)
+        viewModel.updateWeatherStatus(RoutePlannerViewModel.assessWeatherStatus(for: routeReading))
     }
 
     @MainActor

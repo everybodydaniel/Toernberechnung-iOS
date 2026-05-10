@@ -1,49 +1,20 @@
 import SwiftUI
 
-enum DepthMode: String, CaseIterable, Identifiable {
-    case mhw = "MHW"
-    case sounding = "Lottiefe"
-    var id: String { rawValue }
-}
-
 extension ContentView {
-    var calculatorInput: ManualPassageInput {
-        ManualPassageInput(
-            departureTime: departure,
-            highWaterTime: bshHighWaterTime ?? highWater,
-            distanceNM: distanceNM,
-            speedKnots: speedKnots,
-            offsetMinutes: offsetMinutes,
-            meanTidalRangeMeters: mth,
-            referenceDepthMeters: referenceDepth,
-            bshWaterLevelCorrectionMeters: bshWaterLevel,
-            chartDepthMeters: chartDepth,
-            boatDraftMeters: boatDraft,
-            depthMode: depthMode == .mhw ? .mhw : .sounding
-        )
-    }
 
-    var result: ManualPassageResult { ManualPassageCalculator.calculate(input: calculatorInput) }
+    // MARK: - Route Display Properties
 
-    var bshHighWaterTime: Date? {
-        tideReading?.events.first { $0.type == "HW" && $0.time >= departure }?.time
-    }
+    var displayStartHarbourName: String { viewModel.startHarbour.name }
+    var displayDestinationHarbourName: String { viewModel.destinationHarbour.name }
+    var routeTitle: String { viewModel.routeTitle }
+    var startHarbour: HarbourOption { viewModel.startHarbour }
+    var destinationHarbour: HarbourOption { viewModel.destinationHarbour }
 
     var dieselLiters: Double {
-        max(result.distanceNM * 0.35, 0)
+        max((viewModel.calculationResult?.totalDistanceNm ?? 0) * 0.35, 0)
     }
 
-    var displayStartHarbourName: String {
-        startHarbour.name
-    }
-
-    var displayDestinationHarbourName: String {
-        destinationHarbour.name
-    }
-
-    var routeTitle: String {
-        "\(displayStartHarbourName) → \(displayDestinationHarbourName)"
-    }
+    // MARK: - Calculator Tab
 
     func calculatorTab() -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -51,6 +22,7 @@ extension ContentView {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.secondary)
 
+            // Route selection card.
             card {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("ROUTE")
@@ -58,32 +30,49 @@ extension ContentView {
                         .foregroundStyle(Color.secondary)
 
                     VStack(spacing: 10) {
-                        harbourPicker(title: "Start", selection: $startHarbourID, embedded: true)
-                        harbourPicker(title: "Ziel", selection: $destinationHarbourID, embedded: true)
-                        DatePicker("Abfahrt", selection: $departure, displayedComponents: [.date, .hourAndMinute])
+                        harbourPicker(title: "Start", selection: $viewModel.startHarbourID, embedded: true)
+                        harbourPicker(title: "Ziel", selection: $viewModel.destinationHarbourID, embedded: true)
+                        DatePicker("Abfahrt", selection: $viewModel.departure, displayedComponents: [.date, .hourAndMinute])
                             .datePickerStyle(.compact)
                     }
 
-                    CompactMapView(zoomLevel: 8.0, start: startHarbour, destination: destinationHarbour)
+                    // Route template selector (when multiple templates available).
+                    if viewModel.showTemplateSelector, !viewModel.availableTemplates.isEmpty {
+                        routeTemplateSelector
+                    }
+
+                    CompactMapView(
+                        zoomLevel: 8.0,
+                        start: viewModel.startHarbour,
+                        destination: viewModel.destinationHarbour,
+                        routePlan: viewModel.routePlan,
+                        waypointResults: viewModel.calculationResult?.waypointResults
+                    )
                         .frame(height: 240)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
             }
 
+            // Status and results.
             VStack(alignment: .leading, spacing: 14) {
-                statusCard(result)
+                routeStatusBanner
+                passageWindowCard
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                    metricCard("REISEZEIT", text: durationText(result.travelHours), caption: "Dauer")
-                    metricCard("ANKUNFT", text: Self.timeFormatter.string(from: result.arrivalAtPassage), caption: "Uhr")
-                    metricCard("DISTANZ", text: String(format: "%.1f nm", result.distanceNM), caption: "NM")
-                    metricCard("UKC", text: String(format: "%.2f m", result.ukc), caption: result.statusText)
-                    metricCard("WASSERTIEFE", text: String(format: "%.2f m", result.wt), caption: "Tiefe")
+                    metricCard("REISEZEIT", text: viewModel.totalTravelTimeText, caption: "Dauer")
+                    metricCard("ANKUNFT", text: viewModel.arrivalTimeText, caption: "Uhr")
+                    metricCard("DISTANZ", text: viewModel.totalDistanceText, caption: "NM")
+                    metricCard("WuK", text: viewModel.worstWuKText, caption: viewModel.statusText)
                     metricCard("DIESEL", text: String(format: "%.1f l", dieselLiters), caption: "Richtwert")
                 }
 
+                // Per-waypoint calculation details.
+                if let result = viewModel.calculationResult {
+                    RouteDetailView(result: result, boatSettings: viewModel.boatSettings)
+                }
+
                 Button("Törn berechnen & Logbuch anlegen") { saveCalculation() }
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
@@ -99,22 +88,34 @@ extension ContentView {
         }
     }
 
-    func statusCard(_ result: ManualPassageResult) -> some View {
-        let accent = result.isPassable ? Color.green : Color.red
-        let subtitle = result.isPassable
-            ? "Die Passage ist befahrbar."
-            : "Die Passage ist nicht befahrbar."
+    // MARK: - Route Status Banner
+
+    private var routeStatusBanner: some View {
+        let status = viewModel.combinedStatus ?? .incomplete
+        let accent = combinedStatusColor(status)
+        let icon = status == .go ? "checkmark.circle.fill"
+            : status == .warning ? "exclamationmark.triangle.fill"
+            : status == .noGo ? "xmark.circle.fill"
+            : "questionmark.circle.fill"
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: result.isPassable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 28, weight: .bold))
-                Text(result.statusText)
+                if viewModel.isCalculating {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 28, weight: .bold))
+                }
+                Text(viewModel.statusText)
                     .font(.system(size: 28, weight: .bold))
             }
 
-            Text(subtitle)
-                .font(.system(size: 15, weight: .medium))
+            if let error = viewModel.calculationError {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(3)
+            }
         }
         .foregroundStyle(.white)
         .padding(18)
@@ -130,64 +131,140 @@ extension ContentView {
         .shadow(color: accent.opacity(0.35), radius: 18, y: 10)
     }
 
-    func normalizedHarbourName(_ value: String, fallback: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? fallback : trimmed
+    // MARK: - Route Template Selector
+
+    private var routeTemplateSelector: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ROUTENVORSCHLAG")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color.secondary)
+
+            ForEach(viewModel.availableTemplates) { template in
+                let isSelected = viewModel.selectedTemplateID == template.id
+                Button {
+                    viewModel.selectTemplate(template.id)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isSelected ? Color(hex: 0x3C82FF) : Color.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(template.name)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.appPrimary)
+                            Text(template.description)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.secondary)
+                                .lineLimit(2)
+                        }
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(isSelected ? Color(hex: 0x3C82FF).opacity(0.08) : Color.fieldBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
+
+    // MARK: - Passage Window Card
+
+    private var passageWindowCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("SICHERES ABFAHRTSFENSTER")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.secondary)
+                    Spacer()
+                    if viewModel.isSearchingWindow {
+                        ProgressView()
+                    } else {
+                        Button {
+                            viewModel.refreshPassageWindow()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color(hex: 0x3C82FF))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Passagefenster aktualisieren")
+                    }
+                }
+
+                if let window = viewModel.passageWindow {
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock.badge.checkmark.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(Color.green)
+                        Text(window.displayString)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Color.appPrimary)
+                    }
+
+                    if window.contains(viewModel.departure) {
+                        Text("Die aktuelle Abfahrt liegt innerhalb des sicheren Fensters.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.secondary)
+                    } else {
+                        Text("Die aktuelle Abfahrt liegt nicht im sicheren Fenster.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.orange)
+                    }
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: viewModel.isSearchingWindow ? "clock.arrow.circlepath" : "clock.badge.exclamationmark.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(viewModel.isSearchingWindow ? Color(hex: 0x3C82FF) : Color.orange)
+                        Text(viewModel.isSearchingWindow ? "Fenster wird berechnet…" : (viewModel.passageWindowMessage ?? "Kein Passagefenster berechnet."))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Save Calculation (Logbook)
 
     @MainActor
     func saveCalculation() {
-        // Der Logbucheintrag bekommt Momentaufnahmen von Route, Wetter, Gezeiten und Crew, nicht nur die reinen Rechenwerte.
+        let result = viewModel.calculationResult
+
         writeAudit(
-            action: "READ",
-            source: "calculation",
-            statement: """
-            SELECT start_hafen, ziel_hafen, departure_at, distance_nm, speed_knots, offset_minutes FROM manual_passage_input LIMIT 1;
-            """,
+            action: "READ", source: "calculation",
+            statement: "SELECT route, departure_at, distance_nm FROM route_calculation LIMIT 1;",
             status: "ok"
         )
+
         let record = CalculationRecord(
-            routeTitle: routeTitle,
+            routeTitle: viewModel.routeTitle,
             startName: displayStartHarbourName,
             destinationName: displayDestinationHarbourName,
-            departureAt: departure,
-            arrivalAt: result.arrivalAtPassage,
-            distanceNM: result.distanceNM,
-            status: result.statusText,
-            fmw: result.fmw,
-            wt: result.wt,
-            wuk: result.ukc,
-            weatherSummary: weatherSnapshots.first(where: { $0.regionID == destinationHarbour.id })?.currentSummary ?? weatherReading?.current.condition ?? "",
+            departureAt: viewModel.departure,
+            arrivalAt: result?.waypointResults.last?.arrivalTime ?? viewModel.departure,
+            distanceNM: result?.totalDistanceNm ?? 0,
+            status: viewModel.statusText,
+            fmw: result?.waypointResults.compactMap(\.missingWaterFmWMeters).max() ?? 0,
+            wt: result?.waypointResults.compactMap(\.availableWaterDepthWTMeters).min() ?? 0,
+            wuk: result?.worstClearanceUnderKeel ?? 0,
+            weatherSummary: weatherSnapshots.first(where: { $0.regionID == viewModel.destinationHarbourID })?.currentSummary ?? weatherReading?.current.condition ?? "",
             tideSummary: tideReading?.summary ?? "",
             crewSummary: crewSummaryText()
         )
         modelContext.insert(record)
-        writeAudit(
-            action: "INSERT",
-            source: "calculation",
-            statement: """
-            INSERT INTO calculations(route, departure_at, arrival_at, distance_nm, status, wuk) VALUES ('\(record.routeTitle)', '\(Self.isoFormatter.string(from: departure))', '\(Self.isoFormatter.string(from: result.arrivalAtPassage))', \(String(format: "%.1f", result.distanceNM)), '\(result.statusText)', \(String(format: "%.2f", result.ukc)));
-            """,
-            status: "ok"
-        )
-        writeAudit(
-            action: "READ",
-            source: "calculation",
-            statement: "SELECT route_title, arrival_at, wuk FROM calculations ORDER BY created_at DESC LIMIT 1;",
-            status: "ok"
-        )
         try? modelContext.save()
+
+        writeAudit(
+            action: "INSERT", source: "calculation",
+            statement: "INSERT INTO calculations(route, status, wuk) VALUES ('\(record.routeTitle)', '\(record.status)', \(String(format: "%.2f", record.wuk)));",
+            status: "ok"
+        )
     }
 
     @MainActor
     func syncRouteDefaults() {
-        // Die Route steuert mehrere Eingabewerte: Distanz, Kartentiefe, Wetterregion und Pegel sollen synchron bleiben.
-        let distance = SeaRoutePlanner.distanceNM(from: startHarbour, to: destinationHarbour)
-        if distance > 0.1 {
-            distanceNM = (distance * 10).rounded() / 10
-        }
-        chartDepth = destinationHarbour.chartDepth
-        weatherRegionID = destinationHarbour.id
-        tideHarbourID = destinationHarbour.id
+        weatherRegionID = viewModel.destinationHarbourID
+        tideHarbourID = viewModel.destinationHarbourID
     }
 }

@@ -55,21 +55,9 @@ struct ContentView: View {
 
     @State private var selectedTab: AppTab = .map
     @State private var settingsShown = false
-    @State var startHarbourID = HarbourOption.options[0].id
-    @State var destinationHarbourID = HarbourOption.options[3].id
+    @State var viewModel = RoutePlannerViewModel()
     @State var weatherRegionID = HarbourOption.options[2].id
     @State var tideHarbourID = HarbourOption.options[2].id
-    @State var departure = Date()
-    @State var highWater = Date()
-    @State var distanceNM = 14.5
-    @State var speedKnots = 6.2
-    @State var offsetMinutes = 25.0
-    @State var mth = 2.4
-    @State var referenceDepth = 2.7
-    @State var bshWaterLevel = 0.3
-    @State var chartDepth = 0.4
-    @State var boatDraft = 1.1
-    @State var depthMode: DepthMode = .mhw
     @State var exportedPDFURL: URL?
     @State var shareSheetPresented = false
     @State var weatherLoading = false
@@ -86,15 +74,7 @@ struct ContentView: View {
     @State var newCrewEmergencyPhone = ""
     @State var newCrewNotes = ""
 
-    private let crew: [CrewMember] = [
-        .init(name: "Leon", role: "Navigator", status: "ONBOARD", accent: .blue),
-        .init(name: "Benedikt", role: "First Mate", status: "ONBOARD", accent: .blue),
-        .init(name: "Laura", role: "Gast", status: "OFF-DUTY", accent: .gray)
-    ]
-
     var harbours: [HarbourOption] { HarbourOption.options }
-    var startHarbour: HarbourOption { HarbourOption.byID(startHarbourID) }
-    var destinationHarbour: HarbourOption { HarbourOption.byID(destinationHarbourID) }
     var weatherHarbour: HarbourOption { HarbourOption.byID(weatherRegionID) }
     var tideHarbour: HarbourOption { HarbourOption.byID(tideHarbourID) }
     var compactColumns: [GridItem] {
@@ -153,14 +133,15 @@ struct ContentView: View {
         .onChange(of: tideHarbourID) { _, _ in
             Task { await loadTides(force: true) }
         }
-        .onChange(of: destinationHarbourID) { _, _ in
+        .onChange(of: viewModel.destinationHarbourID) { _, _ in
             syncRouteDefaults()
+            syncRouteWeatherStatus()
             Task { await loadTides(force: true) }
         }
-        .onChange(of: startHarbourID) { _, _ in
+        .onChange(of: viewModel.startHarbourID) { _, _ in
             syncRouteDefaults()
         }
-        .onChange(of: departure) { _, _ in
+        .onChange(of: viewModel.departure) { _, _ in
             Task { await loadTides(force: false) }
         }
     }

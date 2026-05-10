@@ -108,12 +108,9 @@ extension ContentView {
         }
 
         do {
-            let reading = try await BSHTideService.shared.fetch(for: harbour, around: departure, force: force)
+            let reading = try await BSHTideService.shared.fetch(for: harbour, around: viewModel.departure, force: force)
             await MainActor.run {
                 tideReading = reading
-                if let nextHighWater = reading.events.first(where: { $0.type == "HW" })?.time {
-                    highWater = nextHighWater
-                }
                 islandTides[harbour.id] = reading
                 tideLoading = false
                 writeAudit(action: "READ", source: "bsh_tides", statement: "SELECT next_hw_nw FROM bsh_tides WHERE station_id = '\(harbour.tideStationID)' LIMIT 8", status: "ok")
@@ -139,7 +136,7 @@ extension ContentView {
         // Die Inselpegel werden nacheinander geladen, damit Teilerfolge angezeigt und einzelne Fehler gesammelt werden können.
         for harbour in islandHarbours {
             do {
-                let reading = try await BSHTideService.shared.fetch(for: harbour, around: departure, force: force)
+                let reading = try await BSHTideService.shared.fetch(for: harbour, around: viewModel.departure, force: force)
                 loadedCount += 1
                 await MainActor.run {
                     islandTides[harbour.id] = reading

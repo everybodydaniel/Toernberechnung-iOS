@@ -5,6 +5,9 @@ extension ContentView {
     func bootstrapIfNeeded() async {
         // Beim ersten Öffnen werden abgeleitete Routendaten und Startdatensätze vorbereitet.
         syncRouteDefaults()
+        if viewModel.routePlan == nil {
+            viewModel.onRouteChanged()
+        }
         await loadTides(force: tideReading == nil)
         if crewMembers.isEmpty {
             modelContext.insert(CrewMemberRecord(name: "Skipper", role: CrewRoleOption.navigation.rawValue, isOnBoard: true))
