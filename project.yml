@@ -45,6 +45,7 @@ targets:
       - path: Toernberechnung/Info.plist
         type: file
         buildPhase: none
+      - path: Toernberechnung/Toernberechnung.docc
     dependencies:
       - package: MapLibre
         product: MapLibre
