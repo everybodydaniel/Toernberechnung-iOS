@@ -78,7 +78,3 @@ Toernberechnung/
 ToernberechnungTests/
   Unit- und Regressionstests
 ```
-
-## Status
-
-Das Projekt ist auf die ostfriesischen Inseln fokussiert und für eine spätere Erweiterung auf weitere Wattenmeer-Reviere vorbereitet.
