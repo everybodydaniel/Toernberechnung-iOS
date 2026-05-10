@@ -1,0 +1,53 @@
+included:
+  - Toernberechnung
+  - ToernberechnungTests
+
+excluded:
+  - Toernberechnung.xcodeproj
+  - DerivedData
+  - .build
+
+disabled_rules:
+  - trailing_whitespace
+  - todo
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - modifier_order
+  - overridden_super_call
+  - redundant_nil_coalescing
+  - sorted_imports
+
+line_length:
+  warning: 140
+  error: 180
+  ignores_comments: true
+  ignores_urls: true
+
+file_length:
+  warning: 500
+  error: 800
+
+type_body_length:
+  warning: 350
+  error: 500
+
+function_body_length:
+  warning: 80
+  error: 140
+
+cyclomatic_complexity:
+  warning: 12
+  error: 18
+
+identifier_name:
+  min_length:
+    warning: 2
+  allowed_symbols: ["_"]
+
+reporter: "xcode"

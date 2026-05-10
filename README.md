@@ -33,6 +33,9 @@ Der lokale Katalog enthält Routen-Templates, Wegpunkte, Peilplan-/Katalogwerte,
 - MapLibre für Karten
 - ZIPFoundation zum Entpacken der DWD-KMZ-Dateien
 - XcodeGen-Projektbeschreibung in `project.yml`
+- SwiftLint für lokalen Code Style und CI-Checks
+- SonarCloud Quality Gate über `sonar-project.properties`
+- Versionierung nach `<Major>.<Feature>.<Bugfix>`, aktuell `1.0.0`
 
 ## Projekt öffnen
 
@@ -65,6 +68,39 @@ Beispiel:
 ```bash
 xcodebuild test -scheme Toernberechnung -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.4.1'
 ```
+
+## Qualität und CI
+
+Lokale Checks:
+
+```bash
+./scripts/lint.sh
+./scripts/format.sh
+./scripts/build.sh
+./scripts/test.sh
+```
+
+GitHub Actions und GitLab CI sind vorbereitet. Beide Pipelines verwenden dieselben Skripte wie die lokale Entwicklung. Für GitLab wird ein macOS Runner mit dem Tag `macos` benötigt.
+
+SonarCloud liest die Projektkonfiguration aus `sonar-project.properties`. Das benötigte CI-Secret heißt:
+
+```text
+SONAR_TOKEN
+```
+
+## API-Dokumentation
+
+Die API-Dokumentation wird mit DocC erzeugt:
+
+```bash
+./scripts/docs.sh
+```
+
+Die statische Website wird unter `docs/api` abgelegt. Für PDF-Ausgaben kann die generierte Website im Browser geöffnet und als PDF exportiert werden.
+
+## Zusammenarbeit
+
+Review-, Label- und Issue-Prozesse sind in [CONTRIBUTING.md](CONTRIBUTING.md), [docs/QUALITY.md](docs/QUALITY.md) und [docs/ISSUE_BOARD.md](docs/ISSUE_BOARD.md) beschrieben. GitLab- und GitHub-Templates liegen unter `.gitlab/` und `.github/`.
 
 ## Repository-Struktur
 
