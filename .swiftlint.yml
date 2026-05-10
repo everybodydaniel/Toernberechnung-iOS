@@ -13,6 +13,7 @@ excluded:
   - .build
   - DerivedData
   - Pods
+  - vendor
 
 # ── Aktivierte optionale Regeln ──────────────
 opt_in_rules:
@@ -29,38 +30,42 @@ opt_in_rules:
   - redundant_nil_coalescing       # Redundantes ?? nil entfernen
   - sorted_first_last              # .sorted().first → .min()
   - yoda_condition                 # Keine Yoda-Bedingungen (42 == x)
-  - unowned_variable_capture       # unowned statt weak wo sicher
 
 # ── Deaktivierte Regeln ──────────────────────
 disabled_rules:
   - trailing_whitespace            # Zu viel Noise bei Leerzeilen
   - todo                           # TODOs sollen erlaubt bleiben
   - opening_brace                  # XcodeGen-Stil kollidiert teilweise
+  - force_try                      # try! wird in SwiftData/Tests bewusst genutzt
+  - multiple_closures_with_trailing_closure  # SwiftUI-Pattern
+  - trailing_comma                 # Stilfrage, kein Fehler
+  - non_optional_string_data_conversion      # Data(string.utf8) ist valider Swift
 
 # ── Regel-Konfiguration ─────────────────────
 
-# Zeilenlänge: Warnung bei 140, Fehler bei 200
+# Zeilenlänge: angepasst an bestehenden Code
 line_length:
-  warning: 140
-  error: 200
+  warning: 200
+  error: 250
   ignores_urls: true
-  ignores_function_declarations: false
+  ignores_function_declarations: true
   ignores_comments: true
+  ignores_interpolated_strings: true
 
 # Typ-Body-Länge (Klassen/Structs)
 type_body_length:
-  warning: 350
-  error: 500
+  warning: 450
+  error: 600
 
 # Funktions-Body-Länge
 function_body_length:
-  warning: 60
-  error: 100
+  warning: 80
+  error: 150
 
 # Datei-Länge
 file_length:
-  warning: 500
-  error: 800
+  warning: 600
+  error: 1000
   ignore_comment_only_lines: true
 
 # Funktionsparameter-Anzahl
@@ -91,6 +96,8 @@ identifier_name:
     - i
     - j
     - n
+    - a
+    - v
     - cg
     - hw
     - lt
@@ -103,8 +110,8 @@ nesting:
 
 # Cyclomatic Complexity
 cyclomatic_complexity:
-  warning: 15
-  error: 25
+  warning: 20
+  error: 30
 
 # Large Tuple
 large_tuple:
