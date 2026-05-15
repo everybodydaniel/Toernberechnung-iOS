@@ -199,28 +199,6 @@ Das Projekt nutzt [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 ---
 
-## Contributing
-
-1. **Fork** das Repository
-2. Erstelle einen **Feature-Branch** (`git checkout -b feature/mein-feature`)
-3. Stelle sicher, dass **SwiftLint** keine Fehler meldet
-4. Schreibe **Tests** für neue Funktionalität
-5. Erstelle einen **Pull Request** gegen `main`
-
-### Commit-Konvention
-
-Wir nutzen [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat: Neue Routenberechnung für Borkum
-fix: BSH-Gezeitenabruf bei fehlendem Pegel
-docs: README um Setup-Anleitung erweitert
-test: Regression für Norderney-Route
-refactor: ViewModel-Logik vereinfacht
-```
-
----
-
 ## Lizenz
 
 Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
