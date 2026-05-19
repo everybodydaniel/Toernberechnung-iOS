@@ -1,0 +1,87 @@
+name: Toernberechnung
+options:
+  bundleIdPrefix: com.toernberechnung
+  minimumXcodeGenVersion: "2.30"
+  groupSortPosition: top
+
+packages:
+  MapLibre:
+    url: https://github.com/maplibre/maplibre-gl-native-distribution
+    from: 6.25.0
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: 0.9.19
+
+targets:
+  Toernberechnung:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Toernberechnung/ToernberechnungApp.swift
+      - path: Toernberechnung/Views/ContentView.swift
+      - path: Toernberechnung/Views/ContentView+MapTab.swift
+      - path: Toernberechnung/Views/ContentView+SharedUI.swift
+      - path: Toernberechnung/Views/ContentView+Weather.swift
+      - path: Toernberechnung/Views/ContentView+Tides.swift
+      - path: Toernberechnung/Views/ContentView+Crew.swift
+      - path: Toernberechnung/Views/ContentView+Logbook.swift
+      - path: Toernberechnung/Views/ContentView+InitialData.swift
+      - path: Toernberechnung/Views/ContentView+RouteDetail.swift
+      - path: Toernberechnung/Views/MapView.swift
+      - path: Toernberechnung/Engine/RoutePlanModels.swift
+      - path: Toernberechnung/Engine/TidalHeightStrategy.swift
+      - path: Toernberechnung/Engine/RouteCalculationService.swift
+      - path: Toernberechnung/Engine/PassageWindowScanner.swift
+      - path: Toernberechnung/Engine/WaddenSeaCatalog.swift
+      - path: Toernberechnung/Engine/RoutePlannerViewModel.swift
+      - path: Toernberechnung/Engine/SeaRoutePlanner.swift
+      - path: Toernberechnung/Services/DWDService.swift
+      - path: Toernberechnung/Services/BSHTideService.swift
+      - path: Toernberechnung/Services/TideDataProvider.swift
+      - path: Toernberechnung/Resources/wadden_sea_catalog.json
+        type: file
+        buildPhase: resources
+      - path: Toernberechnung/Info.plist
+        type: file
+        buildPhase: none
+      - path: Toernberechnung/Toernberechnung.docc
+    dependencies:
+      - package: MapLibre
+        product: MapLibre
+      - package: ZIPFoundation
+        product: ZIPFoundation
+    postCompileScripts:
+      - name: SwiftLint
+        script: |
+          if command -v swiftlint >/dev/null 2>&1; then
+            swiftlint lint --config "${SRCROOT}/.swiftlint.yml"
+          else
+            echo "warning: SwiftLint ist nicht installiert. Bitte 'brew install swiftlint' ausführen."
+          fi
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.ios
+        INFOPLIST_FILE: Toernberechnung/Info.plist
+        SWIFT_VERSION: "5.9"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0"
+
+  ToernberechnungTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: ToernberechnungTests
+      - path: Toernberechnung/Resources/wadden_sea_catalog.json
+        type: file
+        buildPhase: resources
+    dependencies:
+      - target: Toernberechnung
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.tests
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
+
