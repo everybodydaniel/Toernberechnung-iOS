@@ -458,7 +458,7 @@ extension ContentView {
     }
 
     @MainActor
-    func deleteCrewMember(_ member: CrewMemberRecordRecord) {
+    func deleteCrewMember(_ member: CrewMemberRecord) {
         let name = member.name
         modelContext.delete(member)
         writeAudit(action: "DELETE", source: "crew", statement: "DELETE FROM crew WHERE name = '\(name)'", status: "ok")
