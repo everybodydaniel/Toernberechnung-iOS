@@ -168,13 +168,13 @@ final class RouteCalculationService {
 
         guard tidalResult.isValid else {
             messages.append(contentsOf: tidalResult.messages)
-            return invalidTidalResult(
+            return invalidTidalResult(context: WaypointContext(
                 waypoint: waypoint, arrivalTime: arrivalTime,
                 waypointHWTime: waypointHWTime, deviation: deviation,
                 tidalResult: tidalResult,
                 bshCorrection: bshWaterLevelCorrectionMeters,
-                boatDraft: boatSettings.draftMeters, messages: messages
-            )
+                boatSettings: boatSettings, messages: messages
+            ))
         }
 
         let depthResult = calculateDepth(
@@ -189,11 +189,14 @@ final class RouteCalculationService {
         case .calculated(let depth):
             messages.append(contentsOf: depth.messages)
             return makeCalculatedResult(
-                waypoint: waypoint, arrivalTime: arrivalTime,
-                waypointHWTime: waypointHWTime, deviation: deviation,
-                tidalResult: tidalResult, depth: depth,
-                bshCorrection: bshWaterLevelCorrectionMeters,
-                boatSettings: boatSettings, messages: messages
+                context: WaypointContext(
+                    waypoint: waypoint, arrivalTime: arrivalTime,
+                    waypointHWTime: waypointHWTime, deviation: deviation,
+                    tidalResult: tidalResult,
+                    bshCorrection: bshWaterLevelCorrectionMeters,
+                    boatSettings: boatSettings, messages: messages
+                ),
+                depth: depth
             )
         case .missingData(let errorMessages):
             messages.append(contentsOf: errorMessages)
@@ -230,66 +233,61 @@ final class RouteCalculationService {
         return Self.findNearestHighWater(to: arrivalTime, from: hwEvents)
     }
 
-    private func invalidTidalResult(
-        waypoint: RouteWaypoint,
-        arrivalTime: Date,
-        waypointHWTime: Date,
-        deviation: Double,
-        tidalResult: TidalHeightResult,
-        bshCorrection: Double,
-        boatDraft: Double,
-        messages: [String]
-    ) -> WaypointCalculationResult {
+    private struct WaypointContext {
+        let waypoint: RouteWaypoint
+        let arrivalTime: Date
+        let waypointHWTime: Date
+        let deviation: Double
+        let tidalResult: TidalHeightResult
+        let bshCorrection: Double
+        let boatSettings: BoatSettings
+        let messages: [String]
+    }
+
+    private func invalidTidalResult(context: WaypointContext) -> WaypointCalculationResult {
         WaypointCalculationResult(
-            waypoint: waypoint,
-            arrivalTime: arrivalTime,
-            relevantHighWaterTime: waypointHWTime,
-            deviationHours: deviation,
-            oneTwelfthMeters: tidalResult.oneTwelfthMeters,
+            waypoint: context.waypoint,
+            arrivalTime: context.arrivalTime,
+            relevantHighWaterTime: context.waypointHWTime,
+            deviationHours: context.deviation,
+            oneTwelfthMeters: context.tidalResult.oneTwelfthMeters,
             missingWaterFmWMeters: nil,
             baseWaterAtTideMeters: nil,
-            bshWaterLevelCorrectionMeters: bshCorrection,
+            bshWaterLevelCorrectionMeters: context.bshCorrection,
             chartDepthMetersApplied: nil,
             tideHeightHGMeters: nil,
             availableWaterDepthWTMeters: nil,
-            boatDraftMeters: boatDraft,
+            boatDraftMeters: context.boatSettings.draftMeters,
             clearanceUnderKeelWuKMeters: nil,
             status: .invalid,
-            messages: messages
+            messages: context.messages
         )
     }
 
     private func makeCalculatedResult(
-        waypoint: RouteWaypoint,
-        arrivalTime: Date,
-        waypointHWTime: Date,
-        deviation: Double,
-        tidalResult: TidalHeightResult,
-        depth: DepthCalculation,
-        bshCorrection: Double,
-        boatSettings: BoatSettings,
-        messages: [String]
+        context: WaypointContext,
+        depth: DepthCalculation
     ) -> WaypointCalculationResult {
         let status = Self.determineWaypointStatus(
             clearanceUnderKeel: depth.wuK,
-            safetyMargin: boatSettings.safetyMarginMeters
+            safetyMargin: context.boatSettings.safetyMarginMeters
         )
         return WaypointCalculationResult(
-            waypoint: waypoint,
-            arrivalTime: arrivalTime,
-            relevantHighWaterTime: waypointHWTime,
-            deviationHours: deviation,
-            oneTwelfthMeters: tidalResult.oneTwelfthMeters,
-            missingWaterFmWMeters: tidalResult.fmwMeters,
+            waypoint: context.waypoint,
+            arrivalTime: context.arrivalTime,
+            relevantHighWaterTime: context.waypointHWTime,
+            deviationHours: context.deviation,
+            oneTwelfthMeters: context.tidalResult.oneTwelfthMeters,
+            missingWaterFmWMeters: context.tidalResult.fmwMeters,
             baseWaterAtTideMeters: depth.baseWater,
-            bshWaterLevelCorrectionMeters: bshCorrection,
+            bshWaterLevelCorrectionMeters: context.bshCorrection,
             chartDepthMetersApplied: depth.chartDepthApplied,
             tideHeightHGMeters: depth.hg,
             availableWaterDepthWTMeters: depth.wt,
-            boatDraftMeters: boatSettings.draftMeters,
+            boatDraftMeters: context.boatSettings.draftMeters,
             clearanceUnderKeelWuKMeters: depth.wuK,
             status: status,
-            messages: messages
+            messages: context.messages
         )
     }
 
