@@ -103,6 +103,7 @@ final class RoutePlannerViewModel {
     private let catalog: WaddenSeaCatalog
     private let calculationService: RouteCalculationService
     private let tideDataProvider: TideDataProvider
+    let weatherDataProvider: WeatherDataProvider
     private let passageScanner: PassageWindowScanner
     private var calculationTask: Task<Void, Never>?
     private var passageWindowTask: Task<Void, Never>?
@@ -112,11 +113,13 @@ final class RoutePlannerViewModel {
     init(
         catalog: WaddenSeaCatalog? = nil,
         calculationService: RouteCalculationService = RouteCalculationService(),
-        tideDataProvider: TideDataProvider = BSHTideDataProvider()
+        tideDataProvider: TideDataProvider = BSHTideDataProvider(),
+        weatherDataProvider: WeatherDataProvider = DWDWeatherDataProvider()
     ) {
         self.catalog = catalog ?? WaddenSeaCatalog.loadBundled()
         self.calculationService = calculationService
         self.tideDataProvider = tideDataProvider
+        self.weatherDataProvider = weatherDataProvider
         self.passageScanner = PassageWindowScanner(calculationService: calculationService)
     }
 

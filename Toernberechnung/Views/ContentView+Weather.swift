@@ -420,7 +420,7 @@ extension ContentView {
             }
 
             do {
-                let reading = try await DWDCompactService.shared.fetch(for: harbour, force: force)
+                let reading = try await viewModel.weatherDataProvider.fetchWeather(for: harbour, force: force)
                 loadedCount += 1
                 await MainActor.run {
                     islandWeather[harbour.id] = reading

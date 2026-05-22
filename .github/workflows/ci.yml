@@ -67,6 +67,8 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             -configuration Debug \
             -enableCodeCoverage YES \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/reports/Toernberechnung.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty --color --report junit
 
@@ -77,6 +79,49 @@ jobs:
           name: test-results
           path: build/reports/
           retention-days: 14
+
+      - name: Install Slather
+        run: gem install slather --no-document
+
+      - name: Generate Coverage Report
+        run: |
+          slather coverage \
+            --cobertura-xml \
+            --sonarqube-xml \
+            --html \
+            --output-directory coverage \
+            --scheme Toernberechnung \
+            --binary-basename Toernberechnung \
+            --build-directory build/DerivedData \
+            Toernberechnung.xcodeproj
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+      - name: Summarize Coverage
+        if: github.event_name == 'pull_request'
+        uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95
+        with:
+          filename: coverage/cobertura.xml
+          format: markdown
+          output: both
+          badge: true
+          hide_complexity: true
+          indicators: true
+          thresholds: '60 80'
+
+      - name: Comment Coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@52423e01640425a022ef5fd42c6fb5f633a02728
+        with:
+          header: coverage
+          recreate: true
+          path: code-coverage-results.md
 
   sonarcloud:
     name: 📊 SonarCloud Scan
@@ -94,18 +139,17 @@ jobs:
           name: test-results
           path: build/reports/
 
+      - name: Download Coverage Report
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: coverage-report
+          path: coverage/
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
-        with:
-          args: >
-            -Dsonar.projectKey=everybodydaniel_Toernberechnung-iOS
-            -Dsonar.organization=everybodydaniel
-            -Dsonar.sources=Toernberechnung
-            -Dsonar.tests=ToernberechnungTests
-            -X
 
   deploy-docs:
     name: 📚 Deploy DocC

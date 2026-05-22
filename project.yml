@@ -39,6 +39,7 @@ targets:
       - path: Toernberechnung/Services/DWDService.swift
       - path: Toernberechnung/Services/BSHTideService.swift
       - path: Toernberechnung/Services/TideDataProvider.swift
+      - path: Toernberechnung/Services/WeatherDataProvider.swift
       - path: Toernberechnung/Resources/wadden_sea_catalog.json
         type: file
         buildPhase: resources
