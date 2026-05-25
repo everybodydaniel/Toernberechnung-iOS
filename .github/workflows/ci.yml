@@ -215,12 +215,19 @@ jobs:
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
           name: coverage-reports
-          path: ./docs-out/coverage
+          path: ./docs-out/temp-coverage-reports
+
+      - name: Align Coverage Reports Path
+        run: |
+          mkdir -p ./docs-out/coverage
+          cp -R ./docs-out/temp-coverage-reports/coverage-reports/* ./docs-out/coverage/
+          rm -rf ./docs-out/temp-coverage-reports
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
           path: ./docs-out
+
 
 
       - name: Deploy to GitHub Pages
