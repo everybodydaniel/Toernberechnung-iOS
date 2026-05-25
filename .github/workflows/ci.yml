@@ -72,6 +72,12 @@ jobs:
       - name: Generate Coverage Reports (Cobertura + SonarQube + HTML)
         run: bundle exec fastlane coverage
 
+      - name: Debug – List Coverage Files
+        if: always()
+        run: |
+          echo "=== Contents of build/coverage/ ==="
+          find build/coverage/ -type f 2>/dev/null || echo "Directory not found"
+
       - name: Upload JUnit Test Results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -161,6 +167,11 @@ jobs:
         with:
           name: coverage-reports
           path: build/coverage/
+
+      - name: Debug – List Downloaded Coverage Files
+        run: |
+          echo "=== Contents of build/coverage/ ==="
+          find build/coverage/ -type f 2>/dev/null || echo "Directory not found"
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432

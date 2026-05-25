@@ -1,6 +1,6 @@
 # Coverage-Analyse – Toernberechnung iOS
 
-**Stichdatum:** 2026-05-25 · **Werkzeuge:** xcodebuild (Xcode 26.5), xccov, `scripts/render_coverage.py`
+**Stichdatum:** 2026-05-25 · **Werkzeuge:** xcodebuild (Xcode 26.5), Slather, Fastlane
 **Datensatz:** `build/Test.xcresult` aus dem Lauf von 104 Unit-/Integrationstests (alle bestanden, 21,6 s).
 
 ---
@@ -497,20 +497,13 @@ In Relation zur Kritikalität (siehe Folie „Wann ist genug getestet?") liegt d
 
 ```bash
 # 1. Test-Lauf mit Coverage-Erfassung
-xcodebuild test \
-  -project Toernberechnung.xcodeproj \
-  -scheme Toernberechnung \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
-  -enableCodeCoverage YES \
-  -derivedDataPath build/DerivedData \
-  -resultBundlePath build/Test.xcresult \
-  -only-testing:ToernberechnungTests
+bundle exec fastlane test
 
-# 2. HTML / Cobertura / SonarQube-XML aus xcresult rendern
-python3 scripts/render_coverage.py build/Test.xcresult build/coverage
+# 2. Coverage-Reports erzeugen (HTML / Cobertura / SonarQube-XML via Slather)
+bundle exec fastlane coverage
 
 # 3. Lokal anschauen
 open build/coverage/index.html
 ```
 
-Die CI macht denselben Lauf via `bundle exec fastlane test` + (sobald Slather auf einer modernen Ruby-Version läuft) `bundle exec fastlane coverage`. SonarCloud konsumiert die `sonarqube-generic-coverage.xml` über die `sonar.coverageReportPaths`-Property.
+Die CI macht denselben Lauf via `bundle exec fastlane test` + `bundle exec fastlane coverage`. SonarCloud konsumiert die `sonarqube-generic-coverage.xml` über die `sonar.coverageReportPaths`-Property.
