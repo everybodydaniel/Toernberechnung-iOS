@@ -13,9 +13,15 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  XCODE_PROJECT: Toernberechnung.xcodeproj
+  XCODE_SCHEME: Toernberechnung
+  SIMULATOR_DEVICE: iPhone 16
 
 jobs:
 
+  # ────────────────────────────────────────────
+  # 1. Statische Code-Analyse (Lint)
+  # ────────────────────────────────────────────
   swiftlint:
     name: 🧹 SwiftLint
     runs-on: macos-latest
@@ -29,8 +35,11 @@ jobs:
       - name: Run SwiftLint
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
 
+  # ────────────────────────────────────────────
+  # 2. Build, Unit-Tests, Coverage
+  # ────────────────────────────────────────────
   build-and-test:
-    name: 🏗️ Build & Test
+    name: 🏗️ Build, Test & Coverage
     runs-on: macos-latest
     needs: swiftlint
     steps:
@@ -43,41 +52,88 @@ jobs:
       - name: Show Xcode Version
         run: xcodebuild -version
 
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
       - name: Resolve Swift Packages
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
 
-      - name: Build Project
-        run: |
-          xcodebuild build \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color
+      - name: Run Unit Tests (with Coverage)
+        run: bundle exec fastlane test
 
-      - name: Run Unit Tests
-        run: |
-          xcodebuild test \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -configuration Debug \
-            -enableCodeCoverage YES \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color --report junit
+      - name: Generate Coverage Reports (Cobertura + SonarQube + HTML)
+        run: bundle exec fastlane coverage
 
-      - name: Upload Test Results
+      - name: Upload JUnit Test Results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: test-results
-          path: build/reports/
+          name: junit-test-results
+          path: fastlane/test_output/
           retention-days: 14
 
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coverage-reports
+          path: build/coverage/
+          retention-days: 30
+
+      - name: Upload XCResult Bundle (on failure)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: xcresult-bundle
+          path: fastlane/test_output/*.xcresult
+          retention-days: 7
+
+  # ────────────────────────────────────────────
+  # 3. GUI-Tests (XCUITest)
+  #    Optional deaktivieren mit Repository Variable UI_TESTS_DISABLED=true.
+  # ────────────────────────────────────────────
+  ui-tests:
+    name: 📱 UI Tests (XCUITest)
+    runs-on: macos-latest
+    needs: swiftlint
+    if: ${{ vars.UI_TESTS_DISABLED != 'true' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
+
+      - name: Run UI Tests
+        run: bundle exec fastlane ui_tests
+
+      - name: Upload UI Test Results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ui-test-results
+          path: fastlane/ui_test_output/
+          retention-days: 14
+
+  # ────────────────────────────────────────────
+  # 4. SonarCloud (Code-Qualität + Coverage)
+  # ────────────────────────────────────────────
   sonarcloud:
     name: 📊 SonarCloud Scan
     runs-on: ubuntu-latest
@@ -88,25 +144,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download Test Results
+      - name: Download JUnit Test Results
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
-          name: test-results
-          path: build/reports/
+          name: junit-test-results
+          path: fastlane/test_output/
+
+      - name: Download Coverage Reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: coverage-reports
+          path: build/coverage/
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
-        with:
-          args: >
-            -Dsonar.projectKey=everybodydaniel_Toernberechnung-iOS
-            -Dsonar.organization=everybodydaniel
-            -Dsonar.sources=Toernberechnung
-            -Dsonar.tests=ToernberechnungTests
-            -X
 
+  # ────────────────────────────────────────────
+  # 5. DocC Deployment (GitHub Pages)
+  # ────────────────────────────────────────────
   deploy-docs:
     name: 📚 Deploy DocC
     runs-on: macos-latest
@@ -127,14 +185,14 @@ jobs:
       - name: Resolve Swift Packages
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
 
       - name: Build DocC
         run: |
           xcodebuild docbuild \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
             -derivedDataPath /tmp/docbuild \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             CODE_SIGNING_ALLOWED=NO \

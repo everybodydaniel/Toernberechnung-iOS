@@ -85,3 +85,18 @@ targets:
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
 
+  ToernberechnungUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: ToernberechnungUITests
+    dependencies:
+      - target: Toernberechnung
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.uitests
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Toernberechnung
+

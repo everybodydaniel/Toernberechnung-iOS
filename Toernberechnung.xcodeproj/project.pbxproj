@@ -7,32 +7,49 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04327BA73F4A90C3DE34286C /* FindNearestHighWaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2373C10FA2AC4E0B3A17C3 /* FindNearestHighWaterTests.swift */; };
 		055AB2CDFD8FADEF8B8FC3E6 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = A2C302E94658AD9ABA1622FE /* MapLibre */; };
 		08EE46604BBABD5BF8E74522 /* ContentView+Crew.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */; };
+		0A7641904F89C091A28AF5B6 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EEB86CE21C4261D374C6F2 /* MockURLProtocol.swift */; };
 		1A0BEF78EAEE470A2C851AB0 /* PassageWindowScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF51E2BE9460F831E95F3631 /* PassageWindowScanner.swift */; };
+		25B4DCAFE55FB57C2916CA64 /* TwelfthsRuleStrategyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750FD5D3F36E8FE90D8C10F /* TwelfthsRuleStrategyTests.swift */; };
+		2A91B4D06FEFFB0D9C5DBA71 /* BSHTideServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A840A82D06CB834F1106DB72 /* BSHTideServiceTests.swift */; };
 		2E5D6CF2857614B287146E8D /* TidalHeightStrategy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */; };
 		2F17F8E1AE1CC501F580EC41 /* ContentView+Tides.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */; };
 		341D4D819FF47AEA79150034 /* ContentView+RouteDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */; };
 		4016C38D4688B7BB0A45EDD7 /* ContentView+SharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */; };
 		461698973EC983552F171EE5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4653D4F082EF987F05C20FDA /* ContentView.swift */; };
+		51818EBA6764205E781EDD6C /* CombinedRouteStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 441F8F3014C6AE0A333B57C0 /* CombinedRouteStatusTests.swift */; };
 		69F5BB2092DC89486E00BCA2 /* RoutePlannerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */; };
+		7096CDD9ACCB06D1C72D94F4 /* TideDataProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13551A1D2DF6D5D9986F1ED2 /* TideDataProviderTests.swift */; };
+		72BDDB378B744244B721F467 /* WaypointStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91809A5FC66138273E11013E /* WaypointStatusTests.swift */; };
 		73A27DD5E9AD6ECD2E0A9118 /* WaddenSeaCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD559185A21CCD913BF3C85 /* WaddenSeaCatalog.swift */; };
 		7ACB055CB43EB4F54C5C362D /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA10C24AE4955C3606CFDDB5 /* MapView.swift */; };
 		7C79AFFF3EA4324647CDAA69 /* DWDService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B461EC20F7C1C18357672F9 /* DWDService.swift */; };
 		7E714DDD9E68F69232D4A767 /* RoutePlanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */; };
+		986ECAB9304C79BFF34DD040 /* WaddenSeaCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7BAC6B4433C29493CB4CD1 /* WaddenSeaCatalogTests.swift */; };
+		987C00BF0FB92D05FFB8AE1F /* RoutePlannerViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BEC36FDDE76703E9D589228 /* RoutePlannerViewModelTests.swift */; };
+		AEF88D686A4A33D13F1AD22E /* HighWaterOffsetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD38D77C98D5D6DE2730FF79 /* HighWaterOffsetTests.swift */; };
 		B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */; };
 		B069F8AFF73E9CFBD3BB93B0 /* Toernberechnung.docc in Sources */ = {isa = PBXBuildFile; fileRef = B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */; };
+		B3A8C079A2B1A25012CD5476 /* TravelTimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E219FC5E138592CD8B6D45 /* TravelTimeTests.swift */; };
 		BA89B835246BA7901CC3EA4C /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
+		BB9A8317B92014165EB77952 /* RouteStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D5B1BA1CF25110235FA7CD /* RouteStatusTests.swift */; };
 		BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */; };
+		CE640FC28E4998A791F57D7A /* RouteFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD61AE32C875FE6439A3AE62 /* RouteFactory.swift */; };
 		D2BAFB3D7C28E3062E4784F1 /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
 		D49DFE01FB1CF2EEB8323297 /* TideDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */; };
 		D69BD48913D7A75D79EEA619 /* ContentView+Logbook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */; };
 		DCEE953FBF73EECE6EACB04E /* ContentView+MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */; };
-		DE31F81D793F4E62C48EDAA1 /* RouteCalculationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E72ED92078B23A111163BBB9 /* RouteCalculationTests.swift */; };
 		DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */; };
+		E3A88A54FEDF91B5CA809F25 /* DWDServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4E6307E53FDC6A63347D4E /* DWDServiceTests.swift */; };
+		E5929B2AD681BF42CBE23649 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0157A995893C89A8A61AAD77 /* TestFixtures.swift */; };
 		EBF4D6ECA5179A5486582306 /* RouteCalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */; };
+		EBFA962196251A9BE5045D76 /* ToernberechnungUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A080BD3DC8D97F0D5BFA3897 /* ToernberechnungUITests.swift */; };
+		EE381EA0EADE59B9D7A94AE4 /* RouteCalculationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9BBAFF1BCA19B21DD55075D /* RouteCalculationServiceTests.swift */; };
 		F139CCBE12014D4F550A1213 /* BSHTideService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */; };
 		F241C1AC3877E8623BDB0315 /* ContentView+InitialData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */; };
+		F5EE30C5FB348AA35500C963 /* PassageWindowScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8024EAA96D8F96659FB930C /* PassageWindowScannerTests.swift */; };
 		FB73398DACA9BE2DDB0F2F78 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 1EA7A3199597B12C10A6C77F /* ZIPFoundation */; };
 /* End PBXBuildFile section */
 
@@ -44,36 +61,61 @@
 			remoteGlobalIDString = 5F9D9C3365B426B92A441223;
 			remoteInfo = Toernberechnung;
 		};
+		FC7FBBD5A92A9F1C2A37402D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FB83BDC6A5DA8A5D96C85872 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F9D9C3365B426B92A441223;
+			remoteInfo = Toernberechnung;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0157A995893C89A8A61AAD77 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
+		12E219FC5E138592CD8B6D45 /* TravelTimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelTimeTests.swift; sourceTree = "<group>"; };
+		13551A1D2DF6D5D9986F1ED2 /* TideDataProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TideDataProviderTests.swift; sourceTree = "<group>"; };
 		19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+RouteDetail.swift"; sourceTree = "<group>"; };
 		23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlannerViewModel.swift; sourceTree = "<group>"; };
+		2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D96FAFEC88A7B5407880B6B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2F51D64F57B9D701864122D1 /* RoutePlanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanModels.swift; sourceTree = "<group>"; };
 		334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Tides.swift"; sourceTree = "<group>"; };
 		41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+MapTab.swift"; sourceTree = "<group>"; };
+		441F8F3014C6AE0A333B57C0 /* CombinedRouteStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedRouteStatusTests.swift; sourceTree = "<group>"; };
 		4653D4F082EF987F05C20FDA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		4750FD5D3F36E8FE90D8C10F /* TwelfthsRuleStrategyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwelfthsRuleStrategyTests.swift; sourceTree = "<group>"; };
 		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Logbook.swift"; sourceTree = "<group>"; };
+		5BEC36FDDE76703E9D589228 /* RoutePlannerViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlannerViewModelTests.swift; sourceTree = "<group>"; };
+		65EEB86CE21C4261D374C6F2 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
+		6C7BAC6B4433C29493CB4CD1 /* WaddenSeaCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaddenSeaCatalogTests.swift; sourceTree = "<group>"; };
 		77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Crew.swift"; sourceTree = "<group>"; };
 		77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteCalculationService.swift; sourceTree = "<group>"; };
 		86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B461EC20F7C1C18357672F9 /* DWDService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DWDService.swift; sourceTree = "<group>"; };
+		8F4E6307E53FDC6A63347D4E /* DWDServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DWDServiceTests.swift; sourceTree = "<group>"; };
+		91809A5FC66138273E11013E /* WaypointStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointStatusTests.swift; sourceTree = "<group>"; };
 		96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SharedUI.swift"; sourceTree = "<group>"; };
 		9B0EF452B023DDE88AA091E5 /* ToernberechnungApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToernberechnungApp.swift; sourceTree = "<group>"; };
 		9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+InitialData.swift"; sourceTree = "<group>"; };
+		A080BD3DC8D97F0D5BFA3897 /* ToernberechnungUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToernberechnungUITests.swift; sourceTree = "<group>"; };
+		A840A82D06CB834F1106DB72 /* BSHTideServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideServiceTests.swift; sourceTree = "<group>"; };
+		AA2373C10FA2AC4E0B3A17C3 /* FindNearestHighWaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindNearestHighWaterTests.swift; sourceTree = "<group>"; };
+		AD38D77C98D5D6DE2730FF79 /* HighWaterOffsetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighWaterOffsetTests.swift; sourceTree = "<group>"; };
+		B1D5B1BA1CF25110235FA7CD /* RouteStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteStatusTests.swift; sourceTree = "<group>"; };
 		B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Toernberechnung.docc; sourceTree = "<group>"; };
 		B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Weather.swift"; sourceTree = "<group>"; };
 		B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TideDataProvider.swift; sourceTree = "<group>"; };
+		B9BBAFF1BCA19B21DD55075D /* RouteCalculationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteCalculationServiceTests.swift; sourceTree = "<group>"; };
 		BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TidalHeightStrategy.swift; sourceTree = "<group>"; };
 		CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeaRoutePlanner.swift; sourceTree = "<group>"; };
 		CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideService.swift; sourceTree = "<group>"; };
-		E72ED92078B23A111163BBB9 /* RouteCalculationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteCalculationTests.swift; sourceTree = "<group>"; };
+		D8024EAA96D8F96659FB930C /* PassageWindowScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassageWindowScannerTests.swift; sourceTree = "<group>"; };
 		EA10C24AE4955C3606CFDDB5 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		EF51E2BE9460F831E95F3631 /* PassageWindowScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassageWindowScanner.swift; sourceTree = "<group>"; };
 		F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = wadden_sea_catalog.json; sourceTree = "<group>"; };
 		FCD559185A21CCD913BF3C85 /* WaddenSeaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaddenSeaCatalog.swift; sourceTree = "<group>"; };
+		FD61AE32C875FE6439A3AE62 /* RouteFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteFactory.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +141,49 @@
 			path = Toernberechnung;
 			sourceTree = "<group>";
 		};
+		31B2DFC27FEE2459392EBA8A /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A840A82D06CB834F1106DB72 /* BSHTideServiceTests.swift */,
+				8F4E6307E53FDC6A63347D4E /* DWDServiceTests.swift */,
+				13551A1D2DF6D5D9986F1ED2 /* TideDataProviderTests.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		6331B81356AF92AAE1F5121E /* Catalog */ = {
+			isa = PBXGroup;
+			children = (
+				6C7BAC6B4433C29493CB4CD1 /* WaddenSeaCatalogTests.swift */,
+			);
+			path = Catalog;
+			sourceTree = "<group>";
+		};
+		75C0DED963282080C818DD1F /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				65EEB86CE21C4261D374C6F2 /* MockURLProtocol.swift */,
+			);
+			path = Mocks;
+			sourceTree = "<group>";
+		};
+		75FD6D49D5E1CFB5E5D30431 /* ToernberechnungUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A080BD3DC8D97F0D5BFA3897 /* ToernberechnungUITests.swift */,
+			);
+			path = ToernberechnungUITests;
+			sourceTree = "<group>";
+		};
+		86869051C69E095CA0B7ACDC /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				FD61AE32C875FE6439A3AE62 /* RouteFactory.swift */,
+				0157A995893C89A8A61AAD77 /* TestFixtures.swift */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		893ABB9A87C56D39B0255B2A /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -108,6 +193,22 @@
 			);
 			name = Services;
 			path = Toernberechnung/Services;
+			sourceTree = "<group>";
+		};
+		99643B7A3817C8C364DCA738 /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				441F8F3014C6AE0A333B57C0 /* CombinedRouteStatusTests.swift */,
+				AA2373C10FA2AC4E0B3A17C3 /* FindNearestHighWaterTests.swift */,
+				AD38D77C98D5D6DE2730FF79 /* HighWaterOffsetTests.swift */,
+				D8024EAA96D8F96659FB930C /* PassageWindowScannerTests.swift */,
+				B9BBAFF1BCA19B21DD55075D /* RouteCalculationServiceTests.swift */,
+				B1D5B1BA1CF25110235FA7CD /* RouteStatusTests.swift */,
+				12E219FC5E138592CD8B6D45 /* TravelTimeTests.swift */,
+				4750FD5D3F36E8FE90D8C10F /* TwelfthsRuleStrategyTests.swift */,
+				91809A5FC66138273E11013E /* WaypointStatusTests.swift */,
+			);
+			path = Engine;
 			sourceTree = "<group>";
 		};
 		A5EED1EBBDC132C9A0D8F2E3 /* Engine */ = {
@@ -152,11 +253,20 @@
 			path = Toernberechnung/Views;
 			sourceTree = "<group>";
 		};
+		D746A8A9EFAF38CA10939D7B /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				5BEC36FDDE76703E9D589228 /* RoutePlannerViewModelTests.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
 		DA0B1B119FC3DEDB38C5A818 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */,
 				86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */,
+				2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -164,7 +274,12 @@
 		DF62DFC93AE71B30E327780D /* ToernberechnungTests */ = {
 			isa = PBXGroup;
 			children = (
-				E72ED92078B23A111163BBB9 /* RouteCalculationTests.swift */,
+				6331B81356AF92AAE1F5121E /* Catalog */,
+				99643B7A3817C8C364DCA738 /* Engine */,
+				86869051C69E095CA0B7ACDC /* Fixtures */,
+				75C0DED963282080C818DD1F /* Mocks */,
+				31B2DFC27FEE2459392EBA8A /* Services */,
+				D746A8A9EFAF38CA10939D7B /* ViewModels */,
 			);
 			path = ToernberechnungTests;
 			sourceTree = "<group>";
@@ -177,6 +292,7 @@
 				893ABB9A87C56D39B0255B2A /* Services */,
 				18DEA961666D7FCBAE02D751 /* Toernberechnung */,
 				DF62DFC93AE71B30E327780D /* ToernberechnungTests */,
+				75FD6D49D5E1CFB5E5D30431 /* ToernberechnungUITests */,
 				D439D35983ED21D420788A42 /* Views */,
 				DA0B1B119FC3DEDB38C5A818 /* Products */,
 			);
@@ -185,6 +301,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1BE8DB3DE33B704C3E5A5227 /* ToernberechnungUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1282965B09DBE8513DE05A4 /* Build configuration list for PBXNativeTarget "ToernberechnungUITests" */;
+			buildPhases = (
+				19D73E135388891F48781B1F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				923CD846AC24E6D5D4047B29 /* PBXTargetDependency */,
+			);
+			name = ToernberechnungUITests;
+			packageProductDependencies = (
+			);
+			productName = ToernberechnungUITests;
+			productReference = 2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		5F9D9C3365B426B92A441223 /* Toernberechnung */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 79E7B60BA827BD5CCF02527F /* Build configuration list for PBXNativeTarget "Toernberechnung" */;
@@ -235,6 +369,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					1BE8DB3DE33B704C3E5A5227 = {
+						TestTargetID = 5F9D9C3365B426B92A441223;
+					};
 				};
 			};
 			buildConfigurationList = 60BF1BC7BCD405F7C03BD6AB /* Build configuration list for PBXProject "Toernberechnung" */;
@@ -257,6 +394,7 @@
 			targets = (
 				5F9D9C3365B426B92A441223 /* Toernberechnung */,
 				DB274558A4EDC412F15CF557 /* ToernberechnungTests */,
+				1BE8DB3DE33B704C3E5A5227 /* ToernberechnungUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -303,6 +441,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		19D73E135388891F48781B1F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EBFA962196251A9BE5045D76 /* ToernberechnungUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A3ED586CABFBC9D80BD773E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -336,13 +482,34 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DE31F81D793F4E62C48EDAA1 /* RouteCalculationTests.swift in Sources */,
+				2A91B4D06FEFFB0D9C5DBA71 /* BSHTideServiceTests.swift in Sources */,
+				51818EBA6764205E781EDD6C /* CombinedRouteStatusTests.swift in Sources */,
+				E3A88A54FEDF91B5CA809F25 /* DWDServiceTests.swift in Sources */,
+				04327BA73F4A90C3DE34286C /* FindNearestHighWaterTests.swift in Sources */,
+				AEF88D686A4A33D13F1AD22E /* HighWaterOffsetTests.swift in Sources */,
+				0A7641904F89C091A28AF5B6 /* MockURLProtocol.swift in Sources */,
+				F5EE30C5FB348AA35500C963 /* PassageWindowScannerTests.swift in Sources */,
+				EE381EA0EADE59B9D7A94AE4 /* RouteCalculationServiceTests.swift in Sources */,
+				CE640FC28E4998A791F57D7A /* RouteFactory.swift in Sources */,
+				987C00BF0FB92D05FFB8AE1F /* RoutePlannerViewModelTests.swift in Sources */,
+				BB9A8317B92014165EB77952 /* RouteStatusTests.swift in Sources */,
+				E5929B2AD681BF42CBE23649 /* TestFixtures.swift in Sources */,
+				7096CDD9ACCB06D1C72D94F4 /* TideDataProviderTests.swift in Sources */,
+				B3A8C079A2B1A25012CD5476 /* TravelTimeTests.swift in Sources */,
+				25B4DCAFE55FB57C2916CA64 /* TwelfthsRuleStrategyTests.swift in Sources */,
+				986ECAB9304C79BFF34DD040 /* WaddenSeaCatalogTests.swift in Sources */,
+				72BDDB378B744244B721F467 /* WaypointStatusTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		923CD846AC24E6D5D4047B29 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F9D9C3365B426B92A441223 /* Toernberechnung */;
+			targetProxy = FC7FBBD5A92A9F1C2A37402D /* PBXContainerItemProxy */;
+		};
 		CC1FC300FABAE83C60301DDC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5F9D9C3365B426B92A441223 /* Toernberechnung */;
@@ -367,6 +534,25 @@
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Toernberechnung.app/Toernberechnung";
+			};
+			name = Debug;
+		};
+		4709F369C54CA65CFACD0585 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.toernberechnung.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Toernberechnung;
 			};
 			name = Debug;
 		};
@@ -422,6 +608,25 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8A3CD6C050DAD9BFAB0CDE37 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.toernberechnung.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Toernberechnung;
 			};
 			name = Release;
 		};
@@ -572,6 +777,15 @@
 			buildConfigurations = (
 				D9B0878ED90FEE17364456D3 /* Debug */,
 				AC4824225C262AC942726583 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A1282965B09DBE8513DE05A4 /* Build configuration list for PBXNativeTarget "ToernberechnungUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4709F369C54CA65CFACD0585 /* Debug */,
+				8A3CD6C050DAD9BFAB0CDE37 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

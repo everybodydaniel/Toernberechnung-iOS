@@ -1,17 +1,27 @@
 # ──────────────────────────────────────────────
 # Fastlane – Toernberechnung iOS
 # ──────────────────────────────────────────────
-# Installation:  gem install fastlane
-# Ausführung:    bundle exec fastlane lint
-#                bundle exec fastlane test
+# Installation : bundle install
+# Lokale Nutzung:
+#   bundle exec fastlane lint        # SwiftLint
+#   bundle exec fastlane test        # Unit-Tests + Coverage erfassen
+#   bundle exec fastlane coverage    # Coverage-Reports erzeugen (HTML/Cobertura/SonarQube)
+#   bundle exec fastlane ui_tests    # XCUITest (erst sinnvoll wenn UI-Target existiert)
+#   bundle exec fastlane ci          # Vollständiger lokaler CI-Lauf
 # ──────────────────────────────────────────────
 
 default_platform(:ios)
 
+XCODE_PROJECT = "Toernberechnung.xcodeproj"
+XCODE_SCHEME  = "Toernberechnung"
+UI_SCHEME     = "ToernberechnungUITests"
+SIM_DEVICE    = "iPhone 16"
+DERIVED_DATA  = "build/DerivedData"
+
 platform :ios do
 
   # ── Lane: SwiftLint ────────────────────────
-  desc "Führt SwiftLint auf dem gesamten Projekt aus"
+  desc "Statische Code-Analyse mit SwiftLint"
   lane :lint do
     swiftlint(
       mode: :lint,
@@ -22,19 +32,60 @@ platform :ios do
     UI.success("✅ SwiftLint: Keine Verstöße gefunden.")
   end
 
-  # ── Lane: Unit Tests ──────────────────────
-  desc "Baut das Projekt und führt alle Unit Tests aus"
+  # ── Lane: Unit-Tests + Coverage erfassen ──
+  desc "Baut das Projekt und führt alle Unit-Tests mit Coverage aus"
   lane :test do
     scan(
-      project: "Toernberechnung.xcodeproj",
-      scheme: "Toernberechnung",
-      devices: ["iPhone 16"],
+      project: XCODE_PROJECT,
+      scheme:  XCODE_SCHEME,
+      devices: [SIM_DEVICE],
       clean: true,
       code_coverage: true,
       output_types: "junit,html",
-      output_directory: "fastlane/test_output"
+      output_directory: "fastlane/test_output",
+      derived_data_path: DERIVED_DATA,
+      result_bundle: true
     )
-    UI.success("✅ Tests: Alle Tests bestanden.")
+    UI.success("✅ Unit-Tests: alle bestanden.")
+  end
+
+  # ── Lane: Coverage-Reports erzeugen ────────
+  desc "Erzeugt Coverage-Reports (Cobertura, SonarQube, HTML) via Slather"
+  lane :coverage do
+    slather(
+      proj:    XCODE_PROJECT,
+      scheme:  XCODE_SCHEME,
+      build_directory: DERIVED_DATA,
+      output_directory: "build/coverage",
+      cobertura_xml: true,
+      sonarqube_xml: true,
+      html: true
+    )
+    UI.success("✅ Coverage: Reports unter build/coverage/ erzeugt.")
+  end
+
+  # ── Lane: XCUITest (UI-Tests) ──────────────
+  desc "Führt XCUITest UI-Tests aus (erfordert UI-Test-Target/-Scheme)"
+  lane :ui_tests do
+    scan(
+      project: XCODE_PROJECT,
+      scheme:  UI_SCHEME,
+      devices: [SIM_DEVICE],
+      clean: false,
+      output_types: "junit,html",
+      output_directory: "fastlane/ui_test_output",
+      derived_data_path: DERIVED_DATA,
+      result_bundle: true
+    )
+    UI.success("✅ UI-Tests: alle bestanden.")
+  end
+
+  # ── Lane: Voller CI-Lauf ──────────────────
+  desc "Vollständiger lokaler CI-Lauf (Lint → Test → Coverage)"
+  lane :ci do
+    lint
+    test
+    coverage
   end
 
 end
