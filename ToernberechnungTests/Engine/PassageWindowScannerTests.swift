@@ -34,6 +34,36 @@ final class PassageWindowScannerTests: XCTestCase {
         XCTAssertTrue(window!.end   >= route.plannedStartTime)
     }
 
+    // MARK: - Window DisplayString Test
+
+    func test_window_displayString_formatsCorrectly() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy/MM/dd HH:mm"
+        
+        let start = formatter.date(from: "2024/07/20 08:30")!
+        let end = formatter.date(from: "2024/07/20 12:45")!
+        
+        let window = PassageWindowScanner.Window(start: start, end: end)
+        
+        XCTAssertEqual(window.displayString, "08:30 – 12:45 Uhr")
+    }
+
+    // MARK: - RoutePlanModels Tests
+
+    func test_WaypointCalculationMode_displayName() {
+        XCTAssertEqual(WaypointCalculationMode.meanHighWater.displayName, "MHW")
+        XCTAssertEqual(WaypointCalculationMode.lottiefe.displayName, "Lottiefe")
+    }
+    
+    func test_ValueSource_displayName() {
+        XCTAssertEqual(ValueSource.bsh.displayName, "BSH")
+        XCTAssertEqual(ValueSource.catalog.displayName, "Vorgabe")
+        XCTAssertEqual(ValueSource.cache.displayName, "Cache")
+        XCTAssertEqual(ValueSource.manual.displayName, "Manuell")
+        XCTAssertEqual(ValueSource.weatherService.displayName, "DWD")
+        XCTAssertEqual(ValueSource.unknown.displayName, "Unbekannt")
+    }
+
     // MARK: - Kein sicheres Fenster
 
     func test_findSafeWindow_returnsNil_whenRouteAlwaysFails() async {
