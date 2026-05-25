@@ -211,7 +211,7 @@ jobs:
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -derivedDataPath /tmp/docbuild \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             DOCC_EXTRACT_EXTENSION_API=YES \
             DOCC_EXTRACT_API=YES \
