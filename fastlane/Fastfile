@@ -53,14 +53,14 @@ platform :ios do
   # ── Lane: Coverage-Reports erzeugen ────────
   desc "Erzeugt Coverage-Reports (Cobertura, SonarQube, HTML) via Slather"
   lane :coverage do
-    # Slather unterstützt nur ein Format pro Aufruf –
-    # deshalb drei separate Aufrufe.
+    # Slather löscht standardmäßig das Ausgabeverzeichnis bei jedem Start.
+    # Deshalb müssen wir unterschiedliche Verzeichnisse für die XMLs nutzen.
 
     slather(
       proj:    XCODE_PROJECT,
       scheme:  XCODE_SCHEME,
       build_directory: DERIVED_DATA,
-      output_directory: "build/coverage",
+      output_directory: "build/coverage/cobertura",
       cobertura_xml: true
     )
     UI.message("📄 Cobertura-XML erzeugt.")
@@ -69,7 +69,7 @@ platform :ios do
       proj:    XCODE_PROJECT,
       scheme:  XCODE_SCHEME,
       build_directory: DERIVED_DATA,
-      output_directory: "build/coverage",
+      output_directory: "build/coverage/sonarqube",
       sonarqube_xml: true
     )
     UI.message("📄 SonarQube-XML erzeugt.")
@@ -78,7 +78,7 @@ platform :ios do
       proj:    XCODE_PROJECT,
       scheme:  XCODE_SCHEME,
       build_directory: DERIVED_DATA,
-      output_directory: "build/coverage",
+      output_directory: "build/coverage/html",
       html: true
     )
     UI.message("📄 HTML-Report erzeugt.")
