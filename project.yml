@@ -89,7 +89,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.tests
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
-    scheme: {}
+    scheme:
+      testTargets:
+        - ToernberechnungTests
 
   ToernberechnungUITests:
     type: bundle.ui-testing
@@ -105,6 +107,9 @@ targets:
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: Toernberechnung
-    scheme: {}
+    scheme:
+      testTargets:
+        - ToernberechnungUITests
+
 
 

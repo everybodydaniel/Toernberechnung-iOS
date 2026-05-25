@@ -39,6 +39,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1BE8DB3DE33B704C3E5A5227"
+               BuildableName = "ToernberechnungUITests.xctest"
+               BlueprintName = "ToernberechnungUITests"
+               ReferencedContainer = "container:Toernberechnung.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>
