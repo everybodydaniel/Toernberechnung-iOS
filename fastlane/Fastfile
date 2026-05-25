@@ -44,7 +44,8 @@ platform :ios do
       output_types: "junit,html",
       output_directory: "fastlane/test_output",
       derived_data_path: DERIVED_DATA,
-      result_bundle: true
+      result_bundle: true,
+      xcodebuild_formatter: "xcpretty"
     )
     UI.success("✅ Unit-Tests: alle bestanden.")
   end
@@ -75,7 +76,8 @@ platform :ios do
       output_types: "junit,html",
       output_directory: "fastlane/ui_test_output",
       derived_data_path: DERIVED_DATA,
-      result_bundle: true
+      result_bundle: true,
+      xcodebuild_formatter: "xcpretty"
     )
     UI.success("✅ UI-Tests: alle bestanden.")
   end

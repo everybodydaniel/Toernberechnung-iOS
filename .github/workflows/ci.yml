@@ -220,7 +220,7 @@ jobs:
       - name: Align Coverage Reports Path
         run: |
           mkdir -p ./docs-out/coverage
-          cp -R ./docs-out/temp-coverage-reports/coverage-reports/* ./docs-out/coverage/
+          cp -R ./docs-out/temp-coverage-reports/* ./docs-out/coverage/
           rm -rf ./docs-out/temp-coverage-reports
 
       - name: Upload Pages Artifact
