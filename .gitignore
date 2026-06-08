@@ -24,3 +24,11 @@ fastlane/Preview.html
 .DS_Store
 *.swp
 *~
+
+# ── Logs ──────────────────────────────
+build_output.log
+test_output.log
+
+# ── IDEs/Tools ─────────────────────────
+.claude/
+

@@ -357,7 +357,7 @@
     {
       "id": "B0000001-0001-0001-0001-000000000001",
       "name": "Emden → Norderney (via Osterems)",
-      "description": "Emden Außenhafen über Emshörn und Memmert Wattfahrwasser nach Norderney. Referenzroute aus dem Excel-Berechnungsblatt.",
+      "description": "Emden Außenhafen über Emshörn und Memmert Wattfahrwasser nach Norderney. Referenzroute aus dem Wadden-Sea-Katalog.",
       "waypointTemplateIDs": [
         "A0000001-0001-0001-0001-000000000001",
         "A0000001-0001-0001-0001-000000000002",

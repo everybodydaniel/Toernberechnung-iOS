@@ -1,36 +1,48 @@
 import SwiftUI
 
-/// Aufklappbare Ergebnisanzeige pro Wegpunkt.
-/// Zeigt alle Felder der Tidenberechnung aus der Excel-Mappe.
-struct RouteDetailView: View {
-    let result: RouteCalculationResult
-    let boatSettings: BoatSettings
+// MARK: - Route Detail View
+//
+// Leg-based summary used by the Map tab. Only user-selected harbours are
+// shown; internal Dijkstra fairway WPs (`watt_dornum`, `juist_south_e`, …)
+// are intentionally hidden — they contribute their depth to the leg they
+// belong to, but they are not surfaced individually.
+//
+// Each row covers ONE leg between two consecutive user harbours and
+// reports:
+//   - ETA at the leg's destination harbour
+//   - the worst Under-Keel Clearance (WuK) observed along the leg
+//   - status indicator (.go / .warning / .noGo / .incomplete)
+//   - a localized failure reason when the leg is not passable.
 
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
-    }()
+struct RouteDetailView: View {
+    let summary: RouteSummary?
+    let boatSettings: BoatSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             disclaimerBanner
 
-            ForEach(result.waypointResults) { wpResult in
-                waypointCard(wpResult)
+            if let summary {
+                if let failure = summary.failureMessage {
+                    failureBanner(failure)
+                }
+                ForEach(summary.legs) { leg in
+                    legCard(leg)
+                }
+            } else {
+                placeholderRow
             }
         }
     }
+
+    // MARK: - Disclaimer
 
     private var disclaimerBanner: some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color.orange)
-            Text(
-                "Diese Berechnung ist nur eine Planungshilfe und ersetzt keine amtlichen nautischen Veröffentlichungen, "
-                + "aktuellen Bekanntmachungen, Revierinformationen, Wetterbeurteilung oder die Verantwortung der Schiffsführung."
-            )
+            Text("Diese Berechnung ist nur eine Planungshilfe und ersetzt keine amtlichen nautischen Veröffentlichungen, aktuellen Bekanntmachungen, Revierinformationen, Wetterbeurteilung oder die Verantwortung der Schiffsführung.")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.secondary)
         }
@@ -43,136 +55,113 @@ struct RouteDetailView: View {
         }
     }
 
-    private func waypointCard(_ wpResult: WaypointCalculationResult) -> some View {
-        DisclosureGroup {
-            waypointDetails(wpResult)
-                .padding(.top, 8)
-        } label: {
-            waypointHeader(wpResult)
+    // MARK: - Failure Banner
+
+    private func failureBanner(_ text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "xmark.octagon.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.red)
+            Text(text)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.red)
+                .lineLimit(3)
+            Spacer()
         }
-        .tint(Color.appPrimary)
+        .padding(12)
+        .background(Color.red.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.red.opacity(0.35), lineWidth: 1)
+        }
+    }
+
+    // MARK: - Leg Card
+
+    private func legCard(_ leg: RouteSummary.Leg) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                statusBadge(leg.status)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(leg.fromName)  →  \(leg.toName)")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.appPrimary)
+                        .lineLimit(2)
+                    Text("Abfahrt \(AppDateFormatters.hourMinute.string(from: leg.departureTime))   ·   Ankunft \(AppDateFormatters.hourMinute.string(from: leg.arrivalTime))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.secondary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                metric("DISTANZ", String(format: "%.1f sm", leg.distanceNm))
+                metric("DAUER", AppDateFormatters.duration(hours: leg.travelTimeHours))
+                if let wuK = leg.worstWuKMeters {
+                    metric("WuK", String(format: "%.2f m", wuK),
+                           tint: statusColor(leg.status))
+                } else {
+                    metric("WuK", "–")
+                }
+            }
+
+            if let reason = leg.failureReason {
+                Text(reason)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(statusColor(leg.status))
+                    .padding(.top, 2)
+            }
+            if let bottleneck = leg.bottleneckName, leg.status != .go {
+                Text("Engstelle: \(bottleneck)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.secondary)
+            }
+        }
         .padding(14)
         .background(Color.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(statusBorderColor(wpResult.status).opacity(0.3), lineWidth: 1.5)
+                .stroke(statusBorderColor(leg.status).opacity(0.3), lineWidth: 1.5)
         }
     }
 
-    private func waypointHeader(_ wpResult: WaypointCalculationResult) -> some View {
+    // MARK: - Placeholder
+
+    private var placeholderRow: some View {
         HStack(spacing: 10) {
-            statusBadge(wpResult.status)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(wpResult.waypoint.name)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.appPrimary)
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    Text("ETA \(Self.timeFormatter.string(from: wpResult.arrivalTime))")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-
-                    if let wuK = wpResult.clearanceUnderKeelWuKMeters {
-                        Text("WuK \(String(format: "%.2f m", wuK))")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(statusColor(wpResult.status))
-                    }
-                }
-            }
-
+            Image(systemName: "hourglass")
+                .foregroundStyle(Color.secondary)
+            Text("Berechnung läuft…")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.secondary)
             Spacer()
         }
+        .padding(12)
+        .background(Color.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func waypointDetails(_ wpResult: WaypointCalculationResult) -> some View {
-        let rows: [(String, String)] = buildDetailRows(wpResult)
+    // MARK: - Tiles
 
-        return LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8)
-        ], spacing: 8) {
-            ForEach(rows, id: \.0) { row in
-                detailTile(row.0, row.1)
-            }
+    private func metric(_ title: String, _ value: String, tint: Color = .appPrimary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color.secondary)
+            Text(value)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(tint)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
         }
-    }
-
-    private func buildDetailRows(_ wp: WaypointCalculationResult) -> [(String, String)] {
-        var rows: [(String, String)] = [
-            ("Bezugsort (BO)", wp.waypoint.tidalReferenceStation),
-            ("ETA", Self.timeFormatter.string(from: wp.arrivalTime))
-        ]
-
-        if let hw = wp.relevantHighWaterTime {
-            rows.append(("HW", Self.timeFormatter.string(from: hw)))
-        }
-
-        if wp.waypoint.highWaterOffsetMinutes != 0 {
-            let sign = wp.waypoint.highWaterOffsetMinutes > 0 ? "+" : ""
-            rows.append(("HW-Offset", "\(sign)\(wp.waypoint.highWaterOffsetMinutes) min"))
-        }
-
-        if let dev = wp.deviationHours {
-            rows.append(("Δ HW", String(format: "%.2f h", dev)))
-        }
-
-        if let mth = wp.waypoint.meanTidalRangeMeters?.value {
-            rows.append(("MTH", String(format: "%.1f m", mth)))
-        }
-
-        if let twelfth = wp.oneTwelfthMeters {
-            rows.append(("1/12", String(format: "%.4f m", twelfth)))
-        }
-
-        if let fmw = wp.missingWaterFmWMeters {
-            rows.append(("FmW", fmw == 0 ? "keine Fehlmenge" : String(format: "%.2f m", fmw)))
-        }
-
-        switch wp.waypoint.calculationMode {
-        case .meanHighWater:
-            if let mhw = wp.waypoint.meanHighWaterMeters?.value {
-                rows.append(("MHW", String(format: "%.1f m", mhw)))
-            }
-        case .lottiefe:
-            if let lt = wp.waypoint.lottiefeMeters?.value {
-                rows.append(("Lottiefe", String(format: "%.1f m", lt)))
-            }
-        }
-
-        rows.append(("BSH ±m", String(format: "%+.2f m", wp.bshWaterLevelCorrectionMeters)))
-
-        if let cd = wp.chartDepthMetersApplied {
-            rows.append(("Kartentiefe", String(format: "%+.1f m", cd)))
-        } else if wp.waypoint.calculationMode == .lottiefe {
-            rows.append(("Kartentiefe", "– (Lottiefe)"))
-        }
-
-        if let hg = wp.tideHeightHGMeters {
-            rows.append(("HG", String(format: "%.2f m", hg)))
-        } else if wp.waypoint.calculationMode == .lottiefe {
-            rows.append(("HG", "leer (Lottiefe)"))
-        }
-
-        if let wt = wp.availableWaterDepthWTMeters {
-            rows.append(("WT", String(format: "%.2f m", wt)))
-        }
-
-        rows.append(("Tiefgang", String(format: "%.2f m", wp.boatDraftMeters)))
-
-        if let wuK = wp.clearanceUnderKeelWuKMeters {
-            rows.append(("WuK", String(format: "%.2f m", wuK)))
-        }
-
-        rows.append(("Modus", wp.waypoint.calculationMode.displayName))
-
-        if !wp.messages.isEmpty {
-            rows.append(("Hinweise", wp.messages.joined(separator: "; ")))
-        }
-
-        return rows
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(Color.fieldBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func statusBadge(_ status: WaypointStatus) -> some View {
@@ -183,25 +172,9 @@ struct RouteDetailView: View {
             .background(statusColor(status).opacity(0.12))
             .clipShape(Circle())
     }
-
-    private func detailTile(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Color.secondary)
-            Text(value)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.appPrimary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .padding(8)
-        .background(Color.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
 }
+
+// MARK: - Status Styling Helpers (shared by the Map tab UI)
 
 func statusColor(_ status: WaypointStatus) -> Color {
     switch status {

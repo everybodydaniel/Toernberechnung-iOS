@@ -1,7 +1,5 @@
 import SwiftUI
 
-// MARK: - Wetter-Tab: Anzeige der DWD-Wetterdaten für das Revier
-
 extension ContentView {
     func weatherTab() -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -20,6 +18,7 @@ extension ContentView {
                 weatherHourlyCard(reading)
                 weatherMetricsGrid(reading)
                 weatherDailyCard(reading)
+                windfinderCard()
             } else {
                 weatherPlaceholder(icon: "cloud.sun.fill", title: "Insel auswählen", text: "Wähle eine ostfriesische Insel, um die DWD-Prognose zu sehen.")
             }
@@ -158,6 +157,7 @@ extension ContentView {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: compactColumns.count > 1 ? 4 : 2), spacing: 12) {
             weatherMetricCard(icon: "wind", title: "Wind", value: "\(Int(reading.current.windKnots.rounded())) kn")
             weatherMetricCard(icon: "wind.circle.fill", title: "Böen", value: reading.current.windGustKnots.map { "\(Int($0.rounded())) kn" } ?? "-")
+            weatherMetricCard(icon: "safari", title: "Windrichtung", value: "\(windDirectionText(reading.current.windDirection)) (\(reading.current.windDirection)°)")
             weatherMetricCard(icon: "drop.fill", title: "Niederschlag", value: String(format: "%.1f mm", reading.current.precipitationMM))
             weatherMetricCard(icon: "humidity.fill", title: "Feuchtigkeit", value: reading.current.humidityPercent.map { "\($0)%" } ?? "-")
             weatherMetricCard(icon: "thermometer.medium", title: "Gefühlt", value: String(format: "%.0f°", reading.current.feelsLikeC))
@@ -269,6 +269,11 @@ extension ContentView {
 
         return Group {
             if style == .hero {
+                // The old design added a ~24% white linear gradient on top
+                // of the blue sky background, which washed the gradient out
+                // until the white headline text became unreadable. We now
+                // drop that overlay entirely and add a darker, subtle
+                // top-to-bottom shading so the type stays high-contrast.
                 content()
                     .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -278,13 +283,14 @@ extension ContentView {
                     }
                     .overlay {
                         LinearGradient(
-                            colors: [.white.opacity(0.24), .white.opacity(0.06)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: [.clear, .black.opacity(0.12)],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                         .clipShape(shape)
+                        .allowsHitTesting(false)
                     }
-                    .overlay { shape.stroke(.white.opacity(0.42), lineWidth: 1) }
+                    .overlay { shape.stroke(.white.opacity(0.18), lineWidth: 0.5) }
             } else {
                 content()
                     .padding(16)
@@ -293,7 +299,7 @@ extension ContentView {
                     .overlay { shape.stroke(Color.primary.opacity(0.06), lineWidth: 1) }
             }
         }
-        .shadow(color: style == .hero ? Color.appPrimary.opacity(0.06) : .clear, radius: style == .hero ? 12 : 0, y: style == .hero ? 8 : 0)
+        .shadow(color: style == .hero ? Color.appPrimary.opacity(0.12) : .clear, radius: style == .hero ? 14 : 0, y: style == .hero ? 8 : 0)
     }
 
     func weatherSkyBackground() -> some View {
@@ -459,6 +465,7 @@ extension ContentView {
 
     @MainActor
     func upsertWeatherSnapshot(_ reading: WeatherReading, for region: HarbourOption) {
+        // Pro Region bleibt ein aktueller Snapshot erhalten, damit das Logbuch später kompakte Wetterdaten übernehmen kann.
         let summary = String(format: "%.0f°C · %.0f kn · %@ · %@", reading.current.temperatureC, reading.current.windKnots, reading.current.condition, freshnessText(reading))
         let slots = reading.upcoming.map {
             "\(Self.slotFormatter.string(from: $0.time)) \(Int($0.temperatureC.rounded()))°/\(Int($0.windKnots.rounded()))kn/\($0.precipitationChance)%"
@@ -494,4 +501,149 @@ extension ContentView {
             status: "ok"
         )
     }
+
+    func loadWindfinder(for harbourID: String, force: Bool) async {
+        let harbour = HarbourOption.byID(harbourID)
+        await MainActor.run {
+            windfinderLoading = true
+        }
+        let reading = await WindfinderService.shared.forecast(
+            latitude: harbour.latitude,
+            longitude: harbour.longitude,
+            spotID: harbourID,
+            force: force
+        )
+        await MainActor.run {
+            windfinderReading = reading
+            windfinderLoading = false
+        }
+    }
+
+    private func windfinderSlotDayLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.dateFormat = "E"
+        return formatter.string(from: date)
+    }
+
+    private func windfinderSlotTimeLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    func windfinderCard() -> some View {
+        return weatherGlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("WIND-PROGNOSE", systemImage: "wind")
+                        .font(.system(size: 13, weight: .heavy))
+                        .foregroundStyle(Color.secondary)
+                    
+                    Spacer()
+                    
+                    if windfinderLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+                
+                Divider()
+                
+                if let reading = windfinderReading, !reading.slots.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(reading.slots) { slot in
+                                VStack(spacing: 8) {
+                                    // Day & Time
+                                    Text(windfinderSlotDayLabel(slot.time))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.secondary)
+                                    Text(windfinderSlotTimeLabel(slot.time))
+                                        .font(.system(size: 14, weight: .heavy))
+                                        .foregroundStyle(Color.primary)
+                                    
+                                    // Wind direction arrow (premium rotated compass)
+                                    if let deg = slot.directionDegrees {
+                                        Image(systemName: "arrow.up")
+                                            .font(.system(size: 18, weight: .black))
+                                            .foregroundStyle(Color.appPrimary)
+                                            .rotationEffect(.degrees(Double(deg)))
+                                            .frame(width: 32, height: 32)
+                                            .background(Color.fieldBackground, in: Circle())
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                                            }
+                                    } else {
+                                        Image(systemName: "circle.dashed")
+                                            .font(.system(size: 18))
+                                            .foregroundStyle(Color.secondary)
+                                            .frame(width: 32, height: 32)
+                                    }
+                                    
+                                    // Wind knots
+                                    Text("\(Int(slot.windKnots.rounded())) kn")
+                                        .font(.system(size: 16, weight: .heavy))
+                                        .foregroundStyle(Color.primary)
+                                    
+                                    // Gusts
+                                    if let gusts = slot.gustKnots {
+                                        Text("\(Int(gusts.rounded())) kn")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(.red)
+                                        Text("Böen")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(Color.secondary)
+                                    } else {
+                                        Text("-")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.secondary)
+                                        Text("")
+                                            .font(.system(size: 8))
+                                    }
+                                }
+                                .frame(width: 70)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.02), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } else if windfinderLoading {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            ProgressView()
+                            Text("Winddaten werden geladen...")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.secondary)
+                        }
+                        Spacer()
+                    }
+                    .frame(height: 120)
+                } else {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "wind.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color.orange)
+                            Text("Winddaten konnten nicht abgerufen werden.")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.secondary)
+                        }
+                        Spacer()
+                    }
+                    .frame(height: 120)
+                }
+                
+                Text("Windvorhersage von Open-Meteo.")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.secondary)
+                    .padding(.top, 4)
+            }
+        }
+    }
 }
+

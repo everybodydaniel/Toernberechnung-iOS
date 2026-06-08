@@ -1,0 +1,104 @@
+{
+  "type": "FeatureCollection",
+  "description": "Beispieldaten Ostfriesisches Wattenmeer — kann durch echte WSA-Peilplan-Exports ersetzt werden.",
+  "sources": [
+    "https://www.openseamap.org/ (Pricken & Tonnen)",
+    "https://www.bsh.de/ (Peilpläne, Plantabelle)",
+    "https://www.nationalpark-wattenmeer.de/ (Zonierung)"
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "memmertbalje_demo",
+        "minDepth": 0.8,
+        "bouyType": "beprickt",
+        "name": "Memmertbalje (Demo-Linie, ersetzbar durch WSA-Peilung)"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [6.812, 53.598],
+          [6.825, 53.605],
+          [6.838, 53.612],
+          [6.850, 53.620],
+          [6.870, 53.627],
+          [6.892, 53.634],
+          [6.910, 53.642],
+          [6.928, 53.650],
+          [6.945, 53.655],
+          [6.965, 53.660],
+          [6.978, 53.663],
+          [6.992, 53.665]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "osterems_demo",
+        "minDepth": 0.5,
+        "bouyType": "betonnt",
+        "name": "Osterems-Fahrwasser (Demo-Linie)"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.080, 53.675],
+          [7.100, 53.660],
+          [7.125, 53.645],
+          [7.150, 53.630],
+          [7.170, 53.615],
+          [7.195, 53.600],
+          [7.215, 53.585],
+          [7.235, 53.570],
+          [7.255, 53.555],
+          [7.275, 53.540],
+          [7.295, 53.525],
+          [7.315, 53.510],
+          [7.335, 53.495]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone": "nationalpark_zone_1",
+        "name": "Memmert / Kachelot-Plate (Ruhezone Vogelschutz)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [6.840, 53.625],
+            [6.840, 53.650],
+            [6.890, 53.660],
+            [6.910, 53.650],
+            [6.910, 53.625],
+            [6.870, 53.615],
+            [6.840, 53.625]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone": "nationalpark_zone_1",
+        "name": "Minsener Oog (Ruhezone)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [7.960, 53.760],
+            [7.960, 53.785],
+            [8.010, 53.785],
+            [8.010, 53.760],
+            [7.960, 53.760]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -1,35 +1,37 @@
 import Foundation
 
-/// Zentrale Quelle der Wahrheit für alle Tidenberechnungen (Go/No-Go) in der App.
+// MARK: - Route Calculation Service
+
+/// The single source of truth for all tidal Go / No-Go calculations in the app.
 ///
-/// Berechnet ETA, Tidenwassertiefe und Wasser-unter-Kiel für jeden Wegpunkt
-/// einer mehrgliedrigen Route.
+/// This service replaces `ManualPassageCalculator`. It calculates ETA, tidal water depth,
+/// and clearance under keel for every waypoint in a multi-waypoint route.
 ///
-/// Der Service ist **geografieunabhängig**: Er verarbeitet strukturierte Wegpunkt-, Tiden-,
-/// Leg- und Bootsdaten. Kein Berechnungscode hängt von festen Wegpunktnamen, Inselnamen
-/// oder konkreten Routen ab.
+/// The service is **geography-independent**: it consumes structured waypoint, tide, leg,
+/// and boat data. No calculation code depends on fixed waypoint names, island names,
+/// or specific routes. The Emden → Norderney example is only a regression test fixture.
 ///
-/// ## Berechnungsablauf
-/// 1. Eingaben validieren
-/// 2. Ankunftszeiten an jedem Wegpunkt aus den Legdaten berechnen
-/// 3. Für jeden Wegpunkt:
-///    a. Relevantes Hochwasser ermitteln (vom Provider oder manueller Eintrag)
-///    b. HW-Offset anwenden
-///    c. Abweichung vom HW berechnen
-///    d. Tidenhöhen-Strategie anwenden (1/12-Regel) für FmW
-///    e. Verfügbare Wassertiefe berechnen (MHW- oder Lottiefe-Modus)
-///    f. Wasser unter dem Kiel berechnen
-///    g. Wegpunkt-Status bestimmen
-/// 4. Alle Wegpunkt-Status zum Gesamtstatus der Route zusammenführen
+/// ## Calculation Flow
+/// 1. Validate inputs
+/// 2. Calculate arrival times at each waypoint using leg data
+/// 3. For each waypoint:
+///    a. Resolve relevant high water (from provider or manual entry)
+///    b. Apply HW offset
+///    c. Calculate deviation from HW
+///    d. Apply tidal height strategy (1/12 rule) to get FmW
+///    e. Calculate available water depth (MHW or Lottiefe mode)
+///    f. Calculate clearance under keel
+///    g. Determine waypoint status
+/// 4. Combine all waypoint statuses into overall route status
 final class RouteCalculationService {
 
     private let tidalHeightStrategy: TidalHeightStrategy
     private let calendar: Calendar
 
-    /// Erstellt einen Berechnungs-Service.
+    /// Creates a calculation service.
     /// - Parameters:
-    ///   - tidalHeightStrategy: Strategie zur FmW-Berechnung. Standard: TwelfthsRuleStrategy.
-    ///   - timeZone: Zeitzone für Datumsberechnungen. Standard: Europe/Berlin.
+    ///   - tidalHeightStrategy: Strategy for computing FmW. Default is TwelfthsRuleStrategy.
+    ///   - timeZone: Time zone for date calculations. Default is Europe/Berlin.
     init(
         tidalHeightStrategy: TidalHeightStrategy = TwelfthsRuleStrategy(),
         timeZone: TimeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
@@ -40,15 +42,15 @@ final class RouteCalculationService {
         self.calendar = cal
     }
 
-    // MARK: - Routen-Berechnung
+    // MARK: - Main Calculation
 
-    /// Berechnet Go/No-Go für eine komplette mehrgliedrige Route.
+    /// Calculate tidal Go/No-Go for a complete multi-waypoint route.
     ///
     /// - Parameters:
-    ///   - route: Der Routenplan mit allen Wegpunkten und Legs.
-    ///   - boatSettings: Tiefgang und Sicherheitsmarge des Bootes.
-    ///   - tideDataProvider: Anbieter für BSH-Tidendaten.
-    /// - Returns: Vollständiges Routenberechnungsergebnis.
+    ///   - route: The route plan with all waypoints and legs.
+    ///   - boatSettings: Boat draft and safety margin.
+    ///   - tideDataProvider: Provider for BSH tide data.
+    /// - Returns: Complete route calculation result.
     func calculate(
         route: RoutePlan,
         boatSettings: BoatSettings,
@@ -56,6 +58,7 @@ final class RouteCalculationService {
     ) async -> RouteCalculationResult {
         var messages: [String] = []
 
+        // Validate basic inputs.
         guard boatSettings.draftMeters > 0 else {
             return errorResult(route: route, boatSettings: boatSettings,
                                message: "Tiefgang muss größer als 0 sein.")
@@ -73,6 +76,7 @@ final class RouteCalculationService {
                                message: "Anzahl der Legs stimmt nicht mit den Wegpunkten überein.")
         }
 
+        // Calculate arrival times.
         let legResults = Self.calculateLegResults(
             startTime: route.plannedStartTime,
             legs: route.legs
@@ -83,6 +87,7 @@ final class RouteCalculationService {
             arrivalTimes.append(legResult.arrivalTime)
         }
 
+        // Calculate each waypoint.
         var waypointResults: [WaypointCalculationResult] = []
         for (index, waypoint) in route.waypoints.enumerated() {
             let arrivalTime = arrivalTimes[index]
@@ -99,14 +104,17 @@ final class RouteCalculationService {
             waypointResults.append(result)
         }
 
+        // Determine overall tidal status.
         let tidalStatus = Self.determineRouteStatus(
             waypointStatuses: waypointResults.map(\.status)
         )
 
+        // Compute summary values.
         let totalDistance = legResults.reduce(0) { $0 + $1.leg.distanceNm }
         let totalTime = legResults.reduce(0) { $0 + $1.travelTimeHours }
         let worstWuK = waypointResults.compactMap(\.clearanceUnderKeelWuKMeters).min()
 
+        // Add leg validity warnings.
         for legResult in legResults where !legResult.isValid {
             messages.append(contentsOf: legResult.messages)
         }
@@ -118,13 +126,13 @@ final class RouteCalculationService {
             totalTravelTimeHours: totalTime,
             worstClearanceUnderKeel: worstWuK,
             tidalStatus: tidalStatus,
-            weatherStatus: .incomplete,
+            weatherStatus: .incomplete, // Weather is assessed separately by the view model.
             combinedStatus: CombinedRouteStatus.combine(tidal: tidalStatus, weather: .incomplete),
             messages: messages
         )
     }
 
-    // MARK: - Wegpunkt-Berechnung
+    // MARK: - Per-Waypoint Calculation
 
     private func calculateWaypoint(
         waypoint: RouteWaypoint,
@@ -135,7 +143,20 @@ final class RouteCalculationService {
     ) async -> WaypointCalculationResult {
         var messages: [String] = []
 
-        guard let mth = await resolveMeanTidalRange(for: waypoint, provider: tideDataProvider), mth > 0 else {
+        // Resolve MTH using priority chain:
+        // 1. waypoint value (user override or template)
+        // 2. TideDataProvider value
+        // 3. incomplete
+        let mthMeters: Double?
+        if let sourced = waypoint.meanTidalRangeMeters {
+            mthMeters = sourced.value
+        } else {
+            mthMeters = try? await tideDataProvider.meanTidalRange(
+                for: waypoint.tidalReferenceStationID
+            )
+        }
+
+        guard let mth = mthMeters, mth > 0 else {
             messages.append("MTH (Mittlerer Tidenhub) fehlt oder ist ungültig für \(waypoint.name).")
             return incompleteWaypointResult(
                 waypoint: waypoint, arrivalTime: arrivalTime,
@@ -144,9 +165,19 @@ final class RouteCalculationService {
             )
         }
 
-        guard let referenceHWTime = await resolveReferenceHighWater(
-            for: waypoint, arrivalTime: arrivalTime, provider: tideDataProvider
-        ) else {
+        // Resolve relevant high water time.
+        let hwTime: Date?
+        if let manual = waypoint.manualHighWaterTime {
+            hwTime = manual
+        } else {
+            let hwEvents = (try? await tideDataProvider.highWaters(
+                for: waypoint.tidalReferenceStationID,
+                around: arrivalTime
+            )) ?? []
+            hwTime = Self.findNearestHighWater(to: arrivalTime, from: hwEvents)
+        }
+
+        guard let referenceHWTime = hwTime else {
             messages.append("Kein Hochwasser für \(waypoint.tidalReferenceStation) verfügbar.")
             return incompleteWaypointResult(
                 waypoint: waypoint, arrivalTime: arrivalTime,
@@ -155,28 +186,46 @@ final class RouteCalculationService {
             )
         }
 
+        // Apply waypoint HW offset.
         let waypointHWTime = Self.applyHighWaterOffset(
             referenceHWTime: referenceHWTime,
             offsetMinutes: waypoint.highWaterOffsetMinutes
         )
+
+        // Calculate deviation from HW.
         let deviation = Self.calculateDeviationHours(
-            arrivalTime: arrivalTime, highWaterTime: waypointHWTime
+            arrivalTime: arrivalTime,
+            highWaterTime: waypointHWTime
         )
+
+        // Apply tidal height strategy (1/12 rule).
         let tidalResult = tidalHeightStrategy.missingWater(
-            deviationHours: deviation, meanTidalRangeMeters: mth
+            deviationHours: deviation,
+            meanTidalRangeMeters: mth
         )
 
         guard tidalResult.isValid else {
             messages.append(contentsOf: tidalResult.messages)
-            return invalidTidalResult(context: WaypointContext(
-                waypoint: waypoint, arrivalTime: arrivalTime,
-                waypointHWTime: waypointHWTime, deviation: deviation,
-                tidalResult: tidalResult,
-                bshCorrection: bshWaterLevelCorrectionMeters,
-                boatSettings: boatSettings, messages: messages
-            ))
+            return WaypointCalculationResult(
+                waypoint: waypoint,
+                arrivalTime: arrivalTime,
+                relevantHighWaterTime: waypointHWTime,
+                deviationHours: deviation,
+                oneTwelfthMeters: tidalResult.oneTwelfthMeters,
+                missingWaterFmWMeters: nil,
+                baseWaterAtTideMeters: nil,
+                bshWaterLevelCorrectionMeters: bshWaterLevelCorrectionMeters,
+                chartDepthMetersApplied: nil,
+                tideHeightHGMeters: nil,
+                availableWaterDepthWTMeters: nil,
+                boatDraftMeters: boatSettings.draftMeters,
+                clearanceUnderKeelWuKMeters: nil,
+                status: .invalid,
+                messages: messages
+            )
         }
 
+        // Calculate water depth based on mode.
         let depthResult = calculateDepth(
             waypoint: waypoint,
             fmwMeters: tidalResult.fmwMeters,
@@ -187,17 +236,30 @@ final class RouteCalculationService {
 
         switch depthResult {
         case .calculated(let depth):
-            messages.append(contentsOf: depth.messages)
-            return makeCalculatedResult(
-                context: WaypointContext(
-                    waypoint: waypoint, arrivalTime: arrivalTime,
-                    waypointHWTime: waypointHWTime, deviation: deviation,
-                    tidalResult: tidalResult,
-                    bshCorrection: bshWaterLevelCorrectionMeters,
-                    boatSettings: boatSettings, messages: messages
-                ),
-                depth: depth
+            let status = Self.determineWaypointStatus(
+                clearanceUnderKeel: depth.wuK,
+                safetyMargin: boatSettings.safetyMarginMeters
             )
+            messages.append(contentsOf: depth.messages)
+
+            return WaypointCalculationResult(
+                waypoint: waypoint,
+                arrivalTime: arrivalTime,
+                relevantHighWaterTime: waypointHWTime,
+                deviationHours: deviation,
+                oneTwelfthMeters: tidalResult.oneTwelfthMeters,
+                missingWaterFmWMeters: tidalResult.fmwMeters,
+                baseWaterAtTideMeters: depth.baseWater,
+                bshWaterLevelCorrectionMeters: bshWaterLevelCorrectionMeters,
+                chartDepthMetersApplied: depth.chartDepthApplied,
+                tideHeightHGMeters: depth.hg,
+                availableWaterDepthWTMeters: depth.wt,
+                boatDraftMeters: boatSettings.draftMeters,
+                clearanceUnderKeelWuKMeters: depth.wuK,
+                status: status,
+                messages: messages
+            )
+
         case .missingData(let errorMessages):
             messages.append(contentsOf: errorMessages)
             return incompleteWaypointResult(
@@ -208,94 +270,11 @@ final class RouteCalculationService {
         }
     }
 
-    private func resolveMeanTidalRange(
-        for waypoint: RouteWaypoint,
-        provider: TideDataProvider
-    ) async -> Double? {
-        if let sourced = waypoint.meanTidalRangeMeters {
-            return sourced.value
-        }
-        return try? await provider.meanTidalRange(for: waypoint.tidalReferenceStationID)
-    }
-
-    private func resolveReferenceHighWater(
-        for waypoint: RouteWaypoint,
-        arrivalTime: Date,
-        provider: TideDataProvider
-    ) async -> Date? {
-        if let manual = waypoint.manualHighWaterTime {
-            return manual
-        }
-        let hwEvents = (try? await provider.highWaters(
-            for: waypoint.tidalReferenceStationID,
-            around: arrivalTime
-        )) ?? []
-        return Self.findNearestHighWater(to: arrivalTime, from: hwEvents)
-    }
-
-    private struct WaypointContext {
-        let waypoint: RouteWaypoint
-        let arrivalTime: Date
-        let waypointHWTime: Date
-        let deviation: Double
-        let tidalResult: TidalHeightResult
-        let bshCorrection: Double
-        let boatSettings: BoatSettings
-        let messages: [String]
-    }
-
-    private func invalidTidalResult(context: WaypointContext) -> WaypointCalculationResult {
-        WaypointCalculationResult(
-            waypoint: context.waypoint,
-            arrivalTime: context.arrivalTime,
-            relevantHighWaterTime: context.waypointHWTime,
-            deviationHours: context.deviation,
-            oneTwelfthMeters: context.tidalResult.oneTwelfthMeters,
-            missingWaterFmWMeters: nil,
-            baseWaterAtTideMeters: nil,
-            bshWaterLevelCorrectionMeters: context.bshCorrection,
-            chartDepthMetersApplied: nil,
-            tideHeightHGMeters: nil,
-            availableWaterDepthWTMeters: nil,
-            boatDraftMeters: context.boatSettings.draftMeters,
-            clearanceUnderKeelWuKMeters: nil,
-            status: .invalid,
-            messages: context.messages
-        )
-    }
-
-    private func makeCalculatedResult(
-        context: WaypointContext,
-        depth: DepthCalculation
-    ) -> WaypointCalculationResult {
-        let status = Self.determineWaypointStatus(
-            clearanceUnderKeel: depth.wuK,
-            safetyMargin: context.boatSettings.safetyMarginMeters
-        )
-        return WaypointCalculationResult(
-            waypoint: context.waypoint,
-            arrivalTime: context.arrivalTime,
-            relevantHighWaterTime: context.waypointHWTime,
-            deviationHours: context.deviation,
-            oneTwelfthMeters: context.tidalResult.oneTwelfthMeters,
-            missingWaterFmWMeters: context.tidalResult.fmwMeters,
-            baseWaterAtTideMeters: depth.baseWater,
-            bshWaterLevelCorrectionMeters: context.bshCorrection,
-            chartDepthMetersApplied: depth.chartDepthApplied,
-            tideHeightHGMeters: depth.hg,
-            availableWaterDepthWTMeters: depth.wt,
-            boatDraftMeters: context.boatSettings.draftMeters,
-            clearanceUnderKeelWuKMeters: depth.wuK,
-            status: status,
-            messages: context.messages
-        )
-    }
-
-    // MARK: - Tiefen-Berechnung
+    // MARK: - Depth Calculation
 
     private struct DepthCalculation {
         let baseWater: Double
-        let hg: Double?
+        let hg: Double?     // nil for Lottiefe mode
         let chartDepthApplied: Double?
         let wt: Double
         let wuK: Double
@@ -333,7 +312,7 @@ final class RouteCalculationService {
         }
     }
 
-    /// MHW-Modus: baseWater = MHW - FmW; HG = baseWater + bshCorrection; WT = HG + Kartentiefe
+    /// MHW mode: baseWater = MHW - FmW; HG = baseWater + bshCorrection; WT = HG + chartDepth
     private func calculateMHWDepth(
         waypoint: RouteWaypoint,
         fmwMeters: Double,
@@ -341,6 +320,7 @@ final class RouteCalculationService {
         boatDraftMeters: Double,
         tideDataProvider: TideDataProvider
     ) -> DepthResult {
+        // Resolve MHW using priority chain.
         guard let mhw = waypoint.meanHighWaterMeters?.value else {
             return .missingData(["MHW (Mittleres Hochwasser) fehlt für \(waypoint.name)."])
         }
@@ -359,7 +339,7 @@ final class RouteCalculationService {
         ))
     }
 
-    /// Lottiefe-Modus: baseWater = Lottiefe - FmW; WT = baseWater + bshCorrection; Kartentiefe wird NICHT angewendet.
+    /// Lottiefe mode: baseWater = Lottiefe - FmW; WT = baseWater + bshCorrection; chartDepth NOT applied.
     private func calculateLottiefeDepth(
         waypoint: RouteWaypoint,
         fmwMeters: Double,
@@ -374,15 +354,16 @@ final class RouteCalculationService {
         let wt = baseWater + bshCorrectionMeters
         let wuK = wt - boatDraftMeters
 
+        // HG is "leer" (empty) in Lottiefe mode — chart depth is not applied.
         return .calculated(DepthCalculation(
             baseWater: baseWater, hg: nil, chartDepthApplied: nil,
             wt: wt, wuK: wuK, messages: []
         ))
     }
 
-    // MARK: - Geschwindigkeit & Reisezeit
+    // MARK: - Static Helper Functions (Pure, Testable)
 
-    /// Geschwindigkeit über Grund = Fahrt durchs Wasser + Tidenstrom.
+    /// Speed over ground = speed through water + tidal current.
     static func calculateSpeedOverGround(
         speedThroughWaterKnots: Double,
         tidalCurrentKnots: Double
@@ -390,8 +371,8 @@ final class RouteCalculationService {
         speedThroughWaterKnots + tidalCurrentKnots
     }
 
-    /// Reisezeit in Stunden = Distanz / Geschwindigkeit über Grund.
-    /// Gibt nil zurück, wenn SOG <= 0.
+    /// Travel time in hours = distance / speed over ground.
+    /// Returns nil if SOG <= 0.
     static func calculateTravelTimeHours(
         distanceNm: Double,
         speedOverGroundKnots: Double
@@ -400,7 +381,7 @@ final class RouteCalculationService {
         return distanceNm / speedOverGroundKnots
     }
 
-    /// Berechnet die Leg-Ergebnisse inkl. Ankunftszeiten, kumulierter Distanz und Gültigkeit.
+    /// Calculate leg results including arrival times, cumulative distance, and validity.
     static func calculateLegResults(
         startTime: Date,
         legs: [RouteLeg]
@@ -452,9 +433,7 @@ final class RouteCalculationService {
         return results
     }
 
-    // MARK: - Hochwasser-Hilfsfunktionen
-
-    /// Wendet einen vorzeichenbehafteten HW-Offset auf eine Referenz-Hochwasserzeit an.
+    /// Apply signed high-water offset to a reference HW time.
     static func applyHighWaterOffset(
         referenceHWTime: Date,
         offsetMinutes: Int
@@ -462,10 +441,10 @@ final class RouteCalculationService {
         referenceHWTime.addingTimeInterval(Double(offsetMinutes) * 60)
     }
 
-    /// Berechnet die absolute Abweichung in Dezimalstunden zwischen Ankunft und Hochwasser.
+    /// Calculate the absolute deviation in decimal hours between arrival and high water.
     ///
-    /// Verwendet das absolute Zeitintervall und behandelt Mitternachts-Übergänge korrekt,
-    /// da beide Werte vollständigen Datumskontext tragen.
+    /// Uses the absolute time interval, handling midnight crossing correctly
+    /// because both values carry full date context.
     static func calculateDeviationHours(
         arrivalTime: Date,
         highWaterTime: Date
@@ -473,7 +452,7 @@ final class RouteCalculationService {
         abs(arrivalTime.timeIntervalSince(highWaterTime)) / 3600
     }
 
-    /// Findet das Hochwasser-Ereignis, das der Zielzeit am nächsten ist.
+    /// Find the high water event nearest to the target time.
     static func findNearestHighWater(
         to targetTime: Date,
         from events: [TideEvent]
@@ -483,9 +462,7 @@ final class RouteCalculationService {
             .min(by: { abs($0.timeIntervalSince(targetTime)) < abs($1.timeIntervalSince(targetTime)) })
     }
 
-    // MARK: - Status-Bestimmung
-
-    /// Bestimmt den Wegpunkt-Status aus Wasser-unter-Kiel und Sicherheitsmarge.
+    /// Determine waypoint status from clearance under keel and safety margin.
     static func determineWaypointStatus(
         clearanceUnderKeel: Double,
         safetyMargin: Double
@@ -499,13 +476,13 @@ final class RouteCalculationService {
         }
     }
 
-    /// Bestimmt den Gesamtstatus der Route aus allen Wegpunkt-Status.
+    /// Determine overall route status from all waypoint statuses.
     ///
-    /// - `invalid`, wenn ein Wegpunkt ungültig ist (Berechnungsfehler)
-    /// - `noGo`, wenn ein Wegpunkt noGo ist (nicht genug Tiefe)
-    /// - `incomplete`, wenn eine benötigte Eingabe fehlt
-    /// - `warning`, wenn ein Wegpunkt unter der Sicherheitsmarge liegt
-    /// - `go` nur, wenn alle Wegpunkte go sind
+    /// - `invalid` if any waypoint is invalid (calculation error)
+    /// - `noGo` if any waypoint is noGo (insufficient depth)
+    /// - `incomplete` if any required input is missing
+    /// - `warning` if any waypoint is below safety margin
+    /// - `go` only if all waypoints are go
     static func determineRouteStatus(
         waypointStatuses: [WaypointStatus]
     ) -> RouteStatus {
@@ -516,7 +493,7 @@ final class RouteCalculationService {
         return .go
     }
 
-    // MARK: - Fehler-/Fallback-Ergebnisse
+    // MARK: - Private Helpers
 
     private func errorResult(
         route: RoutePlan,

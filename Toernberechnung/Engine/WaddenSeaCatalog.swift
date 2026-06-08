@@ -1,51 +1,55 @@
 import Foundation
 
-/// Eine BSH-Tidenreferenzstation bzw. -pegel.
-/// Stations-IDs sind vorläufig und können von den aktuellen Online-Daten des BSH abweichen.
+// MARK: - Tidal Reference Station
+
+/// A BSH tidal reference station / gauge.
+/// Station IDs are provisional and may not match BSH's current online data.
 struct TidalReferenceStation: Identifiable, Codable, Equatable {
-    
+    /// BSH station ID (e.g. "507P"). May be unavailable or renamed.
     var id: String
-    /// Menschenlesbarer Stationsname (z. B. „Emden, Große Seeschleuse“).
+    /// Human-readable station name (e.g. "Emden, Große Seeschleuse").
     var name: String
     var latitude: Double?
     var longitude: Double?
-    /// Standard-Mittlerer-Tidenhub (MTH), falls bekannt. Mit Quellen-Metadaten.
+    /// Default Mean Tidal Range if known. Source metadata attached.
     var meanTidalRangeMeters: SourcedValue<Double>?
-    /// Standard-Mittleres-Hochwasser (MHW), falls bekannt. Mit Quellen-Metadaten.
+    /// Default Mean High Water if known. Source metadata attached.
     var meanHighWaterMeters: SourcedValue<Double>?
 }
 
-/// Eine vorkonfigurierte Wegpunkt-Vorlage aus dem Katalog.
-/// Vorlagen liefern Planungs-Standardwerte, die der Skipper überprüfen muss.
+// MARK: - Waypoint Template
+
+/// A pre-configured waypoint template from the catalog.
+/// Templates provide planning defaults that require skipper verification.
 struct WaypointTemplate: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
     var latitude: Double?
     var longitude: Double?
-    /// BSH-Tidenreferenzstations-ID.
+    /// BSH tidal reference station ID.
     var tidalReferenceStationID: String
-    /// Name der BSH-Tidenreferenzstation.
+    /// BSH tidal reference station name.
     var tidalReferenceStationName: String
-    /// Vorzeichenbehafteter HW-Offset zur Referenzstation in Minuten.
+    /// Signed HW offset from reference station in minutes.
     var highWaterOffsetMinutes: Int
-    /// Berechnungsmodus: MHW-basiert oder Lottiefe-basiert.
+    /// Calculation mode: MHW-based or Lottiefe-based.
     var calculationMode: WaypointCalculationMode
-    /// Standard-Mittlerer-Tidenhub.
+    /// Default Mean Tidal Range.
     var defaultMTH: SourcedValue<Double>?
-    /// Standard-Mittleres-Hochwasser (für MHW-Modus).
+    /// Default Mean High Water (for MHW mode).
     var defaultMHW: SourcedValue<Double>?
-    /// Standard-Lottiefe (für Lottiefe-Modus).
+    /// Default Lottiefe (for Lottiefe mode).
     var defaultLottiefe: SourcedValue<Double>?
-    /// Standard-Kartentiefe / Peilplanwert.
+    /// Default chart depth / Peilplan value.
     var defaultChartDepth: SourcedValue<Double>?
-    /// Zugehörige Insel (z. B. „Norderney“). Nil für Festland oder Fahrwasser.
+    /// Associated island (e.g. "Norderney"). Nil for mainland/fairway.
     var island: String?
-    /// Kategorie: „Hafen“, „Wattenhoch“, „Fahrwasser“, „Reede“.
+    /// Category: "Hafen", "Wattenhoch", "Fahrwasser", "Reede".
     var category: String
-    /// Notizen oder Quellenangabe.
+    /// Notes or source reference.
     var notes: String
 
-    /// Wandelt diese Vorlage in einen RouteWaypoint mit Katalog-Standardwerten um.
+    /// Convert this template into a RouteWaypoint with catalog defaults.
     func toRouteWaypoint() -> RouteWaypoint {
         RouteWaypoint(
             id: UUID(),
@@ -69,38 +73,43 @@ struct WaypointTemplate: Identifiable, Codable, Equatable {
     }
 }
 
-/// Optionale Komfort-Vorlage, die Wegpunkte mit Standard-Distanzen verbindet.
-/// Routenvorlagen sind nicht zwingend — Nutzer können vollständig eigene Routen bauen.
+// MARK: - Route Template
+
+/// An optional convenience template linking waypoints with default distances.
+/// Route templates are not required — users can build fully custom routes.
 struct RouteTemplate: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
     var description: String
-    /// Geordnete Wegpunkt-Vorlagen-IDs: [Start, …Zwischenpunkte…, Ziel].
+    /// Ordered waypoint template IDs: [start, ...intermediates..., destination].
     var waypointTemplateIDs: [UUID]
-    /// Standard-Legdistanzen in NM. Anzahl muss waypointTemplateIDs.count - 1 sein.
+    /// Default leg distances in NM. Count must be waypointTemplateIDs.count - 1.
     var defaultLegDistancesNm: [Double]
-    /// Standard-Tidenstrom je Leg in Knoten. Anzahl muss zur Leg-Anzahl passen.
+    /// Default tidal current per leg in knots. Count must match legs.
     var defaultTidalCurrentsKnots: [Double]
-    /// Standard-Fahrt durchs Wasser in Knoten.
+    /// Default speed through water in knots.
     var defaultSpeedKnots: Double
-    /// Komfort-Zugriff: Start-Wegpunkt-Vorlagen-ID.
+    /// Start waypoint template ID (convenience).
     var startWaypointID: UUID { waypointTemplateIDs.first ?? UUID() }
-    /// Komfort-Zugriff: Ziel-Wegpunkt-Vorlagen-ID.
+    /// Destination waypoint template ID (convenience).
     var destinationWaypointID: UUID { waypointTemplateIDs.last ?? UUID() }
 }
 
-/// Datengetriebener Katalog für das Ostfriesische Wattenmeer.
+// MARK: - Wadden Sea Catalog
+
+/// Data-driven catalog for the East Frisian Wadden Sea.
 ///
-/// Wird aus einer mitgelieferten JSON-Datei geladen. Neue Inseln, Häfen, Routen,
-/// Wegpunkte oder Peilplanwerte müssen nur in den JSON-Daten ergänzt werden,
-/// nicht im Berechnungscode.
+/// Loaded from a bundled JSON file. Adding a new island, harbour, route, waypoint,
+/// or Peilplan value only requires modifying the JSON data, not the calculation code.
 ///
-/// Der Katalog ist so ausgelegt, dass zukünftige Gebiete (Nordfriesland,
-/// niederländisches Wattenmeer) durch weitere Daten ergänzt werden können.
+/// The catalog is designed so future areas (North Frisian, Dutch Wadden Sea)
+/// can be supported by adding more data.
 struct WaddenSeaCatalog: Codable, Equatable {
     var stations: [TidalReferenceStation]
     var waypoints: [WaypointTemplate]
     var routeTemplates: [RouteTemplate]
+
+    // MARK: Lookup
 
     func station(byID id: String) -> TidalReferenceStation? {
         stations.first { $0.id == id }
@@ -110,16 +119,17 @@ struct WaddenSeaCatalog: Codable, Equatable {
         waypoints.first { $0.id == id }
     }
 
-    /// Findet Routenvorlagen, die die gegebenen Start- und Ziel-Wegpunkt-Vorlagen verbinden.
+    /// Find route templates that connect the given start and destination waypoint templates.
     func routeTemplates(from startID: UUID, to destinationID: UUID) -> [RouteTemplate] {
         routeTemplates.filter {
             $0.startWaypointID == startID && $0.destinationWaypointID == destinationID
         }
     }
 
-    /// Findet Routenvorlagen, die zu den gegebenen HarbourOption-IDs passen.
-    /// Bildet HarbourOption-IDs auf WaypointTemplate-Namen zum Abgleich ab.
+    /// Find route templates that connect harbours matching the given HarbourOption IDs.
+    /// Maps HarbourOption IDs to WaypointTemplate names for matching.
     func routeTemplates(fromHarbourID startHarbourID: String, toHarbourID destHarbourID: String) -> [RouteTemplate] {
+        // Find waypoint templates that match the harbour IDs by name prefix.
         let startTemplates = waypoints.filter { wp in
             harbourIDMatches(harbourID: startHarbourID, waypointName: wp.name)
         }
@@ -136,7 +146,7 @@ struct WaddenSeaCatalog: Codable, Equatable {
         return matches
     }
 
-    /// Findet eine Wegpunkt-Vorlage, die zur HarbourOption-ID passt.
+    /// Find a waypoint template matching a HarbourOption ID.
     func waypointTemplate(forHarbourID harbourID: String) -> WaypointTemplate? {
         waypoints.first { wp in
             harbourIDMatches(harbourID: harbourID, waypointName: wp.name)
@@ -150,12 +160,14 @@ struct WaddenSeaCatalog: Codable, Equatable {
         return waypointName.lowercased().contains(normalized)
     }
 
-    /// Alle Wegpunkt-Vorlagen der Kategorie „Hafen“.
+    /// All waypoint templates of category "Hafen".
     var harbourWaypoints: [WaypointTemplate] {
         waypoints.filter { $0.category == "Hafen" }
     }
 
-    /// Lädt den Katalog aus der mitgelieferten JSON-Ressource.
+    // MARK: Loading
+
+    /// Load the catalog from the bundled JSON resource.
     static func loadBundled() -> WaddenSeaCatalog {
         guard let url = Bundle.main.url(forResource: "wadden_sea_catalog", withExtension: "json"),
               let data = try? Data(contentsOf: url) else {
@@ -167,7 +179,7 @@ struct WaddenSeaCatalog: Codable, Equatable {
             ?? WaddenSeaCatalog(stations: [], waypoints: [], routeTemplates: [])
     }
 
-    /// Baut einen RoutePlan aus einer Routenvorlage mit Nutzerparametern.
+    /// Build a RoutePlan from a route template with user parameters.
     func buildRoutePlan(
         from template: RouteTemplate,
         date: Date,
@@ -212,7 +224,7 @@ struct WaddenSeaCatalog: Codable, Equatable {
         )
     }
 
-    /// Baut eine direkte 2-Wegpunkt-Fallback-Route aus Hafenoptionen.
+    /// Build a direct (2-waypoint) fallback route from harbour options.
     func buildDirectRoute(
         startHarbourID: String,
         destinationHarbourID: String,

@@ -1,8 +1,6 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Crew-Tab: Verwaltung der Crewmitglieder und Rollen
-
 enum CrewRoleOption: String, CaseIterable, Identifiable {
     case skipper = "Skipper"
     case coSkipper = "Co-Skipper"
@@ -76,169 +74,142 @@ enum CrewRoleOption: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Crew-Tab View-Aufbau
-
 extension ContentView {
     func crewTab() -> some View {
         let onboardCount = crewMembers.filter(\.isOnBoard).count
 
         return VStack(alignment: .leading, spacing: 12) {
             crewOverviewCard(onboardCount: onboardCount)
-            crewAddCard()
-            crewMemberList()
-        }
-    }
 
-    private func crewAddCard() -> some View {
-        crewGlassCard {
-            VStack(alignment: .leading, spacing: 14) {
-                crewAddHeader()
-                crewTextField("Name", text: $newCrewName, capitalization: .words)
-                crewRoleSelector(selection: $newCrewRole)
-                LazyVGrid(columns: compactColumns, spacing: 10) {
-                    crewTextField("Notfallkontakt", text: $newCrewEmergencyContact, capitalization: .words)
-                    crewTextField("Telefon", text: $newCrewEmergencyPhone, keyboard: .phonePad)
-                }
-                crewTextField("Medizinische Hinweise / Notizen", text: $newCrewNotes, capitalization: .sentences)
-                crewAddButton()
-            }
-        }
-    }
+            crewGlassCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0x3C82FF))
+                            .frame(width: 36, height: 36)
+                            .background(Color(hex: 0x3C82FF).opacity(0.12))
+                            .clipShape(Circle())
 
-    private func crewAddHeader() -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color(hex: 0x3C82FF))
-                .frame(width: 36, height: 36)
-                .background(Color(hex: 0x3C82FF).opacity(0.12))
-                .clipShape(Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Crewmitglied hinzufügen")
+                                .font(.system(size: 18, weight: .bold))
+                            Text("Rolle, Notfallkontakt und Hinweise")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.secondary)
+                        }
+                    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Crewmitglied hinzufügen")
-                    .font(.system(size: 18, weight: .bold))
-                Text("Rolle, Notfallkontakt und Hinweise")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.secondary)
-            }
-        }
-    }
+                    crewTextField("Name", text: $newCrewName, capitalization: .words)
 
-    private func crewAddButton() -> some View {
-        let isDisabled = newCrewName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return Button {
-            addCrewMember()
-        } label: {
-            Label("Hinzufügen", systemImage: "plus")
-                .font(.system(size: 16, weight: .bold))
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white)
-        .padding(.vertical, 14)
-        .background(
-            LinearGradient(
-                colors: [Color.appPrimary, Color(hex: 0x3C82FF)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(color: Color(hex: 0x3C82FF).opacity(0.22), radius: 14, y: 8)
-        .opacity(isDisabled ? 0.55 : 1)
-        .disabled(isDisabled)
-    }
+                    crewRoleSelector(selection: $newCrewRole)
 
-    private func crewMemberList() -> some View {
-        ForEach(crewMembers) { member in
-            SwipeDeleteRow(deleteAction: { deleteCrewMember(member) }) {
-                crewGlassCard {
-                    crewMemberCardContent(member: member)
+                    LazyVGrid(columns: compactColumns, spacing: 10) {
+                        crewTextField("Notfallkontakt", text: $newCrewEmergencyContact, capitalization: .words)
+                        crewTextField("Telefon", text: $newCrewEmergencyPhone, keyboard: .phonePad)
+                    }
+
+                    crewTextField("Medizinische Hinweise / Notizen", text: $newCrewNotes, capitalization: .sentences)
+
+                    Button {
+                        addCrewMember()
+                    } label: {
+                        Label("Hinzufügen", systemImage: "plus")
+                            .font(.system(size: 16, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.appPrimary, Color(hex: 0x3C82FF)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: Color(hex: 0x3C82FF).opacity(0.22), radius: 14, y: 8)
+                    .opacity(newCrewName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
+                    .disabled(newCrewName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-        }
-    }
 
-    private func crewMemberCardContent(member: CrewMemberRecord) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            crewMemberHeader(member: member)
-            crewMemberDisclosure(member: member)
-        }
-    }
+            ForEach(crewMembers) { member in
+                SwipeDeleteRow(deleteAction: { deleteCrewMember(member) }) {
+                    crewGlassCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(spacing: 14) {
+                                let roleOption = CrewRoleOption.option(for: member.role)
+                                ZStack {
+                                    Circle()
+                                        .fill(roleOption.tint.opacity(member.isOnBoard ? 0.18 : 0.08))
+                                    Image(systemName: roleOption.icon)
+                                        .font(.system(size: 21, weight: .bold))
+                                        .foregroundStyle(member.isOnBoard ? roleOption.tint : Color.secondary)
+                                }
+                                .frame(width: 52, height: 52)
 
-    private func crewMemberHeader(member: CrewMemberRecord) -> some View {
-        let roleOption = CrewRoleOption.option(for: member.role)
-        return HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(roleOption.tint.opacity(member.isOnBoard ? 0.18 : 0.08))
-                Image(systemName: roleOption.icon)
-                    .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(member.isOnBoard ? roleOption.tint : Color.secondary)
-            }
-            .frame(width: 52, height: 52)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(member.name)
+                                        .font(.system(size: 20, weight: .bold))
+                                    HStack(spacing: 6) {
+                                        Text(roleOption.rawValue)
+                                            .font(.system(size: 15, weight: .semibold))
+                                        Text(member.isOnBoard ? "An Bord" : "Nicht an Bord")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(member.isOnBoard ? Color(hex: 0x0D9488) : Color.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background((member.isOnBoard ? Color(hex: 0x0D9488) : Color.gray).opacity(0.12))
+                                            .clipShape(Capsule())
+                                    }
+                                    .foregroundStyle(Color.secondary)
+                                }
+                                Spacer()
+                                Toggle("An Bord", isOn: Binding(
+                                    get: { member.isOnBoard },
+                                    set: { member.isOnBoard = $0; try? modelContext.save() }
+                                ))
+                                .labelsHidden()
+                                .tint(roleOption.tint)
+                            }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(member.name)
-                    .font(.system(size: 20, weight: .bold))
-                HStack(spacing: 6) {
-                    Text(roleOption.rawValue)
-                        .font(.system(size: 15, weight: .semibold))
-                    crewOnboardBadge(isOnBoard: member.isOnBoard)
+                            DisclosureGroup {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    crewRoleSelector(selection: Binding(
+                                        get: { CrewRoleOption.normalizedRole(member.role) },
+                                        set: { member.role = $0; try? modelContext.save() }
+                                    ))
+
+                                    LazyVGrid(columns: compactColumns, spacing: 10) {
+                                        crewDetailField("Notfallkontakt", text: Binding(
+                                            get: { member.emergencyContact },
+                                            set: { member.emergencyContact = $0; try? modelContext.save() }
+                                        ))
+                                        crewDetailField("Telefon", text: Binding(
+                                            get: { member.emergencyPhone },
+                                            set: { member.emergencyPhone = $0; try? modelContext.save() }
+                                        ), keyboard: .phonePad)
+                                    }
+
+                                    crewDetailField("Notizen", text: Binding(
+                                        get: { member.notes },
+                                        set: { member.notes = $0; try? modelContext.save() }
+                                    ))
+                                }
+                                .padding(.top, 10)
+                            } label: {
+                                Label("Details bearbeiten", systemImage: "slider.horizontal.3")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Color.appPrimary)
+                            }
+                            .tint(Color.appPrimary)
+                        }
+                    }
                 }
-                .foregroundStyle(Color.secondary)
             }
-            Spacer()
-            Toggle("An Bord", isOn: Binding(
-                get: { member.isOnBoard },
-                set: { member.isOnBoard = $0; try? modelContext.save() }
-            ))
-            .labelsHidden()
-            .tint(roleOption.tint)
         }
-    }
-
-    private func crewOnboardBadge(isOnBoard: Bool) -> some View {
-        Text(isOnBoard ? "An Bord" : "Nicht an Bord")
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(isOnBoard ? Color(hex: 0x0D9488) : Color.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background((isOnBoard ? Color(hex: 0x0D9488) : Color.gray).opacity(0.12))
-            .clipShape(Capsule())
-    }
-
-    private func crewMemberDisclosure(member: CrewMemberRecord) -> some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 12) {
-                crewRoleSelector(selection: Binding(
-                    get: { CrewRoleOption.normalizedRole(member.role) },
-                    set: { member.role = $0; try? modelContext.save() }
-                ))
-
-                LazyVGrid(columns: compactColumns, spacing: 10) {
-                    crewDetailField("Notfallkontakt", text: Binding(
-                        get: { member.emergencyContact },
-                        set: { member.emergencyContact = $0; try? modelContext.save() }
-                    ))
-                    crewDetailField("Telefon", text: Binding(
-                        get: { member.emergencyPhone },
-                        set: { member.emergencyPhone = $0; try? modelContext.save() }
-                    ), keyboard: .phonePad)
-                }
-
-                crewDetailField("Notizen", text: Binding(
-                    get: { member.notes },
-                    set: { member.notes = $0; try? modelContext.save() }
-                ))
-            }
-            .padding(.top, 10)
-        } label: {
-            Label("Details bearbeiten", systemImage: "slider.horizontal.3")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color.appPrimary)
-        }
-        .tint(Color.appPrimary)
     }
 
     func crewOverviewCard(onboardCount: Int) -> some View {
@@ -247,7 +218,7 @@ extension ContentView {
         return crewGlassCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("\(onboardCount) von \(crewMembers.count) an Bord")
+                    Text("\(onboardCount) an Bord")
                         .font(.system(size: 24, weight: .heavy))
                         .foregroundStyle(Color.appPrimary)
                         .lineLimit(1)
@@ -324,16 +295,7 @@ extension ContentView {
     }
 
     func crewGlassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-
-        return content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial, in: shape)
-            .overlay {
-                shape.stroke(.white.opacity(0.5), lineWidth: 1)
-            }
-            .shadow(color: Color.appPrimary.opacity(0.08), radius: 18, y: 10)
+        card(content: content)
     }
 
     func crewTextField(
@@ -347,11 +309,7 @@ extension ContentView {
             .keyboardType(keyboard)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.62), lineWidth: 1)
-            }
+            .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     func crewRoleSelector(selection: Binding<String>) -> some View {
@@ -397,12 +355,12 @@ extension ContentView {
                 if isSelected {
                     option.tint
                 } else {
-                    Color.fieldBackground.opacity(0.78)
+                    Color.fieldBackground
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isSelected ? option.tint.opacity(0.2) : Color.white.opacity(0.72), lineWidth: 1)
+                    .stroke(isSelected ? option.tint.opacity(0.2) : Color.clear, lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
@@ -422,11 +380,7 @@ extension ContentView {
                 .keyboardType(keyboard)
                 .font(.system(size: 14, weight: .medium))
                 .padding(10)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.62), lineWidth: 1)
-                }
+                .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -466,6 +420,7 @@ extension ContentView {
     }
 
     func crewSummaryText() -> String {
+        // Das Logbuch speichert eine Textfassung der aktuellen Crew, damit ältere Törns unverändert lesbar bleiben.
         crewMembers.filter(\.isOnBoard).map { member in
             var parts = ["\(member.name) (\(CrewRoleOption.normalizedRole(member.role)))"]
             if !member.emergencyContact.isEmpty {

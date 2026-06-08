@@ -48,13 +48,21 @@ private struct CrewMember: Identifiable {
 struct ContentView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(LocationService.self) var locationService
+    @Environment(NavigationTracker.self) var navigationTracker
+    @Environment(ActiveVoyageManager.self) var voyageManager
     @Query(sort: \CalculationRecord.createdAt, order: .reverse) var calculations: [CalculationRecord]
     @Query(sort: \WeatherSnapshot.fetchedAt, order: .reverse) var weatherSnapshots: [WeatherSnapshot]
     @Query(sort: \CrewMemberRecord.createdAt, order: .forward) var crewMembers: [CrewMemberRecord]
     @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var selectedTab: AppTab = .map
     @State private var settingsShown = false
+    @State var voyageDisclaimerShown = false
+    @State var stopVoyageAlertShown = false
+    @State var navigationFullScreenShown = false
+    @State var mapFullScreenShown = false
     @State var viewModel = RoutePlannerViewModel()
     @State var weatherRegionID = HarbourOption.options[2].id
     @State var tideHarbourID = HarbourOption.options[2].id
@@ -64,10 +72,15 @@ struct ContentView: View {
     @State var weatherReading: WeatherReading?
     @State var islandWeather: [String: WeatherReading] = [:]
     @State var weatherError: String?
+    @State var windfinderReading: WindfinderService.Reading? = nil
+    @State var windfinderLoading = false
     @State var tideLoading = false
     @State var tideReading: TideReading?
     @State var islandTides: [String: TideReading] = [:]
     @State var tideError: String?
+    @State var waterLevelForecasts: [String: WaterLevelForecast] = [:]
+    @State var waterLevelLoading = false
+    @State var waterLevelError: String?
     @State var newCrewName = ""
     @State var newCrewRole = CrewRoleOption.deck.rawValue
     @State var newCrewEmergencyContact = ""
@@ -104,6 +117,9 @@ struct ContentView: View {
                 .tabItem { Label(AppTab.logbook.label, systemImage: AppTab.logbook.icon) }
         }
         .tint(Color(hex: 0x3C82FF))
+        // iOS 26: Tab Bar adopts Liquid Glass automatically. We just
+        // opt in to the auto-minimize behaviour. iOS 18: no-op.
+        .appTabBarMinimize()
         .background(Color.appBackground.ignoresSafeArea())
         .sheet(isPresented: $settingsShown) {
             SettingsSheet()
@@ -117,32 +133,104 @@ struct ContentView: View {
                 ActivityView(activityItems: [exportedPDFURL])
             }
         }
+        .alert("Achtung – Sicherheitshinweis", isPresented: $voyageDisclaimerShown) {
+            Button("Akzeptieren & Fahrt starten", role: .destructive) {
+                startActiveVoyage()
+                navigationFullScreenShown = true
+            }
+            Button("Abbrechen", role: .cancel) { }
+        } message: {
+            Text("Achtung: Diese Route ist eine Planungshilfe. Navigieren Sie stets nach Sicht und aktuellen Seezeichen. Die App ersetzt keine offizielle Seekarte.")
+        }
+        .fullScreenCover(isPresented: $navigationFullScreenShown) {
+            FullScreenNavigationView(
+                start: viewModel.startHarbour,
+                destination: viewModel.destinationHarbour,
+                routePlan: viewModel.routePlan,
+                waypointResults: viewModel.calculationResult?.waypointResults,
+                onStopVoyage: { finishActiveVoyage() }
+            )
+            .environment(locationService)
+            .environment(navigationTracker)
+            .environment(voyageManager)
+            .preferredColorScheme(.dark)
+        }
+        .fullScreenCover(isPresented: $mapFullScreenShown) {
+            FullScreenMapView(
+                isPresented: $mapFullScreenShown,
+                start: viewModel.startHarbour,
+                destination: viewModel.destinationHarbour,
+                routePlan: viewModel.routePlan,
+                waypointResults: viewModel.calculationResult?.waypointResults,
+                breadcrumbs: voyageManager.breadcrumbs.map(\.coordinate)
+            )
+            .preferredColorScheme(preferredColorScheme)
+        }
+        .alert("Aktive Fahrt beenden?", isPresented: $stopVoyageAlertShown) {
+            Button("Fahrt beenden", role: .destructive) {
+                finishActiveVoyage()
+            }
+            Button("Weiter aufzeichnen", role: .cancel) { }
+        } message: {
+            Text("Die aufgezeichnete Strecke wird ins Logbuch übernommen und das GPS-Tracking gestoppt.")
+        }
         .task { await bootstrapIfNeeded() }
         .onChange(of: selectedTab) { _, tab in
             if tab == .weather {
-                Task { await loadWeather(force: islandWeather.isEmpty) }
+                Task {
+                    await loadWeather(force: islandWeather.isEmpty)
+                    await loadWindfinder(for: weatherRegionID, force: false)
+                }
             } else if tab == .tides {
-                Task { await loadIslandTides(force: islandTides.isEmpty) }
+                Task {
+                    await loadIslandTides(force: islandTides.isEmpty)
+                    await loadWaterLevelForecast(for: HarbourOption.byID(tideHarbourID), force: false)
+                }
             }
         }
-        .onChange(of: weatherRegionID) { _, _ in
+        .onChange(of: weatherRegionID) { _, newID in
             if selectedTab == .weather {
-                Task { await loadWeather(force: islandWeather[weatherRegionID] == nil) }
+                Task {
+                    await loadWeather(force: islandWeather[newID] == nil)
+                    await loadWindfinder(for: newID, force: false)
+                }
             }
-        }
-        .onChange(of: tideHarbourID) { _, _ in
-            Task { await loadTides(force: true) }
         }
         .onChange(of: viewModel.destinationHarbourID) { _, _ in
             syncRouteDefaults()
             syncRouteWeatherStatus()
-            Task { await loadTides(force: true) }
+            Task {
+                await loadTides(force: true)
+                await loadWaterLevelForecast(for: destinationHarbour, force: false)
+            }
         }
         .onChange(of: viewModel.startHarbourID) { _, _ in
             syncRouteDefaults()
         }
         .onChange(of: viewModel.departure) { _, _ in
             Task { await loadTides(force: false) }
+        }
+        .onChange(of: tideHarbourID) { _, newID in
+            if selectedTab == .tides {
+                let harbour = HarbourOption.byID(newID)
+                Task {
+                    await loadAstronomicalTide(for: harbour)
+                    await loadWaterLevelForecast(for: harbour, force: false)
+                }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // When the app comes back to the foreground, re-check the BSH
+            // peak forecast for whatever the user is currently looking at.
+            // Cache TTL keeps the actual network calls cheap.
+            guard phase == .active else { return }
+            Task {
+                let harbour = HarbourOption.byID(tideHarbourID)
+                await loadWaterLevelForecast(for: harbour, force: false)
+                if selectedTab == .map {
+                    await loadWaterLevelForecast(for: destinationHarbour, force: false)
+                }
+            }
         }
     }
 
@@ -156,7 +244,7 @@ struct ContentView: View {
 
     private func screen(for tab: AppTab, @ViewBuilder content: @escaping () -> some View) -> some View {
         VStack(spacing: 0) {
-            AppHeader(refreshAction: { Task { await refreshActiveTab() } }, settingsAction: {
+            AppHeader(refreshAction: { Task { await reloadEntirePage() } }, settingsAction: {
                 settingsShown = true
             })
             ScrollView {
@@ -174,21 +262,23 @@ struct ContentView: View {
         }
     }
 
-    private func refreshActiveTab() async {
-        switch selectedTab {
-        case .weather:
-            await loadWeather(force: true)
-        case .tides:
-            await loadIslandTides(force: true)
-        case .map:
-            await MainActor.run {
-                writeAudit(action: "READ", source: "karte", statement: "SELECT ukc, wt, fmw FROM manual_passage_preview LIMIT 1", status: "ok")
-            }
-            await loadTides(force: true)
-        default:
-            await MainActor.run {
-                writeAudit(action: "READ", source: "ui", statement: "SELECT tab, refreshed_at FROM ui_state WHERE tab = '\(selectedTab.label)' LIMIT 1", status: "ok")
-            }
-        }
+    /// Full page reload (the header refresh button). Regardless of the active
+    /// tab, this re-syncs the route defaults, recomputes the route + passage
+    /// window and force-refreshes every data source the app shows — weather,
+    /// wind, island tides, the destination/Pegel tides and the BSH
+    /// water-level forecasts — so the whole page reflects fresh data.
+    @MainActor
+    private func reloadEntirePage() async {
+        writeAudit(action: "READ", source: "ui", statement: "SELECT * FROM page_state -- full reload", status: "ok")
+
+        syncRouteDefaults()
+        viewModel.onRouteChanged()
+
+        await loadWeather(force: true)
+        await loadWindfinder(for: weatherRegionID, force: true)
+        await loadTides(force: true)
+        await loadIslandTides(force: true)
+        await loadWaterLevelForecast(for: destinationHarbour, force: true)
+        await loadWaterLevelForecast(for: HarbourOption.byID(tideHarbourID), force: true)
     }
 }

@@ -1,16 +1,10 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Geteilte UI-Bausteine (Karten, Buttons, Status-Badges)
-
 extension ContentView {
     func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .shadow(color: .black.opacity(0.05), radius: 12, y: 8)
+            .appCardSurface(cornerRadius: 22)
     }
 
     func harbourPicker(title: String, selection: Binding<String>, embedded: Bool = false) -> some View {
@@ -24,11 +18,9 @@ extension ContentView {
 
         return Group {
             if embedded {
-                picker
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.fieldBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                // Embedded picker sits INSIDE a glass card, so we stay
+                // on `appFieldSurface` (flat) — never stack glass on glass.
+                picker.appFieldSurface(cornerRadius: 14)
             } else {
                 card { picker }
             }
@@ -48,12 +40,11 @@ extension ContentView {
             Text(caption)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.secondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
-        .padding(14)
-        .background(Color.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 12, y: 8)
+        .appMetricSurface(cornerRadius: 20)
     }
 
     func placeholderCard(icon: String, title: String, text: String) -> some View {
@@ -82,10 +73,7 @@ extension ContentView {
             Text(value)
                 .font(.system(size: 16, weight: .semibold))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .appFieldSurface(cornerRadius: 16)
     }
 
     func numberField(_ title: String, value: Binding<Double>) -> some View {
@@ -103,23 +91,11 @@ extension ContentView {
         return "\(totalMinutes / 60)h \(totalMinutes % 60)m"
     }
 
-    static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM.yyyy"
-        return formatter
-    }()
-
-    static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
-
-    static let slotFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
+    // German-locale, Berlin-timezone formatters. These delegate to
+    // `AppDateFormatters` so the whole app uses one consistent set.
+    static var dateFormatter: DateFormatter { AppDateFormatters.dayMonthYear }
+    static var timeFormatter: DateFormatter { AppDateFormatters.hourMinute }
+    static var slotFormatter: DateFormatter { AppDateFormatters.hourMinute }
 
     static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -184,6 +160,9 @@ struct SwipeDeleteRow<Content: View>: View {
     }
 }
 
+// AppHeader sits at the top of every tab, just under the system status
+// bar. On iOS 26 it becomes a true Liquid Glass top bar (closer to the
+// system NavigationBar) and on iOS 18 it stays as ultraThinMaterial.
 struct AppHeader: View {
     let refreshAction: () -> Void
     let settingsAction: () -> Void
@@ -215,8 +194,7 @@ struct AppHeader: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 14)
-        .background(Color.cardBackground)
-        .shadow(color: .black.opacity(0.04), radius: 6, y: 4)
+        .appFloatingOverlay(cornerRadius: 0)
     }
 }
 
@@ -229,10 +207,7 @@ struct CircleButton: View {
             Image(systemName: systemName)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Color.primary.opacity(0.85))
-                .frame(width: 44, height: 44)
-                .background(Color.cardBackground)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.08), radius: 10, y: 6)
+                .appCircularGlass(diameter: 44)
         }
         .buttonStyle(.plain)
     }
@@ -266,14 +241,18 @@ struct SettingsSheet: View {
                 }
                 .padding(16)
             }
-            .background(
+            // iOS 26 sheets get an automatic Liquid Glass background —
+            // any opaque background we paint would hide that. The helper
+            // hides our gradient on 26+ and keeps it as a clean fallback
+            // for 18/25.
+            .appSheetBackground {
                 LinearGradient(
                     colors: [Color.appBackground, Color.cardBackground, Color.fieldBackground],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
-            )
+            }
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
             .preferredColorScheme(preferredColorScheme)
@@ -337,11 +316,11 @@ struct SettingsSheet: View {
             .tint(Color(hex: 0x3C82FF))
             settingsTextField("Rufzeichen", text: $boatCallsign, icon: "antenna.radiowaves.left.and.right")
             HStack(spacing: 10) {
-                settingsTextField("Tiefgang (m)", text: $boatDraft, icon: "arrow.down.to.line", keyboard: .decimalPad)
-                settingsTextField("Länge (m)", text: $boatLength, icon: "ruler", keyboard: .decimalPad)
+                settingsDecimalField("Tiefgang (m)", text: $boatDraft, icon: "arrow.down.to.line")
+                settingsDecimalField("Länge (m)", text: $boatLength, icon: "ruler")
             }
             HStack(spacing: 10) {
-                settingsTextField("Sicherheitsmarge (m)", text: $safetyMargin, icon: "shield.checkered", keyboard: .decimalPad)
+                settingsDecimalField("Sicherheitsmarge (m)", text: $safetyMargin, icon: "shield.checkered")
             }
         }
     }
@@ -390,16 +369,58 @@ struct SettingsSheet: View {
         }
     }
 
+    // Top-level settings card → Liquid Glass on iOS 26.
     private func settingsGlassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
-
-        return content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.cardBackground, in: shape)
-            .overlay { shape.stroke(Color.primary.opacity(0.06), lineWidth: 1) }
+        content()
+            .appCardSurface(cornerRadius: 24)
     }
 
+    // Decimal field that works on German keyboards. The .decimalPad
+    // keyboard on a German locale shows a comma, not a dot, so the
+    // raw String the user types is "1,5". We persist with a dot so
+    // `Double("1.5")` keeps working everywhere, but the visible value
+    // shows whichever the user typed last. Both notations round-trip
+    // safely.
+    private func settingsDecimalField(
+        _ title: String,
+        text rawStorage: Binding<String>,
+        icon: String
+    ) -> some View {
+        let displayBinding = Binding<String>(
+            get: {
+                // Show what's stored; users see dots in legacy data
+                // but new edits will appear with whichever separator
+                // the keyboard offers.
+                rawStorage.wrappedValue
+            },
+            set: { newValue in
+                // Strip everything except digits, comma, dot, minus;
+                // then normalize the decimal separator to a dot before
+                // persisting, so the engine's `Double(_:)` parser still
+                // accepts the value on any locale.
+                let filtered = newValue.filter { "0123456789.,-".contains($0) }
+                rawStorage.wrappedValue = filtered.replacingOccurrences(of: ",", with: ".")
+            }
+        )
+
+        return HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color(hex: 0x3C82FF))
+                .frame(width: 28, height: 28)
+                .background(Color(hex: 0x3C82FF).opacity(0.12))
+                .clipShape(Circle())
+            TextField(title, text: displayBinding)
+                .keyboardType(.decimalPad)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .font(.system(size: 15, weight: .semibold))
+        }
+        .appFieldSurface(cornerRadius: 16)
+    }
+
+    // Inline text-field row. Sits INSIDE a glass card, so it stays as a
+    // flat field on every OS (never stack glass on glass).
     private func settingsTextField(
         _ title: String,
         text: Binding<String>,
@@ -423,12 +444,7 @@ struct SettingsSheet: View {
                 .autocorrectionDisabled(autocorrectionDisabled)
                 .font(.system(size: 15, weight: .semibold))
         }
-        .padding(12)
-        .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        }
+        .appFieldSurface(cornerRadius: 16)
     }
 
     private func sourceRow(name: String, detail: String, icon: String) -> some View {
@@ -449,12 +465,7 @@ struct SettingsSheet: View {
             }
             Spacer()
         }
-        .padding(12)
-        .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        }
+        .appFieldSurface(cornerRadius: 16)
     }
 }
 

@@ -1,11 +1,12 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Logbuch-Tab: Verlauf gespeicherter Berechnungen und PDF-Export
-
 extension ContentView {
     func logbookTab() -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            if voyageManager.isVoyageActive {
+                liveVoyageBanner
+            }
             if calculations.isEmpty {
                 placeholderCard(icon: "book.closed.fill", title: "Noch kein Logbuch-Eintrag", text: "Sobald eine Berechnung gespeichert wird, erscheint hier ein kompakter Törn.")
             } else {
@@ -18,6 +19,67 @@ extension ContentView {
                 }
             }
         }
+    }
+
+    // MARK: - Live Voyage Banner
+
+    /// Always-visible banner on the Logbook tab whenever a voyage is
+    /// recording. Shows the elapsed timer and the current SOG; ticks via
+    /// TimelineView so the clock animates without us mutating state
+    /// every second.
+    private var liveVoyageBanner: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.18))
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Color.green)
+            }
+            .frame(width: 44, height: 44)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("LIVE-FAHRT")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.secondary)
+                Text(voyageManager.activeRoute?.routeName ?? "Aktive Aufzeichnung")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.appPrimary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let elapsed = Date().timeIntervalSince(voyageManager.voyageStartTime ?? context.date)
+                    Text(Self.formatHMS(elapsed))
+                        .font(.system(size: 16, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(Color.appPrimary)
+                }
+                Text(String(format: "%.1f kn · %.2f sm",
+                            locationService.speedKnots,
+                            voyageManager.totalDistanceNm))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.secondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.green.opacity(0.45), lineWidth: 1.5)
+        }
+    }
+
+    private static func formatHMS(_ interval: TimeInterval) -> String {
+        let total = max(0, Int(interval))
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        return String(format: "%02d:%02d:%02d", h, m, s)
     }
 
     func logbookCard(_ record: CalculationRecord) -> some View {
@@ -195,6 +257,8 @@ extension ContentView {
 
     private static let displayDateTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = AppDateFormatters.germanLocale
+        formatter.timeZone = AppDateFormatters.berlinTimeZone
         formatter.dateFormat = "dd.MM.yyyy HH:mm"
         return formatter
     }()
@@ -418,18 +482,24 @@ enum ToernPDFExporter {
 
     private static let fileDate: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = AppDateFormatters.germanLocale
+        formatter.timeZone = AppDateFormatters.berlinTimeZone
         formatter.dateFormat = "yyyyMMdd-HHmm"
         return formatter
     }()
 
     private static let displayDate: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = AppDateFormatters.germanLocale
+        formatter.timeZone = AppDateFormatters.berlinTimeZone
         formatter.dateFormat = "dd.MM.yyyy"
         return formatter
     }()
 
     private static let displayTime: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = AppDateFormatters.germanLocale
+        formatter.timeZone = AppDateFormatters.berlinTimeZone
         formatter.dateFormat = "HH:mm"
         return formatter
     }()

@@ -1,8 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - SwiftData-Modelle für persistente App-Daten
-
 @Model
 final class CalculationRecord {
     var routeTitle: String
@@ -21,6 +19,28 @@ final class CalculationRecord {
     var notes: String = ""
     var createdAt: Date
 
+    // MARK: - Voyage fields
+    //
+    // Filled in by `ActiveVoyageManager.stopVoyageAndSaveLogbook` when a
+    // live tracked trip ends. For planning-only entries these stay at
+    // their default zero / empty values, so the model stays backwards-
+    // compatible with previously saved records.
+
+    /// True when the record represents an actually sailed voyage (not a
+    /// planning-only calculation).
+    var isActualVoyage: Bool = false
+    /// GPS-measured distance in nautical miles.
+    var actualDistanceNM: Double = 0
+    /// Mean speed-over-ground in knots, averaged over GPS samples.
+    var averageSOGKnots: Double = 0
+    /// Peak SOG observed during the voyage.
+    var maxSOGKnots: Double = 0
+    /// Voyage duration in seconds (`arrivalAt − departureAt`).
+    var voyageDurationSeconds: Double = 0
+    /// JSON-encoded breadcrumb trail: an array of `{lat,lon,ts}` triples.
+    /// Stored as text so the SwiftData schema stays trivial.
+    var breadcrumbJSON: String = ""
+
     init(
         routeTitle: String,
         startName: String,
@@ -36,7 +56,13 @@ final class CalculationRecord {
         tideSummary: String = "",
         crewSummary: String = "",
         notes: String = "",
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        isActualVoyage: Bool = false,
+        actualDistanceNM: Double = 0,
+        averageSOGKnots: Double = 0,
+        maxSOGKnots: Double = 0,
+        voyageDurationSeconds: Double = 0,
+        breadcrumbJSON: String = ""
     ) {
         self.routeTitle = routeTitle
         self.startName = startName
@@ -53,6 +79,12 @@ final class CalculationRecord {
         self.crewSummary = crewSummary
         self.notes = notes
         self.createdAt = createdAt
+        self.isActualVoyage = isActualVoyage
+        self.actualDistanceNM = actualDistanceNM
+        self.averageSOGKnots = averageSOGKnots
+        self.maxSOGKnots = maxSOGKnots
+        self.voyageDurationSeconds = voyageDurationSeconds
+        self.breadcrumbJSON = breadcrumbJSON
     }
 }
 
@@ -137,8 +169,6 @@ final class CrewMemberRecord {
     }
 }
 
-// MARK: - App-Einstiegspunkt und ModelContainer-Setup
-
 @main
 struct ToernberechnungApp: App {
     private let modelContainer: ModelContainer = {
@@ -147,9 +177,41 @@ struct ToernberechnungApp: App {
         return try! ModelContainer(for: schema, configurations: [configuration])
     }()
 
+    /// Live GPS service.  Shared across every tab so the background
+    /// recording survives navigation away from the Map tab.
+    @State private var locationService = LocationService()
+    @State private var navigationTracker = NavigationTracker()
+    @State private var voyageManager: ActiveVoyageManager
+
+    init() {
+        let loc = LocationService()
+        let tracker = NavigationTracker()
+        let voyage = ActiveVoyageManager(locationService: loc, tracker: tracker)
+        _locationService = State(initialValue: loc)
+        _navigationTracker = State(initialValue: tracker)
+        _voyageManager = State(initialValue: voyage)
+
+        // Start SeaMask building asynchronously on launch
+        NauticalRouteService.shared.buildSeaMask()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(locationService)
+                .environment(navigationTracker)
+                .environment(voyageManager)
+                // Force German locale + Berlin timezone for every native
+                // SwiftUI control (DatePicker, formatted dates, …) so the
+                // UI never falls back to en_US / UTC.
+                .environment(\.locale, Locale(identifier: "de_DE"))
+                .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin") ?? .current)
+                .environment(\.calendar, {
+                    var cal = Calendar(identifier: .gregorian)
+                    cal.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
+                    cal.locale = Locale(identifier: "de_DE")
+                    return cal
+                }())
         }
         .modelContainer(modelContainer)
     }

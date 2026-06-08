@@ -1,8 +1,6 @@
 import Foundation
 import CoreLocation
 
-// MARK: - Seerouten-Planung mit Seezeichen-Graph aus OpenSeaMap (Overpass-API)
-
 enum SeaRoutePlanner {
     private struct SeamarkGraph {
         let nodes: [Int: CLLocationCoordinate2D]
@@ -31,50 +29,26 @@ enum SeaRoutePlanner {
         let links: [String]
     }
 
-    static var nauticalStyleURL: URL {
-        let style = """
-        {
-          "version": 8,
-          "sources": {
-            "osm": {
-              "type": "raster",
-              "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-              "tileSize": 256,
-              "attribution": "OpenStreetMap contributors"
-            },
-            "openseamap": {
-              "type": "raster",
-              "tiles": ["https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"],
-              "tileSize": 256,
-              "attribution": "OpenSeaMap"
-            }
-          },
-          "layers": [
-            {
-              "id": "osm",
-              "type": "raster",
-              "source": "osm",
-              "minzoom": 0,
-              "maxzoom": 19
-            },
-            {
-              "id": "openseamap",
-              "type": "raster",
-              "source": "openseamap",
-              "minzoom": 0,
-              "maxzoom": 18
-            }
-          ]
-        }
-        """
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("toern-nautical-style.json")
-        try? style.data(using: .utf8)?.write(to: url, options: .atomic)
-        return url
-    }
-
     static func route(from start: HarbourOption, to destination: HarbourOption) -> [CLLocationCoordinate2D] {
         guard start.id != destination.id else {
             return [mapCoordinate(for: start)]
+        }
+
+        // Primary route source: NauticalRouter Dijkstra over the verified
+        // fairway waypoint catalog. The legacy harbour graph below is kept as
+        // a fallback in case NauticalRouter cannot resolve a path.
+        let nauticalPath = NauticalRouter.route(
+            from: mapCoordinate(for: start),
+            to: mapCoordinate(for: destination)
+        )
+        if nauticalPath.count >= 2 {
+            let smoothed = NauticalRouter.smooth(
+                [mapCoordinate(for: start)]
+                + nauticalPath.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+                + [mapCoordinate(for: destination)],
+                iterations: 1
+            )
+            return deduplicated(smoothed)
         }
 
         guard let startNode = harbourNodeIDs[start.id],
@@ -229,6 +203,7 @@ enum SeaRoutePlanner {
         var nodeIDsByCoordinate: [String: Int] = [:]
         var nextID = 0
 
+        // Koordinaten werden gerundet als Schlüssel verwendet, damit identische Wegpunkte nur einmal im Graphen landen.
         func nodeID(for coordinate: CLLocationCoordinate2D) -> Int {
             let key = "\(Int((coordinate.latitude * 100_000).rounded())):\(Int((coordinate.longitude * 100_000).rounded()))"
             if let existing = nodeIDsByCoordinate[key] { return existing }

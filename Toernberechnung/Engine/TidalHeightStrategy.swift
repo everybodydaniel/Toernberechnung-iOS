@@ -1,67 +1,73 @@
 import Foundation
 
-/// Abstraktion für die Berechnung der Fehlmenge Wasser (FmW) anhand der
-/// Zeitabweichung zum Hochwasser.
+// MARK: - Tidal Height Strategy Protocol
+
+/// Abstraction for computing the tidal water deficit ("Fehlmenge Wasser") based on
+/// the time deviation from high water.
 ///
-/// Standardimplementierung ist die **Zwölftelregel**, welche den Tidenhub
-/// in 12 gleiche Teile teilt und Wasserstandsänderungen stündlichen Buckets zuordnet.
+/// The default implementation is the **Twelfths Rule** (Zwölftelregel), which divides
+/// the tidal range into 12 equal parts and assigns water-level changes to hourly buckets.
 ///
-/// Zukünftige Strategien (z. B. harmonische Analyse, sinusförmige Interpolation) können
-/// dieses Protokoll implementieren, ohne `RouteCalculationService` zu ändern.
+/// Future strategies (e.g. harmonic analysis, sinusoidal interpolation) can be added
+/// by conforming to this protocol without modifying `RouteCalculationService`.
 protocol TidalHeightStrategy {
-    /// Berechnet die Fehlmenge Wasser anhand der Zeitabweichung vom Hochwasser.
+    /// Calculate the missing water amount based on time deviation from high water.
     ///
     /// - Parameters:
-    ///   - deviationHours: Absolute Zeitdifferenz zum relevanten Hochwasser in Dezimalstunden.
-    ///   - meanTidalRangeMeters: Mittlerer Tidenhub (MTH) in Metern.
-    /// - Returns: Ein `TidalHeightResult` mit FmW, 1/12-Wert und Gültigkeit.
+    ///   - deviationHours: Absolute time difference from relevant high water, in decimal hours.
+    ///   - meanTidalRangeMeters: Mean tidal range (Mittlerer Tidenhub) in meters.
+    /// - Returns: A `TidalHeightResult` with the computed FmW, 1/12 value, and validity.
     func missingWater(
         deviationHours: Double,
         meanTidalRangeMeters: Double
     ) -> TidalHeightResult
 }
 
-/// Ergebnis einer Tidenhöhen-Strategie-Berechnung.
+// MARK: - Tidal Height Result
+
+/// Result of a tidal height strategy computation.
 struct TidalHeightResult: Equatable {
-    /// Fehlmenge Wasser in Metern (FmW).
-    /// Direkt am Hochwasser ist dieser Wert 0.
+    /// Missing water amount in meters (Fehlmenge Wasser / FmW).
+    /// At exact high water, this is 0.
     let fmwMeters: Double
-    /// Ein Zwölftel des mittleren Tidenhubs in Metern.
+    /// One-twelfth of the mean tidal range in meters.
     let oneTwelfthMeters: Double
-    /// Ob die Berechnung gültig ist. Falsch, wenn deviationHours > 12.
+    /// Whether the calculation is valid. False if deviationHours > 12.
     let isValid: Bool
-    /// Erläuternde Meldungen (z. B. „keine Fehlmenge“ am HW oder Fehlerbeschreibungen).
+    /// Explanatory messages (e.g. "keine Fehlmenge" at HW, or error descriptions).
     let messages: [String]
 }
 
-/// Die klassische Zwölftelregel zur Schätzung der Tidenhöhe.
+// MARK: - Twelfths Rule Strategy
+
+/// The traditional Twelfths Rule (Zwölftelregel) for tidal height estimation.
 ///
-/// Die Regel teilt den Tidenzyklus in stündliche Buckets und ordnet jeder Stunde
-/// einen Anteil in Zwölfteln des Gesamttidenhubs zu:
+/// The rule divides the tidal cycle into hourly buckets, assigning a number of twelfths
+/// of the total tidal range to each hour:
 ///
 /// ```
-/// Stunde ab HW:  0   0-1   1-2   2-3   3-4   4-5   5-7   7-8   8-9   9-10  10-11  11-12  >12
-/// Zwölftel:      0    1     3     6     9    11    12    11     9     6      3      1   ungültig
+/// Hour from HW:  0   0-1   1-2   2-3   3-4   4-5   5-7   7-8   8-9   9-10  10-11  11-12  >12
+/// Twelfths:      0    1     3     6     9    11    12    11     9     6      3      1    invalid
 /// ```
 ///
-/// Das Muster entspricht der näherungsweise sinusförmigen Tidenkurve:
-/// - Nahe Hochwasser (0–1h): minimale Änderung (1/12)
-/// - Mitte der Tide (2–4h): schnelle Änderung (6–9/12)
-/// - Nahe Niedrigwasser (5–7h): voller Hub (12/12)
-/// - Aufsteigend ab Niedrigwasser: symmetrisches Muster zurück zum HW
+/// The pattern reflects the approximate sinusoidal shape of the tidal curve:
+/// - Near high water (0-1h): minimal change (1/12)
+/// - Mid-tide (2-4h): rapid change (6-9/12)
+/// - Near low water (5-7h): full range (12/12)
+/// - Rising from low: symmetrical pattern back to high water
 ///
-/// **Epsilon-Toleranz gegenüber dem Excel-Original:**
-/// Bei `deviationHours < 0.01` wird FmW unabhängig von Gleitkomma-Rundungen auf 0 gesetzt.
-/// So wird vermieden, dass eine Ankunftszeit, die nominell exakt am HW liegt,
-/// aufgrund von Mikrosekundenabweichungen eine ungleich Null FmW erzeugt.
+/// **Epsilon tolerance improvement:**
+/// If `deviationHours < 0.01`, FmW is set to 0 regardless of floating-point rounding.
+/// This avoids cases where an arrival time that is nominally at HW
+/// but differs by microseconds due to floating-point arithmetic produces a non-zero FmW.
 struct TwelfthsRuleStrategy: TidalHeightStrategy {
 
-    /// Epsilon-Toleranz, ab der eine Ankunft als „am Hochwasser“ behandelt wird.
-    /// Liegt die absolute Abweichung unter diesem Schwellwert, gilt FmW = 0.
+    /// Epsilon tolerance for treating arrival as "at high water".
+    /// If the absolute deviation is below this threshold, FmW = 0.
     ///
-    /// Bewusste Verbesserung gegenüber der Excel-Arbeitsmappe, die rohe
-    /// Gleitkomma-Vergleiche nutzt und am exakten HW durch Rundungsartefakte
-    /// winzige, von Null verschiedene FmW-Werte produzieren kann.
+    /// This is an intentional improvement that uses epsilon comparison
+    /// instead of raw floating-point comparison, which can produce tiny
+    /// non-zero FmW values at exact high water due to rounding artifacts.
     static let hwEpsilonHours: Double = 0.01
 
     func missingWater(
@@ -70,6 +76,7 @@ struct TwelfthsRuleStrategy: TidalHeightStrategy {
     ) -> TidalHeightResult {
         let oneTwelfth = meanTidalRangeMeters / 12.0
 
+        // Exact high water (within epsilon tolerance).
         if abs(deviationHours) < Self.hwEpsilonHours {
             return TidalHeightResult(
                 fmwMeters: 0,
@@ -81,6 +88,7 @@ struct TwelfthsRuleStrategy: TidalHeightStrategy {
 
         let hours = abs(deviationHours)
 
+        // Deviation exceeds one full tidal cycle — calculation is meaningless.
         guard hours <= 12 else {
             return TidalHeightResult(
                 fmwMeters: 0,
@@ -103,7 +111,7 @@ struct TwelfthsRuleStrategy: TidalHeightStrategy {
         case ...10: twelfths = 6
         case ...11: twelfths = 3
         case ...12: twelfths = 1
-        default:    twelfths = 0
+        default:    twelfths = 0 // unreachable due to guard
         }
 
         return TidalHeightResult(

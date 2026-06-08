@@ -1,15 +1,16 @@
 import SwiftUI
 
-// MARK: - Erstbefüllung: Initialdaten beim ersten App-Start anlegen
-
 extension ContentView {
     @MainActor
     func bootstrapIfNeeded() async {
+        // Beim ersten Öffnen werden abgeleitete Routendaten und Startdatensätze vorbereitet.
         syncRouteDefaults()
         if viewModel.routePlan == nil {
             viewModel.onRouteChanged()
         }
         await loadTides(force: tideReading == nil)
+        await loadWaterLevelForecast(for: destinationHarbour, force: false)
+        await loadWindfinder(for: weatherRegionID, force: false)
         if crewMembers.isEmpty {
             modelContext.insert(CrewMemberRecord(name: "Skipper", role: CrewRoleOption.navigation.rawValue, isOnBoard: true))
             modelContext.insert(CrewMemberRecord(name: "Crew", role: CrewRoleOption.deck.rawValue, isOnBoard: true))

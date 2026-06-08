@@ -1,8 +1,8 @@
 import SwiftUI
 
-// MARK: - Karten-Tab: Routenplanung mit Start, Ziel und Tidenberechnung
-
 extension ContentView {
+
+    // MARK: - Route Display Properties
 
     var displayStartHarbourName: String { viewModel.startHarbour.name }
     var displayDestinationHarbourName: String { viewModel.destinationHarbour.name }
@@ -14,12 +14,15 @@ extension ContentView {
         max((viewModel.calculationResult?.totalDistanceNm ?? 0) * 0.35, 0)
     }
 
+    // MARK: - Calculator Tab
+
     func calculatorTab() -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("ROUTE & PASSAGE")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.secondary)
 
+            // Route selection card.
             card {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("ROUTE")
@@ -28,100 +31,147 @@ extension ContentView {
 
                     VStack(spacing: 10) {
                         harbourPicker(title: "Start", selection: $viewModel.startHarbourID, embedded: true)
+                        intermediateStopsSection
                         harbourPicker(title: "Ziel", selection: $viewModel.destinationHarbourID, embedded: true)
                         DatePicker("Abfahrt", selection: $viewModel.departure, displayedComponents: [.date, .hourAndMinute])
                             .datePickerStyle(.compact)
+                            .environment(\.locale, AppDateFormatters.germanLocale)
+                            .environment(\.timeZone, AppDateFormatters.berlinTimeZone)
                     }
 
-                    if viewModel.showTemplateSelector, !viewModel.availableTemplates.isEmpty {
-                        routeTemplateSelector
+                    ZStack(alignment: .topTrailing) {
+                        CompactMapView(
+                            zoomLevel: 8.0,
+                            start: viewModel.startHarbour,
+                            destination: viewModel.destinationHarbour,
+                            routePlan: viewModel.routePlan,
+                            waypointResults: viewModel.calculationResult?.waypointResults,
+                            voyageActive: voyageManager.isVoyageActive,
+                            breadcrumbCoordinates: voyageManager.breadcrumbs.map(\.coordinate)
+                        )
+                        .frame(height: voyageManager.isVoyageActive ? 320 : 240)
+
+                        Button {
+                            if voyageManager.isVoyageActive {
+                                navigationFullScreenShown = true
+                            } else {
+                                mapFullScreenShown = true
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(8)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Circle())
+                        }
+                        .padding(10)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Karte im Vollbildmodus anzeigen")
                     }
-
-                    CompactMapView(
-                        zoomLevel: 8.0,
-                        start: viewModel.startHarbour,
-                        destination: viewModel.destinationHarbour,
-                        routePlan: viewModel.routePlan,
-                        waypointResults: viewModel.calculationResult?.waypointResults
-                    )
-                        .frame(height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 14) {
-                routeStatusBanner
-                passageWindowCard
-
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                    metricCard("REISEZEIT", text: viewModel.totalTravelTimeText, caption: "Dauer")
-                    metricCard("ANKUNFT", text: viewModel.arrivalTimeText, caption: "Uhr")
-                    metricCard("DISTANZ", text: viewModel.totalDistanceText, caption: "NM")
-                    metricCard("WuK", text: viewModel.worstWuKText, caption: viewModel.statusText)
-                    metricCard("DIESEL", text: String(format: "%.1f l", dieselLiters), caption: "Richtwert")
-                }
-
-                if let result = viewModel.calculationResult {
-                    RouteDetailView(result: result, boatSettings: viewModel.boatSettings)
-                }
-
-                Button("Törn berechnen & Logbuch anlegen") { saveCalculation() }
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(Color.appPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
             }
-            .padding(16)
-            .background(Color.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: .black.opacity(0.05), radius: 12, y: 8)
+
+            // Status and results — extracted into a dedicated View struct
+            // so SwiftUI evaluates a shallower generic type tree per body,
+            // preventing the stack overflow that manifested as
+            // EXC_BAD_ACCESS(code=2) at voyageActionButtons.
+            CalculatorResultsSection(
+                viewModel: viewModel,
+                voyageManager: voyageManager,
+                locationService: locationService,
+                navigationTracker: navigationTracker,
+                dieselLiters: dieselLiters,
+                saveAction: { saveCalculation() },
+                stopVoyageAlertShown: $stopVoyageAlertShown,
+                voyageDisclaimerShown: $voyageDisclaimerShown,
+                navigationFullScreenShown: $navigationFullScreenShown
+            )
 
             tidesPreviewCard(title: "NÄCHSTE GEZEITEN AM ZIEL")
+
+            windfinderCard()
         }
     }
 
-    private var routeStatusBanner: some View {
-        let status = viewModel.combinedStatus ?? .incomplete
-        let accent = combinedStatusColor(status)
-        let icon = status == .go ? "checkmark.circle.fill"
-            : status == .warning ? "exclamationmark.triangle.fill"
-            : status == .noGo ? "xmark.circle.fill"
-            : "questionmark.circle.fill"
+    // MARK: - Intermediate Stops (Zwischenstopps)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                if viewModel.isCalculating {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: 28, weight: .bold))
+    private var intermediateStopsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("ZWISCHENSTOPPS")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.secondary)
+                Spacer()
+                Button {
+                    viewModel.addIntermediateStop()
+                } label: {
+                    Label("Hinzufügen", systemImage: "plus.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0x3C82FF))
                 }
-                Text(viewModel.statusText)
-                    .font(.system(size: 28, weight: .bold))
+                .buttonStyle(.plain)
             }
 
-            if let error = viewModel.calculationError {
-                Text(error)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(3)
+            ForEach(viewModel.intermediateStops) { stop in
+                intermediateStopRow(stop: stop)
             }
         }
-        .foregroundStyle(.white)
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [accent.opacity(0.92), accent.opacity(0.72)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: accent.opacity(0.35), radius: 18, y: 10)
     }
+
+    /// Single intermediate-stop row. Receives the `IntermediateStop` by
+    /// value so the closures capture its UUID, never its index — that's
+    /// the guarantee against "Index out of range" when SwiftUI re-diffs
+    /// during deletion.
+    @ViewBuilder
+    private func intermediateStopRow(stop: IntermediateStop) -> some View {
+        let stopID = stop.id
+        let positionLabel: String = {
+            if let idx = viewModel.intermediateStops.firstIndex(where: { $0.id == stopID }) {
+                return "Stopp \(idx + 1)"
+            }
+            return "Stopp"
+        }()
+
+        HStack(spacing: 8) {
+            Picker(positionLabel, selection: Binding(
+                get: {
+                    viewModel.intermediateStops.first(where: { $0.id == stopID })?.harbourID
+                        ?? HarbourOption.options.first?.id
+                        ?? ""
+                },
+                set: { newID in
+                    viewModel.updateIntermediateStop(id: stopID, to: newID)
+                }
+            )) {
+                ForEach(HarbourOption.options) { harbour in
+                    Text(harbour.name).tag(harbour.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(Color(hex: 0x3C82FF))
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.fieldBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Button {
+                viewModel.removeIntermediateStop(id: stopID)
+            } label: {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.red)
+                    .frame(width: 36, height: 36)
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(positionLabel) entfernen")
+        }
+    }
+
+    // MARK: - Route Template Selector
 
     private var routeTemplateSelector: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -157,61 +207,7 @@ extension ContentView {
         }
     }
 
-    private var passageWindowCard: some View {
-        card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("SICHERES ABFAHRTSFENSTER")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-                    Spacer()
-                    if viewModel.isSearchingWindow {
-                        ProgressView()
-                    } else {
-                        Button {
-                            viewModel.refreshPassageWindow()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color(hex: 0x3C82FF))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Passagefenster aktualisieren")
-                    }
-                }
-
-                if let window = viewModel.passageWindow {
-                    HStack(spacing: 10) {
-                        Image(systemName: "clock.badge.checkmark.fill")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(Color.green)
-                        Text(window.displayString)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(Color.appPrimary)
-                    }
-
-                    if window.contains(viewModel.departure) {
-                        Text("Die aktuelle Abfahrt liegt innerhalb des sicheren Fensters.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.secondary)
-                    } else {
-                        Text("Die aktuelle Abfahrt liegt nicht im sicheren Fenster.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.orange)
-                    }
-                } else {
-                    HStack(spacing: 10) {
-                        Image(systemName: viewModel.isSearchingWindow ? "clock.arrow.circlepath" : "clock.badge.exclamationmark.fill")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(viewModel.isSearchingWindow ? Color(hex: 0x3C82FF) : Color.orange)
-                        Text(viewModel.isSearchingWindow ? "Fenster wird berechnet…" : (viewModel.passageWindowMessage ?? "Kein Passagefenster berechnet."))
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.secondary)
-                    }
-                }
-            }
-        }
-    }
+    // MARK: - Save Calculation (Logbook)
 
     @MainActor
     func saveCalculation() {
@@ -252,5 +248,36 @@ extension ContentView {
     func syncRouteDefaults() {
         weatherRegionID = viewModel.destinationHarbourID
         tideHarbourID = viewModel.destinationHarbourID
+    }
+
+    // MARK: - Voyage lifecycle (called from disclaimer alert)
+
+    /// Save the planned route as a logbook entry AND start live GPS
+    /// tracking. Triggered only after the user accepts the safety
+    /// disclaimer.
+    @MainActor
+    func startActiveVoyage() {
+        guard let plan = viewModel.routePlan else { return }
+        saveCalculation()
+        voyageManager.startVoyage(
+            route: plan,
+            userWaypointIDs: viewModel.userWaypointIDs,
+            plannedSpeedKnots: viewModel.speedKnots
+        )
+    }
+
+    /// Stop tracking, persist the actual voyage as a second logbook entry.
+    @MainActor
+    func finishActiveVoyage() {
+        let weather = weatherSnapshots.first(where: { $0.regionID == viewModel.destinationHarbourID })?.currentSummary
+            ?? weatherReading?.current.condition ?? ""
+        let tide = tideReading?.summary ?? ""
+        let crew = crewSummaryText()
+        _ = voyageManager.stopVoyageAndSaveLogbook(
+            modelContext: modelContext,
+            weatherSummary: weather,
+            tideSummary: tide,
+            crewSummary: crew
+        )
     }
 }

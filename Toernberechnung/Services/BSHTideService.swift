@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - Service zum Abruf von Tidendaten der BSH-Pegel
-
 struct TideReading: Equatable {
     let stationName: String
     let stationID: String
@@ -15,6 +13,8 @@ struct TideReading: Equatable {
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
@@ -132,6 +132,7 @@ private struct BSHTidePayload: Decodable {
             return
         }
 
+        // Manche BSH-Dateien liefern die Jahre als Array von Dictionaries; hier wird beides auf dieselbe Struktur normalisiert.
         let yearDictionaries = try container.decode([[String: BSHTideYear]].self, forKey: .years)
         years = yearDictionaries.reduce(into: [:]) { partialResult, yearDictionary in
             partialResult.merge(yearDictionary) { current, _ in current }

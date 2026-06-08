@@ -1,19 +1,23 @@
 import Foundation
 
-/// Bootskonfiguration für alle Berechnungen zum Wasser unter dem Kiel.
-/// Werte werden im View-Layer aus `@AppStorage` gelesen.
+// MARK: - Boat Settings
+
+/// Boat configuration used in all water-clearance calculations.
+/// Values are read from `@AppStorage` in the view layer.
 struct BoatSettings {
-    /// Tiefgang in Metern. Muss > 0 sein.
+    /// Boat draft in meters. Must be > 0.
     var draftMeters: Double
-    /// Mindest-Wasser unter dem Kiel. Standard: 0,0 m (wie in Excel).
-    /// Die UI sollte einen positiven Wert empfehlen (z. B. 0,30 m).
+    /// Minimum clearance under keel required. Default 0.0 m.
+    /// The UI should recommend a positive value (e.g. 0.30 m).
     var safetyMarginMeters: Double
 }
 
-/// Legt fest, wie die verfügbare Wassertiefe an einem Wegpunkt berechnet wird.
+// MARK: - Waypoint Calculation Mode
+
+/// Determines how available water depth is calculated at a waypoint.
 ///
-/// - `meanHighWater`: MHW als Bezugsniveau. Kartentiefe/Peilplanwert wird angewendet.
-/// - `lottiefe`: Lottiefe (maßgebliche Peiltiefe). Kartentiefe wird NICHT angewendet.
+/// - `meanHighWater`: Uses MHW as the reference level. Chart depth / Peilplan value is applied.
+/// - `lottiefe`: Uses Lottiefe (controlling sounding depth). Chart depth is NOT applied.
 enum WaypointCalculationMode: String, Codable, CaseIterable, Identifiable {
     case meanHighWater
     case lottiefe
@@ -28,8 +32,10 @@ enum WaypointCalculationMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Hält fest, woher ein Planungswert stammt.
-/// Die UI muss anzeigen, dass Katalog-/Standardwerte vom Skipper geprüft werden müssen.
+// MARK: - Source Metadata
+
+/// Tracks where a planning value originated.
+/// The UI must show that catalog/default values require skipper verification.
 enum ValueSource: String, Codable {
     case bsh = "bsh"
     case catalog = "catalog"
@@ -50,7 +56,7 @@ enum ValueSource: String, Codable {
     }
 }
 
-/// Ein numerischer Wert zusammen mit Quelle und optionalen Notizen.
+/// A numeric value paired with its source and optional notes.
 struct SourcedValue<T: Codable>: Codable where T: Equatable {
     var value: T
     var source: ValueSource
@@ -59,103 +65,111 @@ struct SourcedValue<T: Codable>: Codable where T: Equatable {
 
 extension SourcedValue: Equatable {}
 
-/// Ein Wegpunkt einer Tidenroute mit vollständigen Tiden-Metadaten.
+// MARK: - Route Waypoint
+
+/// A waypoint in a tidal route with full tidal metadata.
 ///
-/// Die Berechnungsengine verarbeitet diese Struktur generisch.
-/// Kein Feld verweist auf einen festen Wegpunktnamen, eine Insel oder eine Route.
+/// The calculation engine consumes this structure generically.
+/// No field references a fixed waypoint name, island, or route.
 struct RouteWaypoint: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
     var latitude: Double?
     var longitude: Double?
 
-    /// Name der BSH-Tidenreferenzstation (z. B. „Emden, Große Seeschleuse“).
+    /// BSH tidal reference station name (e.g. "Emden, Große Seeschleuse").
     var tidalReferenceStation: String
-    /// BSH-Stations-ID (z. B. „507P“). Vorläufig; ggf. nicht verfügbar.
+    /// BSH tidal reference station ID (e.g. "507P"). Provisional; may be unavailable.
     var tidalReferenceStationID: String
 
-    /// Vorzeichenbehafteter HW-Offset in Minuten von der Referenzstation zum Wegpunkt.
-    /// Positiv = HW am Wegpunkt liegt nach dem HW der Referenzstation.
+    /// Signed offset in minutes from reference station HW to waypoint HW.
+    /// Positive = waypoint HW is later than reference HW.
     var highWaterOffsetMinutes: Int
 
-    /// Mittlerer Tidenhub (MTH) in Metern.
+    /// Mean Tidal Range in meters (Mittlerer Tidenhub).
     var meanTidalRangeMeters: SourcedValue<Double>?
-    /// Mittleres Hochwasser (MHW) in Metern. Erforderlich für `.meanHighWater`-Modus.
+    /// Mean High Water in meters. Required for `.meanHighWater` mode.
     var meanHighWaterMeters: SourcedValue<Double>?
-    /// Lottiefe (maßgebliche Peiltiefe) in Metern. Erforderlich für `.lottiefe`-Modus.
+    /// Lottiefe (controlling sounding depth) in meters. Required for `.lottiefe` mode.
     var lottiefeMeters: SourcedValue<Double>?
-    /// Kartentiefe / Peilplanwert in Metern. Kann positiv oder negativ sein.
-    /// Erforderlich für `.meanHighWater`-Modus. Im `.lottiefe`-Modus NICHT anwenden.
+    /// Chart depth / Peilplan value in meters. Can be positive or negative.
+    /// Required for `.meanHighWater` mode. Must NOT be applied in `.lottiefe` mode.
     var chartDepthMeters: SourcedValue<Double>?
 
-    /// Welche Berechnungsformel an diesem Wegpunkt verwendet wird.
+    /// Which calculation formula to use for this waypoint.
     var calculationMode: WaypointCalculationMode
 
-    /// Optionaler BSH-Wasserstandskorrektur-Override pro Wegpunkt.
-    /// Wenn nil, wird der Routenwert verwendet. Vorbereitung für künftige Per-WP-Unterstützung.
+    /// Optional per-waypoint BSH water-level correction override.
+    /// If nil, the route-level value is used. Prepared for future per-WP support.
     var bshWaterLevelCorrectionOverride: Double?
 
-    /// Manuell eingegebene Hochwasserzeit. Wenn gesetzt, wird der TideDataProvider umgangen.
+    /// User-entered high-water time override. If set, bypasses TideDataProvider.
     var manualHighWaterTime: Date?
 
-    /// Freitext-Notizen oder Quellenangaben.
+    /// Free-text notes or source references.
     var notes: String
 
-    /// Anzeigekategorie (z. B. „Hafen“, „Wattenhoch“, „Fahrwasser“).
+    /// Category for display (e.g. "Hafen", "Wattenhoch", "Fahrwasser").
     var category: String?
-    /// Zugehöriger Inselname, falls vorhanden (z. B. „Norderney“).
+    /// Associated island name, if any (e.g. "Norderney").
     var island: String?
 }
 
-/// Ein Leg zwischen zwei aufeinanderfolgenden Wegpunkten.
+// MARK: - Route Leg
+
+/// One leg between consecutive waypoints.
 struct RouteLeg: Identifiable, Codable, Equatable {
     var id: UUID
     var fromWaypointID: UUID
     var toWaypointID: UUID
-    /// Distanz in Seemeilen. Muss >= 0 sein.
+    /// Distance in nautical miles. Must be >= 0.
     var distanceNm: Double
-    /// Optionaler Kurs in Grad rechtweisend.
+    /// Optional course in degrees true.
     var courseDegrees: Double?
-    /// Fahrt durchs Wasser in Knoten. Muss > 0 sein.
+    /// Speed through water in knots. Must be > 0.
     var speedThroughWaterKnots: Double
-    /// Tidenstrom-Korrektur in Knoten. Positiv = mitlaufend, negativ = gegenlaufend.
+    /// Tidal current correction in knots. Positive = favorable, negative = adverse.
     var tidalCurrentKnots: Double
 }
 
-/// Eine vollständige Routendefinition mit allen Wegpunkten, Legs und Routenparametern.
+// MARK: - Route Plan
+
+/// A complete route definition with all waypoints, legs, and route-level parameters.
 ///
-/// `waypoints[0]` ist der Start, `waypoints[last]` das Ziel.
-/// Es gilt: `legs.count == waypoints.count - 1`.
+/// `waypoints[0]` is the start, `waypoints[last]` is the destination.
+/// `legs.count == waypoints.count - 1`.
 struct RoutePlan: Identifiable, Codable, Equatable {
     var id: UUID
     var date: Date
     var routeName: String
     var plannedStartTime: Date
-    /// Geordnete Wegpunkte: [Start, …Zwischenpunkte…, Ziel].
+    /// Ordered waypoints: [start, ...intermediates..., destination].
     var waypoints: [RouteWaypoint]
-    /// Legs, die aufeinanderfolgende Wegpunkte verbinden.
+    /// Legs connecting consecutive waypoints.
     var legs: [RouteLeg]
-    /// BSH-Wasserstandskorrektur auf Routenebene in Metern. Positiv, null oder negativ.
+    /// Route-level BSH water-level correction in meters. Can be positive, zero, or negative.
     var bshWaterLevelCorrectionMeters: Double
-    /// Anzeigelabel für die Tidenlage (z. B. „Springtide“, „Mitteltide“, „Nipptide“).
+    /// Display label for tidal state (e.g. "Springtide", "Mitteltide", "Nipptide").
     var tidalStateLabel: String
 }
 
-/// Status der Tidenberechnung für einen einzelnen Wegpunkt.
+// MARK: - Calculation Results
+
+/// Status of a single waypoint's tidal calculation.
 enum WaypointStatus: String, Codable, Equatable {
-    /// Wasser unter Kiel >= Sicherheitsmarge.
+    /// Clearance under keel >= safety margin.
     case go
-    /// Wasser unter Kiel >= 0, aber < Sicherheitsmarge.
+    /// Clearance under keel >= 0 but < safety margin.
     case warning
-    /// Wasser unter Kiel < 0 (gültige Berechnung, Tiefe nicht ausreichend).
+    /// Clearance under keel < 0 (valid calculation, insufficient depth).
     case noGo
-    /// Erforderliche Eingabedaten fehlen.
+    /// Required input data is missing.
     case incomplete
-    /// Berechnungsfehler (z. B. Abweichung > 12 h, SOG <= 0).
+    /// Calculation error (e.g. deviation > 12h, SOG <= 0).
     case invalid
 }
 
-/// Gesamt-Tidenstatus der Route.
+/// Overall route tidal status.
 enum RouteStatus: String, Codable, Equatable {
     case go
     case warning
@@ -163,7 +177,7 @@ enum RouteStatus: String, Codable, Equatable {
     case incomplete
 }
 
-/// Ergebnis für ein einzelnes Leg.
+/// Result for a single leg.
 struct LegCalculationResult: Equatable {
     var leg: RouteLeg
     var speedOverGroundKnots: Double
@@ -176,7 +190,7 @@ struct LegCalculationResult: Equatable {
     var messages: [String]
 }
 
-/// Vollständiges Ergebnis der Tidenberechnung für einen einzelnen Wegpunkt.
+/// Full result for a single waypoint's tidal calculation.
 struct WaypointCalculationResult: Identifiable, Equatable {
     var id: UUID { waypoint.id }
     var waypoint: RouteWaypoint
@@ -184,24 +198,24 @@ struct WaypointCalculationResult: Identifiable, Equatable {
     var relevantHighWaterTime: Date?
     var deviationHours: Double?
     var oneTwelfthMeters: Double?
-    /// „Fehlmenge Wasser“ (FmW) — Wasserdefizit gegenüber dem HW.
+    /// "Fehlmenge Wasser" — water deficit relative to HW.
     var missingWaterFmWMeters: Double?
     var baseWaterAtTideMeters: Double?
     var bshWaterLevelCorrectionMeters: Double
-    /// Angewendete Kartentiefe. Nil im Lottiefe-Modus.
+    /// Chart depth applied. Nil for Lottiefe mode.
     var chartDepthMetersApplied: Double?
-    /// Tidenhöhe (HG). Nil im Lottiefe-Modus („leer“ in Excel).
+    /// Tide height (HG). Nil for Lottiefe mode.
     var tideHeightHGMeters: Double?
-    /// Verfügbare Wassertiefe (WT).
+    /// Available water depth (WT).
     var availableWaterDepthWTMeters: Double?
     var boatDraftMeters: Double
-    /// Wasser unter dem Kiel (WuK).
+    /// Clearance under keel (WuK).
     var clearanceUnderKeelWuKMeters: Double?
     var status: WaypointStatus
     var messages: [String]
 }
 
-/// Wetterbewertung für die Routensicherheit.
+/// Weather assessment for route safety.
 enum WeatherStatus: String, Codable, Equatable {
     case go
     case warning
@@ -209,13 +223,13 @@ enum WeatherStatus: String, Codable, Equatable {
     case incomplete
 }
 
-/// Kombinierte Endentscheidung für die Route.
+/// Combined final route decision.
 ///
-/// Endstatus = combine(tidalStatus, weatherStatus):
-/// - No-Go, wenn einer der beiden No-Go ist
-/// - Warning, wenn einer Warning ist und keiner No-Go
-/// - Solange das Wetter noch nicht verfügbar ist, bleibt die Tidenentscheidung sichtbar
-/// - Incomplete, wenn kritische Tidendaten fehlen
+/// Final status = combine(tidalStatus, weatherStatus):
+/// - No-Go if either is No-Go
+/// - Warning if either is Warning and neither is No-Go
+/// - If weather is not available yet, the tidal decision remains visible
+/// - Incomplete if critical tidal data is missing
 enum CombinedRouteStatus: String, Equatable {
     case go
     case warning
@@ -230,7 +244,7 @@ enum CombinedRouteStatus: String, Equatable {
     }
 }
 
-/// Vollständiges Routenberechnungsergebnis.
+/// Complete route calculation result.
 struct RouteCalculationResult: Equatable {
     var waypointResults: [WaypointCalculationResult]
     var legResults: [LegCalculationResult]

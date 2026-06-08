@@ -1,98 +1,218 @@
 import Foundation
 
-/// Sucht sichere Abfahrtsfenster rund um eine angegebene Abfahrtszeit.
-///
-/// Bewertet die **gesamte mehrgliedrige Route**, nicht nur einen Flachpunkt.
-/// Ein Abfahrtsfenster ist nur dann „sicher“, wenn die gesamte Route bei dieser Abfahrt Go oder Warning ist.
+// MARK: - Passage Window Scanner (HW-anchored, bottleneck-driven)
+//
+// Implements the exact algorithm specified by the skipper:
+//
+//   1. Identify the single shallowest point ("Nadelöhr") of the entire
+//      expanded route, including auto-inserted Dijkstra fairway WPs.
+//   2. Find the BSH HW (at that bottleneck's tide station) closest to the
+//      user's planned arrival there.
+//   3. Iterate BACKWARDS from HW in 15-minute steps until
+//      `Wassertiefe(t) − Tiefgang < Sicherheitsmarge`.
+//      The last successful step is the OPENING of the bottleneck window.
+//   4. Iterate FORWARDS from HW in 15-minute steps until the equation
+//      fails again.  The last successful step is the CLOSING.
+//   5. Translate the bottleneck-arrival window into a DEPARTURE window
+//      by subtracting the cumulative travel time to the bottleneck.
+//
+// All formatting is forced to `Europe/Berlin` time and `de_DE` locale.
+
 struct PassageWindowScanner {
-    /// Ein sicheres Abfahrtsfenster mit Start- und Endzeit.
+
+    // MARK: - Public types
+
     struct Window: Equatable {
         let start: Date
         let end: Date
+        /// BSH HW used as anchor (for display).
+        let anchoredHighWater: Date?
+        /// Bottleneck waypoint name (for display).
+        let bottleneckName: String?
 
-        func contains(_ date: Date) -> Bool {
-            date >= start && date <= end
-        }
+        func contains(_ date: Date) -> Bool { date >= start && date <= end }
 
         var displayString: String {
-            "\(Self.timeFormatter.string(from: start)) – \(Self.timeFormatter.string(from: end)) Uhr"
+            "\(AppDateFormatters.hourMinute.string(from: start))" +
+            " – \(AppDateFormatters.hourMinute.string(from: end)) Uhr"
         }
-
-        private static let timeFormatter: DateFormatter = {
-            let f = DateFormatter()
-            f.dateFormat = "HH:mm"
-            return f
-        }()
     }
 
-    private let calculationService: RouteCalculationService
-    /// Schrittweite des Scans in Sekunden. Standard: 10 Minuten.
-    var scanIncrementSeconds: TimeInterval = 10 * 60
-    /// Wie weit vor der Mittelzeit gescannt wird. Standard: 12 Stunden.
-    var scanBackwardHours: Double = 12
-    /// Wie weit nach der Mittelzeit gescannt wird. Standard: 24 Stunden.
-    var scanForwardHours: Double = 24
+    // MARK: - Config
 
-    init(calculationService: RouteCalculationService = RouteCalculationService()) {
-        self.calculationService = calculationService
-    }
+    /// Iteration step. 15 minutes per the skipper's spec.
+    let stepSeconds: TimeInterval = 15 * 60
+    /// Hard limit: ±12 h from HW.
+    let maxOffsetHours: Double = 12
 
-    /// Sucht sichere Abfahrtsfenster um die geplante Abfahrtszeit.
-    ///
-    /// Bewertet bei jedem Scan-Schritt die gesamte Route. Eine Abfahrt ist „sicher“, wenn
-    /// der Gesamttidenstatus `.go` oder `.warning` ist (nicht `.noGo` oder `.incomplete`).
-    ///
-    /// - Parameters:
-    ///   - route: Der Routenplan (die Abfahrtszeit wird für jeden Scan-Schritt verschoben).
-    ///   - boatSettings: Tiefgang und Sicherheitsmarge des Bootes.
-    ///   - tideDataProvider: Anbieter für BSH-Tidendaten.
-    /// - Returns: Das beste sichere Abfahrtsfenster oder nil, wenn keines gefunden wird.
+    init() {}
+
+    // MARK: - Entry point
+
     func findSafeWindow(
         route: RoutePlan,
         boatSettings: BoatSettings,
         tideDataProvider: TideDataProvider
     ) async -> Window? {
-        let center = route.plannedStartTime
-        let scanStart = center.addingTimeInterval(-scanBackwardHours * 3600)
-        let scanEnd = center.addingTimeInterval(scanForwardHours * 3600)
+        // 1. Identify the bottleneck waypoint and its position in the route.
+        guard let bottleneck = bottleneck(in: route, boat: boatSettings) else { return nil }
 
-        var windows: [Window] = []
-        var openStart: Date?
-        var openEnd: Date?
+        // 2. Travel time from start to the bottleneck.
+        let travelToBottleneck = travelTime(
+            toWaypointIndex: bottleneck.index,
+            in: route
+        )
+        let plannedArrival = route.plannedStartTime.addingTimeInterval(travelToBottleneck)
 
-        var candidate = scanStart
-        while candidate <= scanEnd {
-            var shifted = route
-            shifted.plannedStartTime = candidate
+        // 3. BSH HW at the bottleneck's tide station closest to planned arrival.
+        let hwEvents = (try? await tideDataProvider.highWaters(
+            for: bottleneck.waypoint.tidalReferenceStationID,
+            around: plannedArrival
+        )) ?? []
+        guard let bshHW = hwEvents
+            .map(\.time)
+            .min(by: { abs($0.timeIntervalSince(plannedArrival))
+                     < abs($1.timeIntervalSince(plannedArrival)) })
+        else { return nil }
 
-            let result = await calculationService.calculate(
-                route: shifted,
-                boatSettings: boatSettings,
-                tideDataProvider: tideDataProvider
-            )
+        // 4. Local HW at the bottleneck = BSH HW + waypoint HW offset.
+        let localHW = bshHW.addingTimeInterval(
+            Double(bottleneck.waypoint.highWaterOffsetMinutes) * 60
+        )
 
-            let isSafe = result.tidalStatus == .go || result.tidalStatus == .warning
+        // 5. Quick sanity check: must be safe AT HW or the cycle has no window.
+        guard let centralWuK = wuk(
+            at: localHW,
+            waypoint: bottleneck.waypoint,
+            localHW: localHW,
+            bshCorrection: bshCorrectionFor(waypoint: bottleneck.waypoint, route: route),
+            draft: boatSettings.draftMeters
+        ), centralWuK >= boatSettings.safetyMarginMeters else {
+            return nil
+        }
 
-            if isSafe {
-                if openStart == nil { openStart = candidate }
-                openEnd = candidate
-            } else if let start = openStart, let end = openEnd {
-                windows.append(Window(start: start, end: end))
-                openStart = nil
-                openEnd = nil
+        // 6. Sweep BACKWARDS from HW until WuK < margin.
+        var opening = localHW
+        var elapsed: Double = 0
+        while elapsed < maxOffsetHours * 3600 {
+            let candidate = opening.addingTimeInterval(-stepSeconds)
+            guard let wukVal = wuk(
+                at: candidate, waypoint: bottleneck.waypoint, localHW: localHW,
+                bshCorrection: bshCorrectionFor(waypoint: bottleneck.waypoint, route: route),
+                draft: boatSettings.draftMeters
+            ), wukVal >= boatSettings.safetyMarginMeters else { break }
+            opening = candidate
+            elapsed += stepSeconds
+        }
+
+        // 7. Sweep FORWARDS from HW until WuK < margin.
+        var closing = localHW
+        elapsed = 0
+        while elapsed < maxOffsetHours * 3600 {
+            let candidate = closing.addingTimeInterval(stepSeconds)
+            guard let wukVal = wuk(
+                at: candidate, waypoint: bottleneck.waypoint, localHW: localHW,
+                bshCorrection: bshCorrectionFor(waypoint: bottleneck.waypoint, route: route),
+                draft: boatSettings.draftMeters
+            ), wukVal >= boatSettings.safetyMarginMeters else { break }
+            closing = candidate
+            elapsed += stepSeconds
+        }
+
+        // 8. Translate to DEPARTURE window by subtracting travel time.
+        let departureStart = opening.addingTimeInterval(-travelToBottleneck)
+        let departureEnd   = closing.addingTimeInterval(-travelToBottleneck)
+
+        return Window(
+            start: departureStart,
+            end: departureEnd,
+            anchoredHighWater: bshHW,
+            bottleneckName: bottleneck.waypoint.name
+        )
+    }
+
+    // MARK: - WuK at a single point in time
+
+    /// Computes WuK at the bottleneck for a given time, anchored on `localHW`.
+    /// Returns nil if required tidal inputs are missing OR deviation > 12 h.
+    private func wuk(
+        at time: Date,
+        waypoint: RouteWaypoint,
+        localHW: Date,
+        bshCorrection: Double,
+        draft: Double
+    ) -> Double? {
+        let deviationHours = abs(time.timeIntervalSince(localHW)) / 3600
+        guard let mth = waypoint.meanTidalRangeMeters?.value, mth > 0 else { return nil }
+        guard let fmw = RuleOfTwelfths.steppedFehlmenge(
+            deviationHours: deviationHours, meanTidalRangeMeters: mth
+        ) else { return nil }
+
+        switch waypoint.calculationMode {
+        case .meanHighWater:
+            guard let mhw = waypoint.meanHighWaterMeters?.value,
+                  let chart = waypoint.chartDepthMeters?.value else { return nil }
+            let wt = (mhw - fmw) + bshCorrection + chart
+            return wt - draft
+
+        case .lottiefe:
+            guard let lottiefe = waypoint.lottiefeMeters?.value else { return nil }
+            let wt = (lottiefe - fmw) + bshCorrection
+            return wt - draft
+        }
+    }
+
+    // MARK: - Bottleneck identification
+
+    private struct Bottleneck {
+        let waypoint: RouteWaypoint
+        let index: Int
+        /// Static depth budget at MHW (MHW + chartDepth, or Lottiefe).
+        let staticDepthBudget: Double
+    }
+
+    /// Smallest MHW-relative depth budget along the route after subtracting
+    /// the boat draft. If multiple WPs share the lowest budget the FIRST
+    /// occurrence is returned, so the travel-time translation is conservative.
+    private func bottleneck(in route: RoutePlan, boat: BoatSettings) -> Bottleneck? {
+        var best: Bottleneck?
+        for (i, wp) in route.waypoints.enumerated() {
+            let budget: Double
+            switch wp.calculationMode {
+            case .meanHighWater:
+                guard let mhw = wp.meanHighWaterMeters?.value,
+                      let chart = wp.chartDepthMeters?.value else { continue }
+                budget = mhw + chart
+            case .lottiefe:
+                guard let lt = wp.lottiefeMeters?.value else { continue }
+                budget = lt
             }
-
-            candidate = candidate.addingTimeInterval(scanIncrementSeconds)
+            if let current = best {
+                if budget < current.staticDepthBudget {
+                    best = Bottleneck(waypoint: wp, index: i, staticDepthBudget: budget)
+                }
+            } else {
+                best = Bottleneck(waypoint: wp, index: i, staticDepthBudget: budget)
+            }
         }
+        return best
+    }
 
-        if let start = openStart, let end = openEnd {
-            windows.append(Window(start: start, end: end))
-        }
+    // MARK: - Travel time helpers
 
-        if let active = windows.first(where: { $0.contains(center) }) {
-            return active
-        }
+    /// Cumulative travel time from the start waypoint to waypoint index `target`.
+    private func travelTime(toWaypointIndex target: Int, in route: RoutePlan) -> TimeInterval {
+        if target <= 0 { return 0 }
+        let legResults = RouteCalculationService.calculateLegResults(
+            startTime: route.plannedStartTime, legs: route.legs
+        )
+        let legIndex = min(target - 1, legResults.count - 1)
+        guard legIndex >= 0 else { return 0 }
+        return legResults[legIndex].arrivalTime
+            .timeIntervalSince(route.plannedStartTime)
+    }
 
-        return windows.first(where: { $0.start > center })
+    private func bshCorrectionFor(waypoint: RouteWaypoint, route: RoutePlan) -> Double {
+        waypoint.bshWaterLevelCorrectionOverride ?? route.bshWaterLevelCorrectionMeters
     }
 }
