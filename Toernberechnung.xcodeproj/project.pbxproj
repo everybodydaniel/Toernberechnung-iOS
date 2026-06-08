@@ -67,6 +67,7 @@
 		DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */; };
 		E66B2F8786297C22F26956D7 /* WattseglerLotungenService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C715475AD626695C1776565 /* WattseglerLotungenService.swift */; };
 		EBF4D6ECA5179A5486582306 /* RouteCalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */; };
+		EBFA962196251A9BE5045D76 /* ToernberechnungUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A080BD3DC8D97F0D5BFA3897 /* ToernberechnungUITests.swift */; };
 		EC64AD99A94155A38E1D4D2E /* CellType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF93182DE9CBACE33738186 /* CellType.swift */; };
 		F139CCBE12014D4F550A1213 /* BSHTideService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */; };
 		F241C1AC3877E8623BDB0315 /* ContentView+InitialData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */; };
@@ -76,6 +77,13 @@
 
 /* Begin PBXContainerItemProxy section */
 		848AF5F6503A33144E010E2E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FB83BDC6A5DA8A5D96C85872 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F9D9C3365B426B92A441223;
+			remoteInfo = Toernberechnung;
+		};
+		FC7FBBD5A92A9F1C2A37402D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = FB83BDC6A5DA8A5D96C85872 /* Project object */;
 			proxyType = 1;
@@ -93,6 +101,7 @@
 		19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+RouteDetail.swift"; sourceTree = "<group>"; };
 		23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlannerViewModel.swift; sourceTree = "<group>"; };
 		274236500C1B928A068F3783 /* ActiveVoyageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveVoyageManager.swift; sourceTree = "<group>"; };
+		2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2C715475AD626695C1776565 /* WattseglerLotungenService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WattseglerLotungenService.swift; sourceTree = "<group>"; };
 		2D96FAFEC88A7B5407880B6B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2DF95CFE56A1939FA4B8AF8B /* BSHWaterLevelForecastService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHWaterLevelForecastService.swift; sourceTree = "<group>"; };
@@ -129,6 +138,7 @@
 		9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+InitialData.swift"; sourceTree = "<group>"; };
 		9F1D5D2D3DE4D18E6CE44C3E /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		9F50F04D34679E0E056B9C47 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
+		A080BD3DC8D97F0D5BFA3897 /* ToernberechnungUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToernberechnungUITests.swift; sourceTree = "<group>"; };
 		A0F93A8CC11873165313A6C2 /* FullScreenNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenNavigationView.swift; sourceTree = "<group>"; };
 		A97FCC92A2AD55D7EE953DDA /* CalculatorResultsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorResultsSection.swift; sourceTree = "<group>"; };
 		AAF2C827FD36960A66C93637 /* NauticalRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NauticalRouter.swift; sourceTree = "<group>"; };
@@ -192,6 +202,14 @@
 			);
 			name = Routing;
 			path = Toernberechnung/Engine/Routing;
+			sourceTree = "<group>";
+		};
+		75FD6D49D5E1CFB5E5D30431 /* ToernberechnungUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A080BD3DC8D97F0D5BFA3897 /* ToernberechnungUITests.swift */,
+			);
+			path = ToernberechnungUITests;
 			sourceTree = "<group>";
 		};
 		893ABB9A87C56D39B0255B2A /* Services */ = {
@@ -276,6 +294,7 @@
 			children = (
 				4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */,
 				86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */,
+				2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -300,6 +319,7 @@
 				893ABB9A87C56D39B0255B2A /* Services */,
 				18DEA961666D7FCBAE02D751 /* Toernberechnung */,
 				DF62DFC93AE71B30E327780D /* ToernberechnungTests */,
+				75FD6D49D5E1CFB5E5D30431 /* ToernberechnungUITests */,
 				D439D35983ED21D420788A42 /* Views */,
 				DA0B1B119FC3DEDB38C5A818 /* Products */,
 			);
@@ -308,6 +328,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1BE8DB3DE33B704C3E5A5227 /* ToernberechnungUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1282965B09DBE8513DE05A4 /* Build configuration list for PBXNativeTarget "ToernberechnungUITests" */;
+			buildPhases = (
+				19D73E135388891F48781B1F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				923CD846AC24E6D5D4047B29 /* PBXTargetDependency */,
+			);
+			name = ToernberechnungUITests;
+			packageProductDependencies = (
+			);
+			productName = ToernberechnungUITests;
+			productReference = 2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		5F9D9C3365B426B92A441223 /* Toernberechnung */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 79E7B60BA827BD5CCF02527F /* Build configuration list for PBXNativeTarget "Toernberechnung" */;
@@ -358,6 +396,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					1BE8DB3DE33B704C3E5A5227 = {
+						TestTargetID = 5F9D9C3365B426B92A441223;
+					};
 				};
 			};
 			buildConfigurationList = 60BF1BC7BCD405F7C03BD6AB /* Build configuration list for PBXProject "Toernberechnung" */;
@@ -380,6 +421,7 @@
 			targets = (
 				5F9D9C3365B426B92A441223 /* Toernberechnung */,
 				DB274558A4EDC412F15CF557 /* ToernberechnungTests */,
+				1BE8DB3DE33B704C3E5A5227 /* ToernberechnungUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -430,6 +472,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		19D73E135388891F48781B1F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EBFA962196251A9BE5045D76 /* ToernberechnungUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5A3ED586CABFBC9D80BD773E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -504,6 +554,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		923CD846AC24E6D5D4047B29 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F9D9C3365B426B92A441223 /* Toernberechnung */;
+			targetProxy = FC7FBBD5A92A9F1C2A37402D /* PBXContainerItemProxy */;
+		};
 		CC1FC300FABAE83C60301DDC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5F9D9C3365B426B92A441223 /* Toernberechnung */;
@@ -528,6 +583,25 @@
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Toernberechnung.app/Toernberechnung";
+			};
+			name = Debug;
+		};
+		4709F369C54CA65CFACD0585 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.toernberechnung.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Toernberechnung;
 			};
 			name = Debug;
 		};
@@ -583,6 +657,25 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8A3CD6C050DAD9BFAB0CDE37 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.toernberechnung.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Toernberechnung;
 			};
 			name = Release;
 		};
@@ -733,6 +826,15 @@
 			buildConfigurations = (
 				D9B0878ED90FEE17364456D3 /* Debug */,
 				AC4824225C262AC942726583 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A1282965B09DBE8513DE05A4 /* Build configuration list for PBXNativeTarget "ToernberechnungUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4709F369C54CA65CFACD0585 /* Debug */,
+				8A3CD6C050DAD9BFAB0CDE37 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

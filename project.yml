@@ -100,6 +100,11 @@ targets:
         SWIFT_VERSION: "5.9"
         CURRENT_PROJECT_VERSION: "1"
         MARKETING_VERSION: "1.0"
+    scheme:
+      gatherCoverageData: true
+      testTargets:
+        - ToernberechnungTests
+        - ToernberechnungUITests
 
   ToernberechnungTests:
     type: bundle.unit-test
@@ -117,4 +122,26 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.tests
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
+    scheme:
+      testTargets:
+        - ToernberechnungTests
+
+  ToernberechnungUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: ToernberechnungUITests
+    dependencies:
+      - target: Toernberechnung
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.uitests
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Toernberechnung
+    scheme:
+      testTargets:
+        - ToernberechnungUITests
+
 

@@ -2,9 +2,7 @@
 # GitHub Actions CI – Toernberechnung iOS
 # ──────────────────────────────────────────────────────────────
 # Trigger: Push & Pull Request auf main
-# Jobs:    1. SwiftLint   2. Build & Test   3. SonarCloud   4. DocC
-#
-# Alle Actions sind auf volle Commit-SHAs gepinnt (Supply-Chain-Sicherheit).
+# Jobs:    1. SwiftLint   2. Build, Test & Coverage   3. UI Tests (XCUITest)   4. SonarCloud   5. DocC
 # ──────────────────────────────────────────────────────────────
 
 name: CI
@@ -20,17 +18,23 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  XCODE_PROJECT: Toernberechnung.xcodeproj
+  XCODE_SCHEME: Toernberechnung
+  SIMULATOR_DEVICE: iPhone 16
+
 jobs:
 
-  # ─────────────────────────────────────────
-  # Job 1: SwiftLint
-  # ─────────────────────────────────────────
+  # ────────────────────────────────────────────
+  # 1. Statische Code-Analyse (Lint)
+  # ────────────────────────────────────────────
   swiftlint:
     name: 🧹 SwiftLint
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Install SwiftLint
         run: brew install swiftlint
@@ -38,16 +42,16 @@ jobs:
       - name: Run SwiftLint
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
 
-  # ─────────────────────────────────────────
-  # Job 2: Build & Test
-  # ─────────────────────────────────────────
+  # ────────────────────────────────────────────
+  # 2. Build, Unit-Tests, Coverage
+  # ────────────────────────────────────────────
   build-and-test:
-    name: 🏗️ Build & Test
+    name: 🏗️ Build, Test & Coverage
     runs-on: macos-latest
     needs: swiftlint
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Select Xcode Version
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -55,76 +59,150 @@ jobs:
       - name: Show Xcode Version
         run: xcodebuild -version
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
       - name: Resolve Swift Packages
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
 
-      - name: Build Project
+      - name: Boot Simulator
         run: |
-          xcodebuild build \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color
+          # Find available iPhone simulator name and boot it
+          SIM_NAME=$(xcrun simctl list devices available | grep -v 'Unavailable' | grep -oE 'iPhone [0-9a-zA-Z ]+' | head -n 1)
+          echo "Booting $SIM_NAME..."
+          xcrun simctl boot "$SIM_NAME" || true
 
-      - name: Run Unit Tests
-        run: |
-          xcodebuild test \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -configuration Debug \
-            -enableCodeCoverage YES \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color --report junit
+      - name: Run Unit Tests (with Coverage)
+        run: bundle exec fastlane test
 
-      - name: Upload Test Results
+      - name: Generate Coverage Reports (Cobertura + SonarQube + HTML)
+        run: bundle exec fastlane coverage
+
+      - name: Debug – List Coverage Files
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        run: |
+          echo "=== Contents of build/coverage/ ==="
+          find build/coverage/ -type f 2>/dev/null || echo "Directory not found"
+
+      - name: Upload JUnit Test Results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: test-results
-          path: build/reports/
+          name: junit-test-results
+          path: fastlane/test_output/
           retention-days: 14
 
-  # ─────────────────────────────────────────
-  # Job 3: SonarCloud
-  # ─────────────────────────────────────────
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coverage-reports
+          path: build/coverage/
+          retention-days: 30
+
+      - name: Upload XCResult Bundle (on failure)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: xcresult-bundle
+          path: fastlane/test_output/*.xcresult
+          retention-days: 7
+
+  # ────────────────────────────────────────────
+  # 3. GUI-Tests (XCUITest)
+  #    Optional deaktivieren mit Repository Variable UI_TESTS_DISABLED=true.
+  # ────────────────────────────────────────────
+  ui-tests:
+    name: 📱 UI Tests (XCUITest)
+    runs-on: macos-latest
+    needs: swiftlint
+    if: ${{ vars.UI_TESTS_DISABLED != 'true' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
+
+      - name: Boot Simulator
+        run: |
+          # Find available iPhone simulator name and boot it
+          SIM_NAME=$(xcrun simctl list devices available | grep -v 'Unavailable' | grep -oE 'iPhone [0-9a-zA-Z ]+' | head -n 1)
+          echo "Booting $SIM_NAME..."
+          xcrun simctl boot "$SIM_NAME" || true
+
+      - name: Run UI Tests
+        run: bundle exec fastlane ui_tests
+
+      - name: Upload UI Test Results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ui-test-results
+          path: fastlane/ui_test_output/
+          retention-days: 14
+
+  # ────────────────────────────────────────────
+  # 4. SonarCloud (Code-Qualität + Coverage)
+  # ────────────────────────────────────────────
   sonarcloud:
     name: 📊 SonarCloud Scan
     runs-on: ubuntu-latest
     needs: build-and-test
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
-      - name: Download Test Results
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+      - name: Download JUnit Test Results
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
-          name: test-results
-          path: build/reports/
+          name: junit-test-results
+          path: fastlane/test_output/
+
+      - name: Download Coverage Reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: coverage-reports
+          path: build/coverage/
+
+      - name: Debug – List Downloaded Coverage Files
+        run: |
+          echo "=== Contents of build/coverage/ ==="
+          find build/coverage/ -type f 2>/dev/null || echo "Directory not found"
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432 # v8
+        uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
-        with:
-          args: >
-            -Dsonar.projectKey=everybodydaniel_Toernberechnung-iOS
-            -Dsonar.organization=everybodydaniel
-            -Dsonar.sources=Toernberechnung
-            -Dsonar.tests=ToernberechnungTests
-            -X
 
-  # ─────────────────────────────────────────
-  # Job 4: DocC → GitHub Pages
-  # ─────────────────────────────────────────
+  # ────────────────────────────────────────────
+  # 5. DocC Deployment (GitHub Pages)
+  # ────────────────────────────────────────────
   deploy-docs:
     name: 📚 Deploy DocC
     runs-on: macos-latest
@@ -137,7 +215,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Select Xcode Version
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -145,16 +223,16 @@ jobs:
       - name: Resolve Swift Packages
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
 
       - name: Build DocC
         run: |
           xcodebuild docbuild \
-            -project Toernberechnung.xcodeproj \
-            -scheme Toernberechnung \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
             -derivedDataPath /tmp/docbuild \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             DOCC_EXTRACT_EXTENSION_API=YES \
             DOCC_EXTRACT_API=YES \
@@ -162,7 +240,6 @@ jobs:
 
       - name: Prepare Pages Artifact
         run: |
-          # Dynamisch nach dem generierten Ordner suchen, um falsche Pfade zu vermeiden
           ARCHIVE_PATH=$(find /tmp/docbuild -type d -name "*.doccarchive" | head -n 1)
           if [ -z "$ARCHIVE_PATH" ]; then
             echo "Error: Could not find .doccarchive directory!"
@@ -172,11 +249,23 @@ jobs:
           mkdir -p ./docs-out
           cp -R "$ARCHIVE_PATH/" ./docs-out/
 
+      - name: Download Coverage Reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: coverage-reports
+          path: ./docs-out/temp-coverage-reports
+
+      - name: Align Coverage Reports Path
+        run: |
+          mkdir -p ./docs-out/coverage
+          cp -R ./docs-out/temp-coverage-reports/html/* ./docs-out/coverage/
+          rm -rf ./docs-out/temp-coverage-reports
+
       - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
           path: ./docs-out
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
