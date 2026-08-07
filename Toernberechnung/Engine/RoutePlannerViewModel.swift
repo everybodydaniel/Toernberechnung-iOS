@@ -30,11 +30,21 @@ struct IntermediateStop: Identifiable, Equatable {
 final class RoutePlannerViewModel {
     // MARK: - Input State
 
-    var startHarbourID: String = HarbourOption.options[0].id {
-        didSet { if oldValue != startHarbourID { onRouteChanged() } }
+    var startHarbourID: String = "" {
+        didSet {
+            guard oldValue != startHarbourID else { return }
+            if !removeIntermediateStopsMatchingEndpoints() {
+                onRouteChanged()
+            }
+        }
     }
-    var destinationHarbourID: String = HarbourOption.options[3].id {
-        didSet { if oldValue != destinationHarbourID { onRouteChanged() } }
+    var destinationHarbourID: String = "" {
+        didSet {
+            guard oldValue != destinationHarbourID else { return }
+            if !removeIntermediateStopsMatchingEndpoints() {
+                onRouteChanged()
+            }
+        }
     }
     /// Ordered list of intermediate stops (Zwischenstopps). Each stop has a
     /// stable UUID so SwiftUI can safely diff the list — using the raw
@@ -42,7 +52,14 @@ final class RoutePlannerViewModel {
     /// the same harbour id, and SwiftUI's index-based diff can produce
     /// "Index out of range" crashes when an item is deleted mid-update.
     var intermediateStops: [IntermediateStop] = [] {
-        didSet { if oldValue != intermediateStops { onRouteChanged() } }
+        didSet {
+            let sanitized = sanitizedIntermediateStops(intermediateStops)
+            if sanitized != intermediateStops {
+                intermediateStops = sanitized
+                return
+            }
+            if oldValue != intermediateStops { onRouteChanged() }
+        }
     }
     var departure: Date = Date() {
         didSet { scheduleRecalculation() }
@@ -50,9 +67,10 @@ final class RoutePlannerViewModel {
     var speedKnots: Double = 6.0 {
         didSet { scheduleRecalculation() }
     }
-    var bshWaterLevelCorrection: Double = 0.3 {
+    var bshWaterLevelCorrection: Double = 0 {
         didSet { scheduleRecalculation() }
     }
+    private(set) var confirmedComparisonGaugeIDs: [String: String] = [:]
 
     // MARK: - Route Template Selection
 
@@ -81,14 +99,30 @@ final class RoutePlannerViewModel {
     // MARK: - Weather Status
 
     var weatherStatus: WeatherStatus = .incomplete
+    var routeWeatherValidationState: RouteWeatherValidationState = .idle
+    private(set) var routeWeatherValidationID: UUID?
 
     // MARK: - Computed Properties
 
-    var startHarbour: HarbourOption { HarbourOption.byID(startHarbourID) }
-    var destinationHarbour: HarbourOption { HarbourOption.byID(destinationHarbourID) }
+    var selectedStartHarbour: HarbourOption? { HarbourOption.optionalByID(startHarbourID) }
+    var selectedDestinationHarbour: HarbourOption? { HarbourOption.optionalByID(destinationHarbourID) }
+
+    var hasCompleteRouteInput: Bool {
+        selectedStartHarbour != nil
+            && selectedDestinationHarbour != nil
+            && startHarbourID != destinationHarbourID
+    }
+
+    // Backwards-compatible accessors for code paths that are already guarded
+    // by `hasCompleteRouteInput` or an existing route.
+    var startHarbour: HarbourOption { selectedStartHarbour ?? HarbourOption.options[0] }
+    var destinationHarbour: HarbourOption { selectedDestinationHarbour ?? HarbourOption.options[0] }
 
     var routeTitle: String {
-        "\(startHarbour.name) → \(destinationHarbour.name)"
+        guard let start = selectedStartHarbour, let destination = selectedDestinationHarbour else {
+            return "Törn noch nicht geplant"
+        }
+        return "\(start.name) → \(destination.name)"
     }
 
     var isMultiWaypoint: Bool {
@@ -101,6 +135,14 @@ final class RoutePlannerViewModel {
     }
 
     var statusText: String {
+        switch routeWeatherValidationState {
+        case .loading(let completed, let total):
+            return total > 0 ? "Wetterprüfung \(completed)/\(total)" : "Wetter wird geprüft…"
+        case .unavailable:
+            return "Wetterdaten unvollständig"
+        case .idle, .ready:
+            break
+        }
         guard let status = combinedStatus else { return "Berechnung läuft…" }
         switch status {
         case .go: return "Befahrbar"
@@ -145,10 +187,6 @@ final class RoutePlannerViewModel {
     private let passageScanner: PassageWindowScanner
     private var calculationTask: Task<Void, Never>?
     private var passageWindowTask: Task<Void, Never>?
-    private var bshWaterLevelTask: Task<Void, Never>?
-
-    /// Source of the current `bshWaterLevelCorrection` value.
-    var bshWaterLevelSource: ValueSource = .manual
 
     // MARK: - Init
 
@@ -167,13 +205,25 @@ final class RoutePlannerViewModel {
 
     /// Called when start / destination / intermediate stops change.
     func onRouteChanged() {
-        refreshBSHWaterLevelInBackground()
+        confirmedComparisonGaugeIDs.removeAll()
 
         availableTemplates = []
         selectedTemplateID = nil
         showTemplateSelector = false
 
+        guard hasCompleteRouteInput else {
+            clearCalculatedRoute()
+            return
+        }
+
         buildHarbourChainAndCalculate()
+    }
+
+    func clearRouteDraft() {
+        startHarbourID = ""
+        destinationHarbourID = ""
+        intermediateStops = []
+        clearCalculatedRoute()
     }
 
     /// Legacy template selector hook (no longer auto-suggests templates —
@@ -182,15 +232,33 @@ final class RoutePlannerViewModel {
         // No-op: we now always build from the user's start / stops / destination.
     }
 
-    /// Add an intermediate stop. Picks the first harbour that is not yet
-    /// part of the chain so the user lands on a meaningful default.
-    func addIntermediateStop() {
-        let used = Set([startHarbourID, destinationHarbourID]
-                       + intermediateStops.map(\.harbourID))
-        guard let candidate = HarbourOption.options
-            .first(where: { !used.contains($0.id) })
-        else { return }
-        intermediateStops.append(IntermediateStop(harbourID: candidate.id))
+    /// Add several explicitly selected intermediate harbours in one mutation.
+    /// Unknown IDs, route endpoints and already-used harbours are ignored while
+    /// preserving the order in which the user selected the remaining stops.
+    /// Stops may be prepared before start and destination are complete; route
+    /// calculation still begins only once `hasCompleteRouteInput` is true.
+    @discardableResult
+    func addIntermediateStops(harbourIDs: [String]) -> Int {
+        let knownHarbourIDs = Set(HarbourOption.options.map(\.id))
+        var unavailableIDs = Set(intermediateStops.map(\.harbourID))
+        if !startHarbourID.isEmpty { unavailableIDs.insert(startHarbourID) }
+        if !destinationHarbourID.isEmpty { unavailableIDs.insert(destinationHarbourID) }
+
+        var additions: [IntermediateStop] = []
+        additions.reserveCapacity(harbourIDs.count)
+
+        for rawID in harbourIDs {
+            let harbourID = rawID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard knownHarbourIDs.contains(harbourID),
+                  unavailableIDs.insert(harbourID).inserted else {
+                continue
+            }
+            additions.append(IntermediateStop(harbourID: harbourID))
+        }
+
+        guard !additions.isEmpty else { return 0 }
+        intermediateStops.append(contentsOf: additions)
+        return additions.count
     }
 
     /// Remove the intermediate stop with the given stable UUID. Uses
@@ -201,16 +269,65 @@ final class RoutePlannerViewModel {
         intermediateStops.removeAll(where: { $0.id == stopID })
     }
 
-    /// Update the harbour for the stop with the given UUID.
-    func updateIntermediateStop(id stopID: IntermediateStop.ID, to harbourID: String) {
-        guard let idx = intermediateStops.firstIndex(where: { $0.id == stopID })
-        else { return }
-        intermediateStops[idx].harbourID = harbourID
+    /// Update the harbour for the stop with the given UUID. The model enforces
+    /// the same uniqueness rules as the picker so non-UI callers cannot create
+    /// unknown, endpoint, or duplicate waypoints.
+    @discardableResult
+    func updateIntermediateStop(id stopID: IntermediateStop.ID, to rawHarbourID: String) -> Bool {
+        let harbourID = rawHarbourID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let knownHarbourIDs = Set(HarbourOption.options.map(\.id))
+        let endpointIDs = endpointHarbourIDs
+
+        guard knownHarbourIDs.contains(harbourID),
+              !endpointIDs.contains(harbourID),
+              !intermediateStops.contains(where: { $0.id != stopID && $0.harbourID == harbourID }),
+              let index = intermediateStops.firstIndex(where: { $0.id == stopID }) else {
+            return false
+        }
+
+        guard intermediateStops[index].harbourID != harbourID else { return true }
+        intermediateStops[index].harbourID = harbourID
+        return true
+    }
+
+    private var endpointHarbourIDs: Set<String> {
+        Set([startHarbourID, destinationHarbourID].filter { !$0.isEmpty })
+    }
+
+    /// Removes endpoint collisions after Start or Ziel changes. Assignment to
+    /// `intermediateStops` triggers exactly one route refresh via its observer.
+    @discardableResult
+    private func removeIntermediateStopsMatchingEndpoints() -> Bool {
+        let endpoints = endpointHarbourIDs
+        guard !endpoints.isEmpty else { return false }
+        let filtered = intermediateStops.filter { !endpoints.contains($0.harbourID) }
+        guard filtered != intermediateStops else { return false }
+        intermediateStops = filtered
+        return true
+    }
+
+    /// Maintains a unique, catalog-backed route chain for every assignment,
+    /// including assistant actions and future non-UI callers.
+    private func sanitizedIntermediateStops(_ candidates: [IntermediateStop]) -> [IntermediateStop] {
+        let knownHarbourIDs = Set(HarbourOption.options.map(\.id))
+        var unavailable = endpointHarbourIDs
+
+        return candidates.filter { stop in
+            let harbourID = stop.harbourID.trimmingCharacters(in: .whitespacesAndNewlines)
+            return harbourID == stop.harbourID
+                && knownHarbourIDs.contains(harbourID)
+                && unavailable.insert(harbourID).inserted
+        }
     }
 
     // MARK: - Route Building (Start → Stop 1 → Stop 2 → … → Destination)
 
     private func buildHarbourChainAndCalculate() {
+        guard hasCompleteRouteInput else {
+            clearCalculatedRoute()
+            return
+        }
+
         let harbourIDs = [startHarbourID]
             + intermediateStops.map(\.harbourID)
             + [destinationHarbourID]
@@ -284,7 +401,25 @@ final class RoutePlannerViewModel {
         // shallow Watt-segments (bottlenecks).
         let plan = RouteExpander.expandWithFairwayWaypoints(basePlan)
         routePlan = plan
+        invalidateRouteWeatherValidation()
         runCalculation(plan: plan)
+    }
+
+    private func clearCalculatedRoute() {
+        calculationTask?.cancel()
+        passageWindowTask?.cancel()
+        calculationTask = nil
+        passageWindowTask = nil
+        routePlan = nil
+        calculationResult = nil
+        routeSummary = nil
+        userWaypointIDs = []
+        isCalculating = false
+        calculationError = nil
+        passageWindow = nil
+        passageWindowMessage = nil
+        isSearchingWindow = false
+        invalidateRouteWeatherValidation()
     }
 
     // MARK: - Calculation
@@ -306,6 +441,7 @@ final class RoutePlannerViewModel {
         }
 
         routePlan = updatedPlan
+        invalidateRouteWeatherValidation()
         runCalculation(plan: updatedPlan)
     }
 
@@ -326,7 +462,8 @@ final class RoutePlannerViewModel {
             let result = await self.calculationService.calculate(
                 route: plan,
                 boatSettings: boatSettings,
-                tideDataProvider: self.tideDataProvider
+                tideDataProvider: self.tideDataProvider,
+                confirmedComparisonGaugeIDs: self.confirmedComparisonGaugeIDs
             )
 
             guard !Task.isCancelled else { return }
@@ -342,12 +479,10 @@ final class RoutePlannerViewModel {
                 self.calculationError = result.messages.joined(separator: "\n")
             }
 
-            if result.tidalStatus == .incomplete {
-                self.isSearchingWindow = false
-                self.passageWindowMessage = "Passagefenster erst mit vollständigen Gezeitendaten verfügbar."
-            } else {
-                self.startPassageWindowSearch(for: plan)
-            }
+            // Even without a current local model forecast, astronomical HW/NW
+            // can still provide a provisional window. Its quality flag keeps
+            // the route status from becoming green.
+            self.startPassageWindowSearch(for: plan)
         }
     }
 
@@ -368,6 +503,25 @@ final class RoutePlannerViewModel {
         startPassageWindowSearch(for: plan)
     }
 
+    func confirmComparisonGauge(localStationID: String, comparisonStationID: String) {
+        guard localStationID != comparisonStationID,
+              BSHTideStationCatalog.station(id: localStationID) != nil,
+              BSHTideStationCatalog.station(id: comparisonStationID)?.hasLocalWaterLevelForecast == true else {
+            return
+        }
+        confirmedComparisonGaugeIDs[localStationID] = comparisonStationID
+        if let routePlan {
+            runCalculation(plan: routePlan)
+        }
+    }
+
+    func clearComparisonGauge(localStationID: String) {
+        confirmedComparisonGaugeIDs.removeValue(forKey: localStationID)
+        if let routePlan {
+            runCalculation(plan: routePlan)
+        }
+    }
+
     private func startPassageWindowSearch(for plan: RoutePlan) {
         passageWindowTask?.cancel()
         isSearchingWindow = true
@@ -380,14 +534,19 @@ final class RoutePlannerViewModel {
             let window = await self.passageScanner.findSafeWindow(
                 route: plan,
                 boatSettings: self.boatSettings,
-                tideDataProvider: self.tideDataProvider
+                tideDataProvider: self.tideDataProvider,
+                confirmedComparisonGaugeIDs: self.confirmedComparisonGaugeIDs
             )
 
             guard !Task.isCancelled else { return }
             self.passageWindow = window
-            self.passageWindowMessage = window == nil
-                ? "Kein sicheres Abfahrtsfenster im Suchbereich gefunden."
-                : nil
+            if window == nil {
+                self.passageWindowMessage = self.calculationResult?.tidalStatus == .incomplete
+                    ? "Kein provisorisches Passagefenster aus den verfügbaren astronomischen Daten ableitbar."
+                    : "Kein sicheres Abfahrtsfenster im Suchbereich gefunden."
+            } else {
+                self.passageWindowMessage = nil
+            }
             self.isSearchingWindow = false
         }
     }
@@ -399,22 +558,100 @@ final class RoutePlannerViewModel {
         // just update the combined status in the existing result.
     }
 
-    static func assessWeatherStatus(for reading: WeatherReading?) -> WeatherStatus {
-        guard let reading else { return .incomplete }
+    @discardableResult
+    func beginRouteWeatherValidation(total: Int) -> UUID {
+        let id = UUID()
+        routeWeatherValidationID = id
+        routeWeatherValidationState = .loading(completed: 0, total: total)
+        weatherStatus = .incomplete
+        return id
+    }
 
-        let current = reading.current
-        let gustKnots = current.windGustKnots ?? current.windKnots
-        let visibilityKM = current.visibilityKM ?? 99
+    func updateRouteWeatherProgress(_ progress: RouteWeatherProgress, id: UUID) {
+        guard routeWeatherValidationID == id else { return }
+        routeWeatherValidationState = .loading(completed: progress.completed, total: progress.total)
+    }
 
-        if current.windKnots >= 28 || gustKnots >= 34 || visibilityKM < 1 {
+    func finishRouteWeatherValidation(_ batch: RouteWeatherBatch, id: UUID) {
+        guard routeWeatherValidationID == id else { return }
+        let status = Self.assessRouteWeather(batch: batch, calculationResult: calculationResult)
+        guard status != .incomplete else {
+            weatherStatus = .incomplete
+            routeWeatherValidationState = .unavailable(
+                message: MarineWeatherError.incompleteRouteWeather.localizedDescription
+            )
+            return
+        }
+        weatherStatus = status
+        routeWeatherValidationState = .ready(status: status, batch: batch)
+    }
+
+    func failRouteWeatherValidation(_ message: String, id: UUID) {
+        guard routeWeatherValidationID == id else { return }
+        weatherStatus = .incomplete
+        routeWeatherValidationState = .unavailable(message: message)
+    }
+
+    func invalidateRouteWeatherValidation() {
+        routeWeatherValidationID = nil
+        routeWeatherValidationState = .idle
+        weatherStatus = .incomplete
+    }
+
+    static func assessRouteWeather(
+        batch: RouteWeatherBatch,
+        calculationResult: RouteCalculationResult?
+    ) -> WeatherStatus {
+        guard let calculationResult,
+              calculationResult.waypointResults.count == batch.areaKeysByWaypoint.count else {
+            return .incomplete
+        }
+
+        var result: WeatherStatus = .go
+        for (index, waypointResult) in calculationResult.waypointResults.enumerated() {
+            let area = batch.areaKeysByWaypoint[index]
+            guard let snapshot = batch.snapshotsByArea[area],
+                  let hour = snapshot.hourly.min(by: {
+                      abs($0.date.timeIntervalSince(waypointResult.arrivalTime))
+                          < abs($1.date.timeIntervalSince(waypointResult.arrivalTime))
+                  }),
+                  abs(hour.date.timeIntervalSince(waypointResult.arrivalTime)) <= 90 * 60 else {
+                return .incomplete
+            }
+
+            let status = assessWeatherStatus(
+                for: MarineWeatherAssessment(
+                    windKnots: hour.wind.speedKnots,
+                    gustKnots: hour.wind.effectiveGustKnots,
+                    visibilityKM: hour.visibilityKM,
+                    precipitationChance: hour.precipitationChance,
+                    precipitationMM: hour.precipitationMM
+                )
+            )
+            if status == .noGo { return .noGo }
+            if status == .warning { result = .warning }
+        }
+        return result
+    }
+
+    static func assessWeatherStatus(
+        for report: MarineWeatherReport?,
+        departure: Date
+    ) -> WeatherStatus {
+        guard let report else { return .incomplete }
+        return assessWeatherStatus(for: report.weatherForRiskAssessment(at: departure))
+    }
+
+    static func assessWeatherStatus(for assessment: MarineWeatherAssessment) -> WeatherStatus {
+        if assessment.windKnots >= 28 || assessment.gustKnots >= 34 || assessment.visibilityKM < 1 {
             return .noGo
         }
 
-        if current.windKnots >= 20
-            || gustKnots >= 27
-            || visibilityKM < 5
-            || current.precipitationChance >= 60
-            || current.precipitationMM >= 3 {
+        if assessment.windKnots >= 20
+            || assessment.gustKnots >= 27
+            || assessment.visibilityKM < 5
+            || assessment.precipitationChance >= 60
+            || assessment.precipitationMM >= 3 {
             return .warning
         }
 
@@ -499,33 +736,6 @@ final class RoutePlannerViewModel {
         let draft = parseDouble(UserDefaults.standard.string(forKey: "boatDraft"), default: 1.1)
         let margin = parseDouble(UserDefaults.standard.string(forKey: "safetyMargin"), default: 0.0)
         return BoatSettings(draftMeters: draft, safetyMarginMeters: margin)
-    }
-
-    // MARK: - BSH Wasserstand live refresh
-
-    /// Refresh `bshWaterLevelCorrection` from the live BSH Wasserstand service.
-    /// Falls back silently if the network call fails — the existing value
-    /// (manual or last-known) stays in effect.
-    func refreshBSHWaterLevelInBackground() {
-        bshWaterLevelTask?.cancel()
-        let harbourID = destinationHarbourID
-        bshWaterLevelTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let gauge = BSHGauge.defaultGauge(forHarbourID: harbourID)
-            let value = await BSHWaterLevelService.shared.deviation(
-                forGaugeID: gauge.rawValue,
-                at: self.departure
-            )
-            guard !Task.isCancelled else { return }
-            if let value, self.bshWaterLevelSource != .manual {
-                self.bshWaterLevelCorrection = value
-                self.bshWaterLevelSource = .bsh
-            } else if let value {
-                // user has a manual value; record the fetched value for diagnostics only
-                self.bshWaterLevelSource = .manual
-                _ = value
-            }
-        }
     }
 
     // MARK: - Formatting

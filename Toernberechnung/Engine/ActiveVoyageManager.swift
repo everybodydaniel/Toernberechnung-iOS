@@ -47,6 +47,7 @@ final class ActiveVoyageManager {
     /// Planned route the voyage is anchored to (for UI + logbook output).
     private(set) var activeRoute: RoutePlan?
     private(set) var userWaypointIDs: [UUID] = []
+    private(set) var latestWeatherSnapshot: MaritimeWeatherSnapshot?
 
     /// Computed live elapsed-time.  Reads `Date()` so it's correct even
     /// when the app was suspended for hours.
@@ -59,15 +60,21 @@ final class ActiveVoyageManager {
 
     private let locationService: LocationService
     private let tracker: NavigationTracker
+    private let weatherService: MaritimeWeatherService
     /// Minimum distance (m) between consecutive accepted breadcrumbs.
     /// Discards idle GPS jitter when the boat is moored.
     private let minBreadcrumbMeters: Double = 5
     /// Maximum acceptable horizontal accuracy (m) for breadcrumb samples.
     private let maxAccuracyMeters: Double = 30
 
-    init(locationService: LocationService, tracker: NavigationTracker) {
+    init(
+        locationService: LocationService,
+        tracker: NavigationTracker,
+        weatherService: MaritimeWeatherService = .shared
+    ) {
         self.locationService = locationService
         self.tracker = tracker
+        self.weatherService = weatherService
     }
 
     // MARK: - Public API
@@ -93,6 +100,15 @@ final class ActiveVoyageManager {
         breadcrumbs.removeAll()
         sogSum = 0
         lastLocation = nil
+        latestWeatherSnapshot = nil
+        currentWeatherArea = nil
+        pendingWeatherArea = nil
+        pendingWeatherAreaSince = nil
+        nextWeatherCheckAt = UserDefaults.standard.object(
+            forKey: Self.navigationWeatherNextCheckKey
+        ) as? Date
+        weatherTask?.cancel()
+        weatherTask = nil
 
         tracker.setRoute(route, userWaypointIDs: userWaypointIDs, plannedSpeedKnots: plannedSpeedKnots)
 
@@ -170,6 +186,13 @@ final class ActiveVoyageManager {
 
     private var lastLocation: CLLocation?
     private var sogSum: Double = 0
+    private var currentWeatherArea: WeatherAreaKey?
+    private var pendingWeatherArea: WeatherAreaKey?
+    private var pendingWeatherAreaSince: Date?
+    private var nextWeatherCheckAt: Date?
+    private var weatherTask: Task<Void, Never>?
+    private static let navigationWeatherNextCheckKey = "navigationWeatherNextCheckAt"
+    private static let stableWeatherAreaDuration: TimeInterval = 20
 
     private func processLocation(_ location: CLLocation) {
         guard isVoyageActive else { return }
@@ -181,6 +204,7 @@ final class ActiveVoyageManager {
 
         // Update the navigation tracker on every accepted fix.
         tracker.update(location: location, speedKnots: sogKnots)
+        refreshWeatherIfNeeded(for: location)
 
         // Discard near-stationary jitter when accumulating breadcrumbs.
         if let last = lastLocation {
@@ -200,6 +224,66 @@ final class ActiveVoyageManager {
         }
     }
 
+    private func refreshWeatherIfNeeded(for location: CLLocation) {
+        guard let area = location.coordinate.maritimeWeatherArea() else { return }
+        let now = Date()
+        let changedArea: Bool
+        if let currentWeatherArea, area != currentWeatherArea {
+            if pendingWeatherArea != area {
+                pendingWeatherArea = area
+                pendingWeatherAreaSince = now
+                return
+            }
+            guard let pendingWeatherAreaSince,
+                  now.timeIntervalSince(pendingWeatherAreaSince) >= Self.stableWeatherAreaDuration else {
+                return
+            }
+            changedArea = true
+        } else {
+            changedArea = currentWeatherArea == nil
+            pendingWeatherArea = nil
+            pendingWeatherAreaSince = nil
+        }
+        let ttlExpired = nextWeatherCheckAt.map { now >= $0 } ?? true
+        guard changedArea || ttlExpired else { return }
+
+        if weatherTask != nil {
+            guard changedArea else { return }
+            weatherTask?.cancel()
+        }
+
+        currentWeatherArea = area
+        pendingWeatherArea = nil
+        pendingWeatherAreaSince = nil
+        setNextWeatherCheck(now.addingTimeInterval(60))
+        let weatherService = self.weatherService
+        weatherTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.weatherTask = nil }
+            do {
+                let snapshot = try await weatherService.weather(
+                    at: location.coordinate,
+                    datasets: [.current],
+                    policy: .revalidateExpired
+                )
+                guard !Task.isCancelled, self.currentWeatherArea == area else { return }
+                self.latestWeatherSnapshot = snapshot
+                self.setNextWeatherCheck(
+                    snapshot.productStates[.current]?.validUntil
+                        ?? now.addingTimeInterval(40 * 60)
+                )
+            } catch {
+                guard !Task.isCancelled, self.currentWeatherArea == area else { return }
+                self.setNextWeatherCheck(Date().addingTimeInterval(5 * 60))
+            }
+        }
+    }
+
+    private func setNextWeatherCheck(_ date: Date) {
+        nextWeatherCheckAt = date
+        UserDefaults.standard.set(date, forKey: Self.navigationWeatherNextCheckKey)
+    }
+
     // MARK: - Cleanup / encoding
 
     private func cleanup() {
@@ -211,6 +295,13 @@ final class ActiveVoyageManager {
         activeRoute = nil
         userWaypointIDs.removeAll()
         lastLocation = nil
+        latestWeatherSnapshot = nil
+        currentWeatherArea = nil
+        pendingWeatherArea = nil
+        pendingWeatherAreaSince = nil
+        nextWeatherCheckAt = nil
+        weatherTask?.cancel()
+        weatherTask = nil
     }
 
     private func voyageNotes(durationSeconds: TimeInterval) -> String {

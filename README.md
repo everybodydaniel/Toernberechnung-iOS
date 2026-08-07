@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⛵ TörnCalculator
+# TideNode
 
 **Intelligente Törn- & Wattenpassageplanung für die ostfriesischen Inseln**
 
@@ -18,7 +18,7 @@ Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordin
 
 <br/>
 
-<img src="assets/screenshots/01_map_tab.png" alt="TörnCalculator – Kartenansicht mit Route Borkum → Norderney, nautischer Seekarte und Go/No-Go-Status" width="280">
+<img src="assets/screenshots/01_map_tab.png" alt="TideNode – Kartenansicht mit Route Borkum → Norderney, nautischer Seekarte und Go/No-Go-Status" width="280">
 
 <sub><i>Kartenansicht: Route Borkum → Norderney mit nautischer Seekarte, Gezeitenfenster und Go/No-Go-Bewertung</i></sub>
 
@@ -49,12 +49,12 @@ Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordin
 
 ## 🎯 Überblick
 
-TörnCalculator ist eine native iOS-App für die **Planung von Segeltörns und Wattenpassagen** zwischen den ostfriesischen Inseln. Die App richtet sich an Skipper, die eine zuverlässige, datenbasierte Entscheidungsgrundlage für ihre Fahrt benötigen.
+TideNode ist eine native iOS-App für die **Planung von Segeltörns und Wattenpassagen** zwischen den ostfriesischen Inseln. Die App richtet sich an Skipper, die eine zuverlässige, datenbasierte Entscheidungsgrundlage für ihre Fahrt benötigen.
 
 Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Hauptbereichen:
 
 - **Karte** – Nautische Seekarte mit Routenplanung, Wegpunkten und Go/No-Go-Bewertung
-- **Wetter** – DWD-MOSMIX-Wetterdaten mit stündlicher Vorhersage und Winddarstellung in Knoten
+- **Wetter** – Apple-WeatherKit-Prognosen mit 48-Stunden-Wind- und Böendarstellung in Knoten
 - **Gezeiten** – BSH-Gezeitenabruf mit astronomischen Hoch-/Niedrigwasserzeiten und Wasserstandsvorhersage
 - **Crew** – Crewverwaltung mit Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakten und Bordstatus
 - **Logbuch** – Vollständiges Schiffstagebuch mit PDF-Export und Auditprotokoll via SwiftData
@@ -68,7 +68,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Haupt
 <table>
   <tr>
     <td align="center"><img src="assets/screenshots/01_map_tab.png" width="200" alt="Karte-Tab"/><br/><sub><b>Karte</b><br/>Route & Passage</sub></td>
-    <td align="center"><img src="assets/screenshots/02_weather_tab.png" width="200" alt="Wetter-Tab"/><br/><sub><b>Wetter</b><br/>DWD-Vorhersage</sub></td>
+    <td align="center"><img src="assets/screenshots/02_weather_tab.png" width="200" alt="Wetter-Tab"/><br/><sub><b>Wetter</b><br/>WeatherKit-Prognose</sub></td>
     <td align="center"><img src="assets/screenshots/03_tides_tab.png" width="200" alt="Gezeiten-Tab"/><br/><sub><b>Gezeiten</b><br/>BSH-Tidenkalender</sub></td>
   </tr>
   <tr>
@@ -90,7 +90,8 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Haupt
 | 🧮 | **Gezeitenbasierte Berechnung** | Automatische Berechnung von Fallhöhe (FmW), Wassertiefe (WT) und Wassersäule über Kiel (WuK) nach der Zwölftelregel |
 | 🔍 | **Passagefenster-Scanner** | Automatische Suche nach dem nächsten sicheren Abfahrtsfenster basierend auf Gezeiten und Wasserstand |
 | 🌊 | **BSH-Gezeitendaten** | Echtzeit-Abruf astronomischer Hoch-/Niedrigwasservorhersagen und Wasserstandskurven vom BSH |
-| 🌤️ | **DWD-MOSMIX-Wetter** | Stündliche Wettervorhersage mit Temperatur, Wind und Böen in Knoten für alle ostfriesischen Inseln |
+| 🌤️ | **Apple WeatherKit** | Aktuelles Wetter, 48-Stunden-Windprognose und 7-Tage-Vorhersage für alle ostfriesischen Inseln |
+| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten, ohne Übertragung des Chatverlaufs an einen KI-Server |
 | 🚦 | **Go / Warning / No-Go** | Kombinierte Bewertung aus Gezeiten- und Wetterstatus zu einer klaren Passage-Empfehlung |
 | 🧭 | **Mehrstrecken-Routing** | Routenplanung mit Zwischenstopps und automatischer Streckenberechnung über den Wattenmeer-Katalog |
 | 👥 | **Crewverwaltung** | Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakte und Bordstatus-Tracking |
@@ -107,9 +108,9 @@ Die App folgt einer **MVVM-Architektur** mit strikter Trennung zwischen UI-Schic
 graph TD
     BSH["BSH Gezeiten-API<br/>(Hoch-/Niedrigwasser)"]:::source
     BSHWL["BSH Wasserstand-API<br/>(Vorhersage & Messung)"]:::source
-    DWD["DWD Open Data<br/>(MOSMIX-Wetter)"]:::source
+    APPLE["Apple WeatherKit<br/>(Wetter, Wind & Böen)"]:::source
 
-    subgraph App ["TörnCalculator iOS (SwiftUI)"]
+    subgraph App ["TideNode iOS (SwiftUI)"]
         VM["RoutePlannerViewModel<br/>(Zustand & Steuerung)"]:::core
         ENGINE["Engine<br/>(Tidenberechnung, Routing, Scanner)"]:::core
         CATALOG["Wattenmeer-Katalog<br/>(JSON – Offline)"]:::storage
@@ -118,7 +119,7 @@ graph TD
     subgraph Services ["Externe Dienste"]
         BSHS["BSHTideService"]:::service
         BSHWLS["BSHWaterLevelService"]:::service
-        DWDS["DWDService"]:::service
+        WKS["WeatherKitManager"]:::service
     end
 
     subgraph UI ["SwiftUI Views (5 Tabs)"]
@@ -131,10 +132,10 @@ graph TD
 
     BSH -->|JSON| BSHS
     BSHWL -->|JSON| BSHWLS
-    DWD -->|KML/ZIP| DWDS
+    APPLE -->|WeatherKit| WKS
     BSHS --> VM
     BSHWLS --> VM
-    DWDS --> VM
+    WKS --> VM
     CATALOG --> ENGINE
     ENGINE --> VM
     VM --> MAP
@@ -157,7 +158,7 @@ graph TD
 | **Views** | SwiftUI-Oberfläche mit 5-Tab-Navigation, MapLibre-Kartenansicht und Liquid-Glass-Styling |
 | **ViewModel** | `RoutePlannerViewModel` – zentraler Zustand, Berechnungssteuerung und Datenabruf |
 | **Engine** | Tidenberechnung (Zwölftelregel), Routenplanung, Passagefenster-Scan und Statuskombination |
-| **Services** | HTTP-Clients für BSH-Gezeiten, BSH-Wasserstand, DWD-Wetter und Windfinder |
+| **Services** | Clients für BSH-Gezeiten, BSH-Wasserstand und Apple WeatherKit sowie lokale Nauti-Inferenz |
 | **Resources** | Kuratierter Wattenmeer-Katalog, GeoJSON-Schutzgebietsdaten und nautische Kartenressourcen |
 
 ---
@@ -168,11 +169,11 @@ graph TD
 |---|---|---|
 | **BSH Gezeiten** | Astronomische Hoch-/Niedrigwasser-Vorhersagen für Inselpegel | JSON-Abruf, Parsing der HW/NW-Zeiten und -Höhen |
 | **BSH Wasserstand** | Wasserstandsvorhersage und -messung (SKN-Bezug) | Zeitreihen-Abruf, Darstellung als Verlaufskurve |
-| **DWD Open Data** | MOSMIX-Wetterprognosen (Temperatur, Wind, Böen, Niederschlag) | KML-Download, ZIP-Entpackung, Stundenraster-Parsing |
-| **DWD Seewetter** | Maritime Wetterwarnungen für die Deutsche Bucht | HTML-Parsing des aktuellen Seewetterberichts |
+| **Apple WeatherKit** | Aktuelles Wetter, Wind, Böen, Niederschlag sowie Stunden- und Tagesprognosen | Native async/await-Abfragen, nautische Einheiten und lokaler Cache |
+| **Apple Foundation Models** | Lokales Sprachverständnis für Nauti, Törn-Intents und allgemeine Seefragen | Vollständig auf dem Gerät; strukturierte Swift-Ausgaben ohne KI-Netzwerkaufruf |
 | **Lokaler Katalog** | 20+ Routen, Wegpunkte, Tiefenwerte und Pegel | Offline-JSON mit vorberechneten Katalogdaten |
 
-> Die App funktioniert dank des lokalen Katalogs auch ohne Netzwerkverbindung für die Kernberechnung. Gezeiten- und Wetterdaten erfordern eine aktive Internetverbindung.
+> Die Kernberechnung und Nauti-Antworten funktionieren auf unterstützten Geräten lokal. Gezeiten-, Wetter- und Crewspace-Daten erfordern weiterhin eine aktive Internetverbindung.
 
 ---
 
@@ -191,9 +192,13 @@ graph TD
 
 ### Externe Dienste
 - **Gezeiten:** BSH Gezeiten-API + BSH Wasserstand-API
-- **Wetter:** DWD Open Data (MOSMIX_L) + DWD Seewetter
-- **Wind:** Windfinder Web-Service
+- **Wetter und Wind:** Apple WeatherKit
 - **Lotungen:** Wattseglervereinigung Lotungsdaten
+
+### Lokale KI
+- **Framework:** Apple Foundation Models auf iOS 26
+- **Datenschutz:** Nauti-Prompts und Antworten verlassen das Gerät nicht
+- **Fallback:** Auf nicht unterstützten Geräten bleiben alle manuellen Funktionen verfügbar; es gibt keinen Remote-KI-Fallback
 
 ### Berechnungs-Engine
 - **Tidenberechnung:** Zwölftelregel für Wasserstandsinterpolation
@@ -206,7 +211,7 @@ graph TD
 - **Code-Analyse:** SwiftLint
 - **Dokumentation:** DocC (automatisch via GitHub Pages)
 - **CI/CD:** GitHub Actions (SwiftLint → Build & Test → SonarCloud → DocC Deploy)
-- **Dependencies:** Swift Package Manager (MapLibre, ZIPFoundation)
+- **Dependencies:** Swift Package Manager (MapLibre, Firebase)
 
 ---
 
@@ -219,7 +224,8 @@ Toernberechnung-iOS/
 │   ├── Views/
 │   │   ├── ContentView.swift           # Hauptansicht mit Tab-Navigation
 │   │   ├── ContentView+MapTab.swift    # 🗺️ Karten-Tab: Route, Seekarte, Go/No-Go
-│   │   ├── ContentView+Weather.swift   # 🌤️ Wetter-Tab: DWD-Vorhersage, Wind, Böen
+│   │   ├── ContentView+Weather.swift   # 🌤️ Revier-Tab: WeatherKit, Wind und Böen
+│   │   ├── WeatherDetailViews.swift    # Windkarte, Charts und Tagesdetails
 │   │   ├── ContentView+Tides.swift     # 🌊 Gezeiten-Tab: BSH-Tiden, Wasserstandskurve
 │   │   ├── ContentView+Crew.swift      # 👥 Crew-Tab: Rollen, Notfallkontakte, Bordstatus
 │   │   ├── ContentView+Logbook.swift   # 📒 Logbuch-Tab: Reisehistorie, PDF-Export
@@ -247,14 +253,17 @@ Toernberechnung-iOS/
 │   │   ├── NavigationTracker.swift      # GPS-Positionsverfolgung
 │   │   ├── ActiveVoyageManager.swift    # Aktive Reiseverwaltung
 │   │   ├── AppDateFormatters.swift      # Zentrale Datumsformatierung
+│   │   ├── HarbourCatalog.swift         # Neutraler Hafen- und Koordinatenkatalog
+│   │   ├── MarineWeatherModels.swift    # Nautische Wetter-Domänenmodelle
+│   │   ├── NautiModels.swift            # Typisierte lokale KI-Aktionen und Verfügbarkeit
+│   │   ├── NautiChatViewModel.swift     # Chat-Zustand ohne Netzwerkabhängigkeit
 │   │   └── Routing/                     # Routing-Algorithmen und Graphen
 │   ├── Services/
 │   │   ├── BSHTideService.swift         # BSH-Gezeiten-API-Client
 │   │   ├── BSHWaterLevelService.swift   # BSH-Wasserstand-Messdaten
 │   │   ├── BSHWaterLevelForecastService.swift  # BSH-Wasserstandsvorhersage
-│   │   ├── DWDService.swift             # DWD-MOSMIX-Wetterdaten
-│   │   ├── DWDSeewetterService.swift    # DWD-Seewetterbericht
-│   │   ├── WindfinderService.swift      # Windfinder-Winddaten
+│   │   ├── WeatherKitManager.swift      # Apple-WeatherKit-Client und Cache
+│   │   ├── LocalAIInferenceManager.swift # Apple-Foundation-Models-Inferenz
 │   │   ├── WattseglerLotungenService.swift  # Wattseglervereinigung-Lotungen
 │   │   ├── EmdenPlantabelleService.swift    # Emden-Plantabelle
 │   │   ├── TideDataProvider.swift       # Abstrahierter Gezeitendaten-Provider
@@ -315,9 +324,13 @@ xcodegen generate
 open Toernberechnung.xcodeproj
 ```
 
-Dependencies (MapLibre, ZIPFoundation) werden automatisch über **Swift Package Manager** aufgelöst.
+Dependencies (MapLibre und Firebase) werden automatisch über **Swift Package Manager** aufgelöst.
 
-### 4 · SwiftLint installieren (empfohlen)
+### 4 · WeatherKit aktivieren
+
+Aktiviere **WeatherKit** unter *Signing & Capabilities* für das App-Target sowie für die zugehörige App ID im Apple Developer Portal. Erzeuge danach bei Bedarf das Provisioning Profile neu.
+
+### 5 · SwiftLint installieren (empfohlen)
 
 ```bash
 brew install swiftlint

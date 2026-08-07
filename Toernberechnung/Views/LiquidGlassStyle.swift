@@ -115,6 +115,23 @@ extension View {
         }
     }
 
+    /// Clear glass used by the ELWIS quick look and its top-level cards.
+    /// It intentionally matches the untinted glass of the header buttons.
+    @ViewBuilder
+    func appNoticeGlass(cornerRadius: CGFloat = 26) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(.regular, in: shape)
+                .shadow(color: .black.opacity(0.12), radius: 18, y: 10)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.08), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.10), radius: 14, y: 8)
+        }
+    }
+
     /// Circular floating button. Match what the existing `CircleButton`
     /// rendered before so the AppHeader and the FullScreen top-bar can
     /// reuse the same call.
@@ -133,6 +150,141 @@ extension View {
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.08), radius: 10, y: 6)
+        }
+    }
+
+    /// Dark, high-contrast Liquid Glass for controls floating over charts
+    /// and nautical maps. The dark tint keeps white SF Symbols legible over
+    /// bright chart details without turning the control into an opaque chip.
+    @ViewBuilder
+    func appDarkCircularLiquidGlass(diameter: CGFloat = 44) -> some View {
+        let tint = Color(hex: 0x08243A).opacity(0.78)
+        if #available(iOS 26.0, *) {
+            self
+                .frame(width: diameter, height: diameter)
+                .glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            self
+                .frame(width: diameter, height: diameter)
+                .background(.ultraThinMaterial, in: Circle())
+                .background(tint, in: Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.22), lineWidth: 0.8))
+                .shadow(color: .black.opacity(0.24), radius: 12, y: 7)
+        }
+    }
+
+    /// Interactive route control over the map. iOS 26 deliberately stays
+    /// untinted so the system can refract and adapt to the chart underneath.
+    @ViewBuilder
+    func appDarkFloatingOverlay(cornerRadius: CGFloat = 18) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let tint = Color(hex: 0x202746)
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(.regular.interactive(), in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .background(tint.opacity(0.80), in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.11), lineWidth: 0.7))
+                .shadow(color: .black.opacity(0.16), radius: 14, y: 7)
+        }
+    }
+
+    /// Dark marine Liquid Glass for dashboard data placed on the light app
+    /// canvas. The tint creates hierarchy without resorting to opaque cards.
+    @ViewBuilder
+    func appMarineDashboardGlass(cornerRadius: CGFloat = 24, tint: Color = Color(hex: 0x073A5B)) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(Glass.regular.tint(tint.opacity(0.72)), in: shape)
+                .shadow(color: tint.opacity(0.18), radius: 18, y: 10)
+        } else {
+            self
+                .background(.thinMaterial, in: shape)
+                .background(tint.opacity(0.84), in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.22), lineWidth: 0.8))
+                .shadow(color: tint.opacity(0.22), radius: 18, y: 10)
+        }
+    }
+
+    /// Main map dashboard. This is the only glass layer around its contents;
+    /// nested rows stay flat so Liquid Glass samples the map directly.
+    @ViewBuilder
+    func appGraphiteMapOverlay(cornerRadius: CGFloat = 24) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let tint = Color(hex: 0x202746)
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(.regular, in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .background(tint.opacity(0.80), in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.11), lineWidth: 0.7))
+                .shadow(color: .black.opacity(0.18), radius: 20, y: 12)
+        }
+    }
+
+    /// Clear Liquid Glass shared by the complete Revier surface. Weather and
+    /// tide animations remain visible without adding an opaque colour layer.
+    @ViewBuilder
+    func appWeatherLiquidGlass(cornerRadius: CGFloat = 22, interactive: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(
+                    interactive
+                        ? Glass.clear.interactive()
+                        : Glass.clear,
+                    in: shape
+                )
+                .shadow(color: .black.opacity(0.12), radius: 18, y: 10)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.24), lineWidth: 0.8))
+                .shadow(color: .black.opacity(0.12), radius: 18, y: 10)
+        }
+    }
+
+    /// Single clear-glass surface for a presented weather detail. Its child
+    /// panels intentionally stay flat so the system never composites glass
+    /// directly on top of another glass layer.
+    @ViewBuilder
+    func appWeatherDetailSheetGlass(cornerRadius: CGFloat = 32) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(Glass.clear, in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.24), lineWidth: 0.8))
+        }
+    }
+
+    /// Flat grouping used inside the weather detail's single glass surface.
+    func appWeatherDetailInset(cornerRadius: CGFloat = 20) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(Color.primary.opacity(0.055), in: shape)
+            .overlay(shape.stroke(Color.primary.opacity(0.10), lineWidth: 0.7))
+    }
+
+    /// Flat content grouping inside the map dashboard. On iOS 26 the parent
+    /// already provides Liquid Glass, so another material here would block
+    /// refraction. iOS 18 keeps the established inset-card fallback.
+    @ViewBuilder
+    func appMapDashboardInset(cornerRadius: CGFloat = 18) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            self.background(
+                Color.white.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
         }
     }
 }

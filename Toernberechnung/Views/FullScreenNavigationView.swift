@@ -26,6 +26,7 @@ struct FullScreenNavigationView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var stopAlertShown = false
+    @State private var appeared = false
     let onStopVoyage: () -> Void
 
     var body: some View {
@@ -41,6 +42,18 @@ struct FullScreenNavigationView: View {
             )
             .ignoresSafeArea()
 
+            LinearGradient(
+                colors: [
+                    .black.opacity(0.30),
+                    .clear,
+                    .black.opacity(0.36)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
             topBar
                 .padding(.horizontal, 14)
                 .padding(.top, 8)
@@ -53,6 +66,13 @@ struct FullScreenNavigationView: View {
             }
         }
         .background(Color.black)
+        .opacity(appeared ? 1 : 0)
+        .scaleEffect(appeared ? 1 : 0.965)
+        .onAppear {
+            withAnimation(.spring(response: 0.46, dampingFraction: 0.88)) {
+                appeared = true
+            }
+        }
         .alert("Aktive Fahrt beenden?", isPresented: $stopAlertShown) {
             Button("Fahrt beenden", role: .destructive) {
                 onStopVoyage()
@@ -96,28 +116,28 @@ struct FullScreenNavigationView: View {
             .accessibilityLabel("Vollbild minimieren")
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("AKTIVE FAHRT")
+                Text("NAVIGATION")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.68))
                 Text(voyageManager.activeRoute?.routeName ?? "")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
                     .lineLimit(1)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .appFloatingOverlay(cornerRadius: 14)
+            .appMarineDashboardGlass(cornerRadius: 16, tint: Color(hex: 0x1F2937))
 
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(Self.formatHMS(
                     Date().timeIntervalSince(voyageManager.voyageStartTime ?? context.date)
                 ))
                 .font(.system(size: 14, weight: .heavy, design: .monospaced))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .appFloatingOverlay(cornerRadius: 14)
+                .appMarineDashboardGlass(cornerRadius: 16, tint: Color(hex: 0x1F2937))
             }
         }
     }
@@ -128,14 +148,34 @@ struct FullScreenNavigationView: View {
     // on Color.fieldBackground because they sit INSIDE the glass panel
     // and glass-on-glass is forbidden.
     private var bottomDashboard: some View {
-        VStack(spacing: 10) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                tile("SOG", String(format: "%.1f kn", locationService.speedKnots))
-                tile("COG", locationService.courseDegrees.map { String(format: "%03.0f°", $0) } ?? "–")
-                tile("DTW", navigationTracker.distanceToWaypointNm.map { String(format: "%.2f sm", $0) } ?? "–")
-                tile("NÄCHSTER WP", navigationTracker.activeWaypointName ?? "–")
-                tile("ETA", navigationTracker.dynamicETA.map(AppDateFormatters.hourMinute.string(from:)) ?? "–")
-                tile("STRECKE", String(format: "%.2f sm", voyageManager.totalDistanceNm))
+        VStack(alignment: .leading, spacing: 12) {
+            Capsule()
+                .fill(Color.white.opacity(0.32))
+                .frame(width: 44, height: 5)
+                .frame(maxWidth: .infinity)
+
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color(hex: 0x14B8A6).opacity(0.20))
+                    Image(systemName: "location.north.line.fill")
+                        .font(.system(size: 22, weight: .heavy))
+                        .foregroundStyle(Color(hex: 0x14B8A6))
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(navigationTracker.activeWaypointName ?? "Route folgen")
+                        .font(.system(size: 23, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                    Text(routeInstructionText)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.70))
+                        .lineLimit(1)
+                }
+                Spacer()
             }
 
             if navigationTracker.isOffCourse, let xte = navigationTracker.crossTrackErrorMeters {
@@ -151,6 +191,17 @@ struct FullScreenNavigationView: View {
                 .background(Color.orange, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
 
+            HStack(spacing: 10) {
+                tile("SOG", String(format: "%.1f kn", locationService.speedKnots), icon: "speedometer")
+                tile("DTW", navigationTracker.distanceToWaypointNm.map { String(format: "%.2f nm", $0) } ?? "–", icon: "ruler")
+                tile("ETA", navigationTracker.dynamicETA.map(AppDateFormatters.hourMinute.string(from:)) ?? "–", icon: "clock.fill")
+            }
+
+            HStack(spacing: 10) {
+                compactInfo("Kurs", locationService.courseDegrees.map { String(format: "%03.0f°", $0) } ?? "–")
+                compactInfo("Gefahren", String(format: "%.2f nm", voyageManager.totalDistanceNm))
+            }
+
             Button {
                 stopAlertShown = true
             } label: {
@@ -158,24 +209,49 @@ struct FullScreenNavigationView: View {
             }
             .appProminentButton(tint: .red)
         }
-        .padding(12)
-        .appFloatingOverlay(cornerRadius: 20)
+        .padding(16)
+        .appMarineDashboardGlass(cornerRadius: 30, tint: Color(hex: 0x111827))
     }
 
-    private func tile(_ title: String, _ value: String) -> some View {
+    private var routeInstructionText: String {
+        if let distance = navigationTracker.distanceToWaypointNm {
+            return String(format: "%.2f nm bis zum nächsten Wegpunkt", distance)
+        }
+        return "Geplante Route ist auf der Karte eingeblendet"
+    }
+
+    private func tile(_ title: String, _ value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.secondary)
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color(hex: 0x93C5FD))
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .heavy))
+                .foregroundStyle(.white.opacity(0.55))
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: .monospaced))
-                .foregroundStyle(.primary)
+                .font(.system(size: 16, weight: .heavy, design: .monospaced))
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(11)
+        .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+    }
+
+    private func compactInfo(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .heavy))
+                .foregroundStyle(.white.opacity(0.54))
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.08), in: Capsule())
     }
 
     private static func formatHMS(_ interval: TimeInterval) -> String {

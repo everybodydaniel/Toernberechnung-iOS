@@ -27,8 +27,8 @@ import UIKit
 struct CompactMapView: UIViewRepresentable {
 
     let zoomLevel: Double
-    let start: HarbourOption
-    let destination: HarbourOption
+    let start: HarbourOption?
+    let destination: HarbourOption?
     var routePlan: RoutePlan?
     var waypointResults: [WaypointCalculationResult]?
     /// `true` while an `ActiveVoyageManager` is recording. Switches the map
@@ -54,10 +54,15 @@ struct CompactMapView: UIViewRepresentable {
         Self.installProtectedZoneOverlays(on: map)
 
         // Initial center.
-        let center = CLLocationCoordinate2D(
-            latitude: (start.latitude + destination.latitude) / 2,
-            longitude: (start.longitude + destination.longitude) / 2
-        )
+        let center: CLLocationCoordinate2D
+        if let start, let destination {
+            center = CLLocationCoordinate2D(
+                latitude: (start.latitude + destination.latitude) / 2,
+                longitude: (start.longitude + destination.longitude) / 2
+            )
+        } else {
+            center = CLLocationCoordinate2D(latitude: 53.66, longitude: 7.32)
+        }
         let span = MKCoordinateSpan(latitudeDelta: 0.6, longitudeDelta: 0.9)
         map.setRegion(MKCoordinateRegion(center: center, span: span), animated: false)
 
@@ -121,8 +126,8 @@ struct CompactMapView: UIViewRepresentable {
         private var lastInputs: DrawInputs?
 
         private struct DrawInputs {
-            let start: HarbourOption
-            let destination: HarbourOption
+            let start: HarbourOption?
+            let destination: HarbourOption?
             let routePlan: RoutePlan?
             let waypointResults: [WaypointCalculationResult]?
             let voyageActive: Bool
@@ -225,8 +230,8 @@ struct CompactMapView: UIViewRepresentable {
         @MainActor
         func update(
             map: MKMapView,
-            start: HarbourOption,
-            destination: HarbourOption,
+            start: HarbourOption?,
+            destination: HarbourOption?,
             routePlan: RoutePlan?,
             waypointResults: [WaypointCalculationResult]?,
             voyageActive: Bool,
@@ -247,7 +252,10 @@ struct CompactMapView: UIViewRepresentable {
             // Apply voyage-driven map state on every update so it picks up
             // mid-session transitions instantly.
             map.showsUserLocation = voyageActive
-            let targetMode: MKUserTrackingMode = voyageActive ? .followWithHeading : .none
+            let hasReliableUserLocation = map.userLocation.location.map {
+                $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 100
+            } ?? false
+            let targetMode: MKUserTrackingMode = voyageActive && hasReliableUserLocation ? .followWithHeading : .none
             if map.userTrackingMode != targetMode {
                 map.setUserTrackingMode(targetMode, animated: true)
             }
@@ -262,7 +270,7 @@ struct CompactMapView: UIViewRepresentable {
                 .map { "\($0.waypoint.name):\($0.status.rawValue)" }
                 .joined(separator: "|") ?? ""
             let breadcrumbKey = "bc:\(breadcrumbCoordinates.count)"
-            let key = "\(start.id)|\(destination.id)|\(wpKey)|\(resultKey)|voyage:\(voyageActive)|\(breadcrumbKey)|mask:\(SeaMask.shared.isReady)"
+            let key = "\(start?.id ?? "none")|\(destination?.id ?? "none")|\(wpKey)|\(resultKey)|voyage:\(voyageActive)|\(breadcrumbKey)|mask:\(SeaMask.shared.isReady)"
             guard key != lastRouteKey else { return }
             lastRouteKey = key
 
@@ -283,6 +291,8 @@ struct CompactMapView: UIViewRepresentable {
             if !hasZones {
                 CompactMapView.installProtectedZoneOverlays(on: map)
             }
+
+            guard let start, let destination else { return }
 
             // 1. Build the route polyline from the FULL Dijkstra node list.
             let routeCoords = Self.routeCoordinates(
@@ -327,9 +337,11 @@ struct CompactMapView: UIViewRepresentable {
             //    follow-me mode (the tracking mode handles centering for
             //    us during the voyage and a manual setVisibleMapRect call
             //    would fight against it).
-            if !voyageActive {
+            if !voyageActive || !hasReliableUserLocation {
                 let polyline = MKPolyline(coordinates: routeCoords, count: routeCoords.count)
-                let padding = UIEdgeInsets(top: 40, left: 28, bottom: 40, right: 28)
+                let padding = voyageActive
+                    ? UIEdgeInsets(top: 96, left: 34, bottom: 250, right: 34)
+                    : UIEdgeInsets(top: 40, left: 28, bottom: 40, right: 28)
                 map.setVisibleMapRect(
                     polyline.boundingMapRect.insetBy(dx: -2000, dy: -2000),
                     edgePadding: padding,

@@ -114,87 +114,157 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-struct SwipeDeleteRow<Content: View>: View {
-    let deleteAction: () -> Void
-    @ViewBuilder let content: () -> Content
+struct ActivityShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
 
-    @State private var offset: CGFloat = 0
+enum AppHeaderBrandStyle {
+    case white
+    case primary
 
-    var body: some View {
-        ZStack(alignment: .leading) {
-            Button(action: deleteAction) {
-                Label("Löschen", systemImage: "trash.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 104, alignment: .center)
-                    .frame(maxHeight: .infinity)
-            }
-            .background(Color.red)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .opacity(offset > 1 ? 1 : 0)
-
-            content()
-                .offset(x: offset)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 18)
-                        .onChanged { value in
-                            guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                            offset = max(0, min(118, value.translation.width))
-                        }
-                        .onEnded { value in
-                            guard abs(value.translation.width) > abs(value.translation.height) else {
-                                withAnimation(.spring(response: 0.25, dampingFraction: 0.86)) { offset = 0 }
-                                return
-                            }
-                            if value.translation.width > 160 {
-                                deleteAction()
-                            } else {
-                                withAnimation(.spring(response: 0.25, dampingFraction: 0.86)) {
-                                    offset = value.translation.width > 64 ? 104 : 0
-                                }
-                            }
-                        }
-                )
+    var color: Color {
+        switch self {
+        case .white: return .white
+        case .primary: return .appPrimary
         }
     }
 }
 
-// AppHeader sits at the top of every tab, just under the system status
-// bar. On iOS 26 it becomes a true Liquid Glass top bar (closer to the
-// system NavigationBar) and on iOS 18 it stays as ultraThinMaterial.
+// The header floats over the current content without painting a separate
+// surface, so the map remains continuous behind the TideNode wordmark.
 struct AppHeader: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(MaritimeNoticeCenter.self) private var maritimeNoticeCenter
+
+    let brandStyle: AppHeaderBrandStyle
+    let unreadNoticeCount: Int
+    let noticePulseTrigger: Int
+    let noticesAction: (MaritimeNoticeSummary?) -> Void
     let refreshAction: () -> Void
     let settingsAction: () -> Void
 
+    @State private var noticePulse = false
+    @State private var noticePreviewShown = false
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "sailboat.fill")
-                    .font(.system(size: 23, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x3C82FF))
-                Text("TÖRNCALCULATOR")
-                    .font(.system(size: 26, weight: .heavy))
-                    .foregroundStyle(Color.appPrimary)
+                Image("TideNodeMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Text("TideNode")
+                    .font(.system(size: 25, weight: .heavy))
+                    .foregroundStyle(brandStyle.color)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.72)
             }
             Spacer()
-            Button(action: refreshAction) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x3C82FF))
-            }
-            Button(action: settingsAction) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Color.primary)
-            }
+            headerActions
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
-        .padding(.bottom, 14)
-        .appFloatingOverlay(cornerRadius: 0)
+        .padding(.bottom, 8)
+        .background(Color.clear)
+        .onChange(of: noticePulseTrigger) { _, _ in
+            guard unreadNoticeCount > 0, !reduceMotion else { return }
+            noticePulse = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(620))
+                noticePulse = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var headerActions: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 10) {
+                headerActionButtons
+            }
+        } else {
+            headerActionButtons
+        }
+    }
+
+    private var headerActionButtons: some View {
+        HStack(spacing: 10) {
+            Button {
+                noticePreviewShown.toggle()
+            } label: {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(headerIconColor)
+                    .appDarkCircularLiquidGlass(diameter: 44)
+                    .overlay(alignment: .topTrailing) {
+                        if unreadNoticeCount > 0 {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 9, height: 9)
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                                .scaleEffect(noticePulse ? 1.32 : 1)
+                                .shadow(color: .red.opacity(noticePulse ? 0.60 : 0.22), radius: noticePulse ? 6 : 2)
+                                .animation(.spring(response: 0.30, dampingFraction: 0.68), value: noticePulse)
+                                .offset(x: 1, y: -1)
+                                .zIndex(1)
+                                .accessibilityHidden(true)
+                        }
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Nachrichten für Seefahrer")
+            .accessibilityValue(unreadNoticeCount == 0 ? "Keine ungelesenen Meldungen" : "\(unreadNoticeCount) ungelesen")
+            .popover(
+                isPresented: $noticePreviewShown,
+                attachmentAnchor: .rect(.bounds),
+                arrowEdge: .top
+            ) {
+                MaritimeNoticeQuickLook(
+                    onOpenNotice: { notice in
+                        dismissNoticePreview(andOpen: notice)
+                    },
+                    onShowAll: {
+                        dismissNoticePreview(andOpen: nil)
+                    }
+                )
+                .environment(maritimeNoticeCenter)
+                .presentationCompactAdaptation(.popover)
+                .presentationBackground(.clear)
+            }
+
+            Button(action: refreshAction) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(headerIconColor)
+                    .appDarkCircularLiquidGlass(diameter: 44)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: settingsAction) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(headerIconColor)
+                    .appDarkCircularLiquidGlass(diameter: 44)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var headerIconColor: Color {
+        if #available(iOS 26.0, *) {
+            return .appPrimary
+        }
+        return .white
+    }
+
+    private func dismissNoticePreview(andOpen notice: MaritimeNoticeSummary?) {
+        noticePreviewShown = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            noticesAction(notice)
+        }
     }
 }
 
@@ -213,29 +283,99 @@ struct CircleButton: View {
     }
 }
 
+struct BoatTypePicker: View {
+    @Environment(BoatProfileStore.self) private var boatProfile
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Bootstyp", systemImage: "sailboat.fill")
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(Color.secondary)
+
+            HStack(spacing: 10) {
+                Image(systemName: "sailboat.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color(hex: 0x3C82FF))
+                    .frame(width: 28, height: 28)
+                    .background(Color(hex: 0x3C82FF).opacity(0.12), in: Circle())
+
+                Picker("Bootstyp", selection: selection) {
+                    ForEach(
+                        BoatTypeCatalog.selectableTypes(including: boatProfile.boatType),
+                        id: \.self
+                    ) { type in
+                        Text(type).tag(type)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(Color(hex: 0x3C82FF))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .appFieldSurface(cornerRadius: 16)
+
+            syncStatus
+        }
+    }
+
+    private var selection: Binding<String> {
+        Binding(
+            get: { boatProfile.boatType },
+            set: { boatProfile.selectBoatType($0) }
+        )
+    }
+
+    @ViewBuilder
+    private var syncStatus: some View {
+        switch boatProfile.syncState {
+        case .localOnly:
+            Label("Auf diesem Gerät gespeichert", systemImage: "iphone")
+                .foregroundStyle(Color.secondary)
+        case .syncing:
+            HStack(spacing: 7) {
+                ProgressView().controlSize(.small)
+                Text("Wird mit Crewspace synchronisiert …")
+            }
+            .foregroundStyle(Color.secondary)
+        case .synced:
+            Label("Mit Crewspace synchronisiert", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(Color.green)
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Crewspace-Synchronisierung ausstehend", systemImage: "wifi.exclamationmark")
+                    .foregroundStyle(Color.orange)
+                Text(message)
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(2)
+                Button("Erneut versuchen") {
+                    boatProfile.retrySync()
+                }
+                .buttonStyle(.plain)
+                .fontWeight(.bold)
+                .foregroundStyle(Color(hex: 0x3C82FF))
+            }
+        }
+    }
+}
+
 struct SettingsSheet: View {
-    @AppStorage("profileName") private var profileName = ""
-    @AppStorage("profileEmail") private var profileEmail = ""
-    @AppStorage("profilePhone") private var profilePhone = ""
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("boatName") private var boatName = ""
-    @AppStorage("boatType") private var boatType = "Segelyacht"
     @AppStorage("boatCallsign") private var boatCallsign = ""
     @AppStorage("boatDraft") private var boatDraft = "1.1"
     @AppStorage("safetyMargin") private var safetyMargin = "0.0"
     @AppStorage("boatLength") private var boatLength = "10.5"
-    @AppStorage("appearanceMode") private var appearanceMode = "system"
-
-    private let boatTypes = ["Segelyacht", "Motoryacht", "Katamaran", "Jolle", "Arbeitsboot"]
-    private let appearanceOptions = [("system", "System"), ("light", "Hell"), ("dark", "Dunkel")]
+    @AppStorage("appearanceMode") private var appearanceMode = AppAppearanceMode.light.rawValue
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     settingsHero
-                    profileSection
+                    CrewspaceAccountSettingsView()
                     boatSection
                     appearanceSection
+                    onboardingSection
                     sourcesSection
                     legalSection
                 }
@@ -255,27 +395,24 @@ struct SettingsSheet: View {
             }
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
-            .preferredColorScheme(preferredColorScheme)
         }
-    }
-
-    private var preferredColorScheme: ColorScheme? {
-        switch appearanceMode {
-        case "light": return .light
-        case "dark": return .dark
-        default: return nil
-        }
+        // Sheets form their own presentation boundary. Applying the selected
+        // appearance here makes an already open settings sheet update
+        // immediately instead of retaining the scheme it was presented with.
+        .preferredColorScheme(activeAppearance.colorScheme)
     }
 
     private var settingsHero: some View {
         settingsGlassCard {
             HStack(spacing: 14) {
-                Image(systemName: "sailboat.circle.fill")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x3C82FF))
+                Image("TideNodeMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Törncalculator™")
+                    Text("TideNode")
                         .font(.system(size: 28, weight: .heavy))
                         .foregroundStyle(Color.appPrimary)
                     Text("Profile, Darstellung und Datenquellen")
@@ -288,32 +425,10 @@ struct SettingsSheet: View {
         }
     }
 
-    private var profileSection: some View {
-        settingsSection(title: "Nutzerprofil", icon: "person.crop.circle.fill") {
-            settingsTextField("Name", text: $profileName, icon: "person.fill")
-            settingsTextField(
-                "E-Mail",
-                text: $profileEmail,
-                icon: "envelope.fill",
-                keyboard: .emailAddress,
-                capitalization: .never,
-                textContentType: .emailAddress,
-                autocorrectionDisabled: true
-            )
-            settingsTextField("Telefon", text: $profilePhone, icon: "phone.fill", keyboard: .phonePad)
-        }
-    }
-
     private var boatSection: some View {
         settingsSection(title: "Bootsprofil", icon: "sailboat.fill") {
             settingsTextField("Bootsname", text: $boatName, icon: "tag.fill")
-            Picker("Bootstyp", selection: $boatType) {
-                ForEach(boatTypes, id: \.self) { type in
-                    Text(type).tag(type)
-                }
-            }
-            .pickerStyle(.menu)
-            .tint(Color(hex: 0x3C82FF))
+            BoatTypePicker()
             settingsTextField("Rufzeichen", text: $boatCallsign, icon: "antenna.radiowaves.left.and.right")
             HStack(spacing: 10) {
                 settingsDecimalField("Tiefgang (m)", text: $boatDraft, icon: "arrow.down.to.line")
@@ -327,31 +442,113 @@ struct SettingsSheet: View {
 
     private var appearanceSection: some View {
         settingsSection(title: "Darstellung", icon: "paintpalette.fill") {
-            Picker("Darstellung", selection: $appearanceMode) {
-                ForEach(appearanceOptions, id: \.0) { option in
-                    Text(option.1).tag(option.0)
+            HStack(spacing: 6) {
+                ForEach(AppAppearanceMode.allCases) { mode in
+                    appearanceButton(mode)
                 }
             }
-            .pickerStyle(.segmented)
-
+            .padding(5)
+            .background(Color.primary.opacity(0.055), in: Capsule())
+            .sensoryFeedback(.selection, trigger: appearanceMode)
         }
+    }
+
+    private func appearanceButton(_ mode: AppAppearanceMode) -> some View {
+        let selected = activeAppearance == mode
+        return Button {
+            appearanceMode = mode.rawValue
+        } label: {
+            appearanceIcon(mode)
+                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.66))
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(selected ? Color.appPrimary : Color.clear, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            selected ? Color.white.opacity(0.22) : Color.primary.opacity(0.08),
+                            lineWidth: 0.8
+                        )
+                }
+                .overlay(alignment: .topTrailing) {
+                    if selected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(7)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mode.accessibilityLabel)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private func appearanceIcon(_ mode: AppAppearanceMode) -> some View {
+        switch mode {
+        case .light:
+            Image(systemName: "sun.max.fill")
+                .font(.system(size: 25, weight: .semibold))
+        case .dark:
+            Image(systemName: "moon.fill")
+                .font(.system(size: 25, weight: .semibold))
+        }
+    }
+
+    private var activeAppearance: AppAppearanceMode {
+        AppAppearanceMode.resolved(from: appearanceMode)
     }
 
     private var sourcesSection: some View {
         settingsSection(title: "Datenquellen", icon: "network") {
             sourceRow(name: "BSH", detail: "Gezeiten, Hoch- und Niedrigwasser", icon: "water.waves")
-            sourceRow(name: "DWD", detail: "Wetterdaten und kompakte Vorhersagen", icon: "cloud.sun.rain.fill")
-            sourceRow(name: "Lokale Profile", detail: "Nutzer- und Bootsdaten bleiben auf dem Gerät", icon: "lock.fill")
+            sourceRow(name: "Apple Weather", detail: "WeatherKit-Prognosen, Wind und Böen", icon: "cloud.sun.rain.fill")
+            sourceRow(name: "Firebase Auth", detail: "Sicherer Crewspace-Zugang mit eindeutiger Skipper-ID", icon: "lock.fill")
+        }
+    }
+
+    private var onboardingSection: some View {
+        settingsSection(title: "Einführung", icon: "sparkles.rectangle.stack.fill") {
+            Button {
+                dismiss()
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(180))
+                    hasSeenOnboarding = false
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Color.appPrimary)
+                        .frame(width: 36, height: 36)
+                        .background(Color.appPrimary.opacity(0.12), in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Einführung erneut ansehen")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color.primary)
+                        Text("Törnplanung, Wetter und Crewspace")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .appFieldSurface(cornerRadius: 16)
         }
     }
 
     private var legalSection: some View {
         settingsGlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("© 2026 Törncalculator™")
+                Text("© 2026 TideNode")
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(Color.appPrimary)
-                Text("Törncalculator ersetzt keine Seeordnung, amtlichen Bekanntmachungen, Revierinformationen oder die nautische Verantwortung der Schiffsführung.")
+                Text("TideNode ersetzt keine Seeordnung, amtlichen Bekanntmachungen, Revierinformationen oder die nautische Verantwortung der Schiffsführung.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.secondary)
             }
@@ -481,15 +678,45 @@ extension Color {
     }
 
     static var appBackground: Color {
-        Color(uiColor: .systemGroupedBackground)
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x121214) : .systemGroupedBackground
+        })
     }
 
     static var cardBackground: Color {
-        Color(uiColor: .secondarySystemGroupedBackground)
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x1C1C1E) : .secondarySystemGroupedBackground
+        })
     }
 
     static var fieldBackground: Color {
-        Color(uiColor: .tertiarySystemGroupedBackground)
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x2C2C2E) : .tertiarySystemGroupedBackground
+        })
+    }
+
+    static var chatOverlayBackground: Color {
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x121214) : .systemBackground
+        })
+    }
+
+    static var chatSidebarBackground: Color {
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x1C1C1E) : .secondarySystemBackground
+        })
+    }
+
+    static var chatElementBackground: Color {
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x2C2C2E) : .secondarySystemBackground
+        })
+    }
+
+    static var chatFieldBackground: Color {
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x2C2C2E) : .tertiarySystemBackground
+        })
     }
 
     static var appPrimary: Color {

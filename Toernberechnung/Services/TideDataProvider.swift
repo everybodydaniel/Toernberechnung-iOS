@@ -31,6 +31,20 @@ protocol TideDataProvider {
     /// Fetch mean high water for a station, if available from the data source.
     /// Returns nil if the provider does not supply this value.
     func meanHighWater(for stationID: String) async throws -> Double?
+
+    /// Current-year BSH reference values and station capability metadata.
+    func stationReference(
+        for stationID: String,
+        around date: Date
+    ) async throws -> TideStationReference?
+
+    /// Conservative meteorological correction for the relevant HW cycle.
+    /// A comparison station is only considered when explicitly supplied.
+    func waterLevelCorrection(
+        for stationID: String,
+        at highWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionResolution
 }
 
 // MARK: - BSH Tide Data Provider
@@ -55,15 +69,30 @@ final class BSHTideDataProvider: TideDataProvider {
     }
 
     func meanTidalRange(for stationID: String) async throws -> Double? {
-        // BSH yearly data may contain MHW and MNW from which MTH can be derived.
-        // For now, return nil — the calculation engine will fall back to catalog/template values.
-        // Future: parse MHW-MNW from BSHTidePayload if available.
-        return nil
+        try await BSHTideService.shared.reference(for: stationID, around: .now)?.meanTidalRangeMeters
     }
 
     func meanHighWater(for stationID: String) async throws -> Double? {
-        // Future: extract from BSH yearly data if available.
-        return nil
+        try await BSHTideService.shared.reference(for: stationID, around: .now)?.meanHighWaterAboveSknMeters
+    }
+
+    func stationReference(
+        for stationID: String,
+        around date: Date
+    ) async throws -> TideStationReference? {
+        try await BSHTideService.shared.reference(for: stationID, around: date)
+    }
+
+    func waterLevelCorrection(
+        for stationID: String,
+        at highWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionResolution {
+        await BSHWaterLevelForecastService.shared.correction(
+            for: stationID,
+            at: highWaterTime,
+            comparisonStationID: confirmedComparisonStationID
+        )
     }
 }
 
@@ -77,6 +106,8 @@ final class MockTideDataProvider: TideDataProvider {
     var meanTidalRanges: [String: Double] = [:]
     /// Pre-configured mean high water values keyed by station ID.
     var meanHighWaters: [String: Double] = [:]
+    var referencesByStation: [String: TideStationReference] = [:]
+    var correctionsByStation: [String: WaterLevelCorrectionResolution] = [:]
     /// If true, throws an error on fetch to simulate network failure.
     var shouldThrow: Bool = false
 
@@ -93,5 +124,23 @@ final class MockTideDataProvider: TideDataProvider {
 
     func meanHighWater(for stationID: String) async throws -> Double? {
         meanHighWaters[stationID]
+    }
+
+    func stationReference(
+        for stationID: String,
+        around date: Date
+    ) async throws -> TideStationReference? {
+        referencesByStation[stationID]
+    }
+
+    func waterLevelCorrection(
+        for stationID: String,
+        at highWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionResolution {
+        correctionsByStation[stationID] ?? .unavailable(
+            stationID: stationID,
+            detail: "Mock enthält keine Wasserstandskorrektur."
+        )
     }
 }

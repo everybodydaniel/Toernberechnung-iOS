@@ -28,11 +28,11 @@ struct CalculatorResultsSection: View {
             passageWindowCard
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                metricCard("REISEZEIT", text: viewModel.totalTravelTimeText, caption: "Dauer")
-                metricCard("ANKUNFT", text: viewModel.arrivalTimeText, caption: "Uhr")
-                metricCard("DISTANZ", text: viewModel.totalDistanceText, caption: "NM")
-                metricCard("WuK", text: viewModel.worstWuKText, caption: viewModel.statusText)
-                metricCard("DIESEL", text: String(format: "%.1f l", dieselLiters), caption: "Richtwert")
+                metricCard("REISEZEIT", icon: "hourglass", text: viewModel.totalTravelTimeText, caption: "Dauer")
+                metricCard("ANKUNFT", icon: "flag.checkered", text: viewModel.arrivalTimeText, caption: "Uhr")
+                metricCard("DISTANZ", icon: "ruler", text: viewModel.totalDistanceText, caption: "NM")
+                metricCard("WuK", icon: "water.waves", text: viewModel.worstWuKText, caption: viewModel.statusText)
+                metricCard("DIESEL", icon: "fuelpump.fill", text: String(format: "%.1f l", dieselLiters), caption: "Richtwert")
             }
 
             // Leg-based route summary (only user-selected harbours).
@@ -43,16 +43,18 @@ struct CalculatorResultsSection: View {
 
             voyageActionButtons
         }
-        .padding(16)
-        .background(Color.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 12, y: 8)
     }
 
     // MARK: - Route Status Banner
 
     private var routeStatusBanner: some View {
         let status = viewModel.combinedStatus ?? .incomplete
+        let weatherProgress: RouteWeatherProgress? = {
+            guard case .loading(let completed, let total) = viewModel.routeWeatherValidationState else {
+                return nil
+            }
+            return RouteWeatherProgress(completed: completed, total: total)
+        }()
         let accent = combinedStatusColor(status)
         let icon = status == .go ? "checkmark.circle.fill"
             : status == .warning ? "exclamationmark.triangle.fill"
@@ -61,7 +63,7 @@ struct CalculatorResultsSection: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                if viewModel.isCalculating {
+                if viewModel.isCalculating || weatherProgress != nil {
                     ProgressView()
                         .tint(.white)
                 } else {
@@ -72,6 +74,21 @@ struct CalculatorResultsSection: View {
                     .font(.system(size: 28, weight: .bold))
             }
 
+            if let weatherProgress, weatherProgress.total > 0 {
+                ProgressView(
+                    value: Double(weatherProgress.completed),
+                    total: Double(weatherProgress.total)
+                )
+                .tint(.white)
+                Text("Alle Seegebiete werden geprüft. Bis zum Abschluss wird kein Sicherheitsstatus angezeigt.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.78))
+            } else if case .unavailable(let message) = viewModel.routeWeatherValidationState {
+                Text(message)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+
             if let error = viewModel.calculationError {
                 Text(error)
                     .font(.system(size: 12, weight: .medium))
@@ -79,17 +96,9 @@ struct CalculatorResultsSection: View {
             }
         }
         .foregroundStyle(.white)
-        .padding(18)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [accent.opacity(0.92), accent.opacity(0.72)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: accent.opacity(0.35), radius: 18, y: 10)
+        .appMarineDashboardGlass(cornerRadius: 30, tint: accent)
     }
 
     // MARK: - Passage Window Card
@@ -99,7 +108,7 @@ struct CalculatorResultsSection: View {
             HStack {
                 Text("SICHERES ABFAHRTSFENSTER")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                 Spacer()
                 if viewModel.isSearchingWindow {
                     ProgressView()
@@ -109,7 +118,7 @@ struct CalculatorResultsSection: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Color(hex: 0x3C82FF))
+                            .foregroundStyle(.white)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Passagefenster aktualisieren")
@@ -123,13 +132,13 @@ struct CalculatorResultsSection: View {
                         .foregroundStyle(Color.green)
                     Text(window.displayString)
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Color.appPrimary)
+                        .foregroundStyle(.white)
                 }
 
                 if window.contains(viewModel.departure) {
                     Text("Die aktuelle Abfahrt liegt innerhalb des sicheren Fensters.")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(.white.opacity(0.78))
                 } else {
                     Text("Die aktuelle Abfahrt liegt nicht im sicheren Fenster.")
                         .font(.system(size: 13, weight: .medium))
@@ -142,33 +151,43 @@ struct CalculatorResultsSection: View {
                         .foregroundStyle(viewModel.isSearchingWindow ? Color(hex: 0x3C82FF) : Color.orange)
                     Text(viewModel.isSearchingWindow ? "Fenster wird berechnet…" : (viewModel.passageWindowMessage ?? "Kein Passagefenster berechnet."))
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(.white.opacity(0.78))
                 }
             }
         }
-        .appCardSurface(cornerRadius: 22)
+        .padding(16)
+        .appMarineDashboardGlass(cornerRadius: 28, tint: Color(hex: 0x075985))
     }
 
     // MARK: - Metric Card
 
-    private func metricCard(_ title: String, text: String, caption: String) -> some View {
+    private func metricCard(_ title: String, icon: String, text: String, caption: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color(hex: 0x7DD3FC))
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.12), in: Circle())
+                Spacer(minLength: 0)
+            }
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.secondary)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.70))
             Text(text)
                 .font(.system(size: 25, weight: .bold))
-                .foregroundStyle(Color.appPrimary)
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
             Text(caption)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(.white.opacity(0.70))
                 .lineLimit(2)
                 .minimumScaleFactor(0.75)
         }
-        .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
-        .appMetricSurface(cornerRadius: 20)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .appMarineDashboardGlass(cornerRadius: 28, tint: Color(hex: 0x0A4C70))
     }
 
     // MARK: - Voyage Action Buttons
@@ -292,11 +311,11 @@ struct CalculatorResultsSection: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
-        .padding(14)
+        .padding(16)
         .background(Color.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(Color.green.opacity(0.35), lineWidth: 1.5)
         }
     }
@@ -313,16 +332,16 @@ struct CalculatorResultsSection: View {
                 .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
+        .padding(10)
         .background(Color.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private static func formatHMS(_ interval: TimeInterval) -> String {
         let total = max(0, Int(interval))
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return String(format: "%02d:%02d:%02d", h, m, s)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }

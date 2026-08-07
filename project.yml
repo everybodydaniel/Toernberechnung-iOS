@@ -5,12 +5,12 @@ options:
   groupSortPosition: top
 
 packages:
-  ZIPFoundation:
-    url: https://github.com/weichsel/ZIPFoundation
-    from: 0.9.19
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.26.0
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 12.16.0
 
 targets:
   Toernberechnung:
@@ -23,8 +23,14 @@ targets:
       - path: Toernberechnung/Views/ContentView+MapTab.swift
       - path: Toernberechnung/Views/CalculatorResultsSection.swift
       - path: Toernberechnung/Views/ContentView+SharedUI.swift
+      - path: Toernberechnung/Views/ContentView+FloatingTabBar.swift
       - path: Toernberechnung/Views/ContentView+Weather.swift
+      - path: Toernberechnung/Views/WeatherDetailViews.swift
+      - path: Toernberechnung/Views/MaritimeNoticesView.swift
       - path: Toernberechnung/Views/ContentView+Tides.swift
+      - path: Toernberechnung/Views/ContentView+SocialDrawer.swift
+      - path: Toernberechnung/Views/ContentView+Nauti.swift
+      - path: Toernberechnung/Views/ContentView+NautiDrawer.swift
       - path: Toernberechnung/Views/ContentView+Crew.swift
       - path: Toernberechnung/Views/ContentView+Logbook.swift
       - path: Toernberechnung/Views/ContentView+InitialData.swift
@@ -34,7 +40,22 @@ targets:
       - path: Toernberechnung/Views/FullScreenMapView.swift
       - path: Toernberechnung/Views/WebView.swift
       - path: Toernberechnung/Views/LiquidGlassStyle.swift
+      - path: Toernberechnung/Views/NautiChatView.swift
+      - path: Toernberechnung/Views/NautiPremiumChatView.swift
+      - path: Toernberechnung/Views/SkipperSocialFeedView.swift
+      - path: Toernberechnung/Views/SocialAuthComponents.swift
+      - path: Toernberechnung/Views/SkipperFeedComponents.swift
+      - path: Toernberechnung/Views/FeedCommentSheet.swift
+      - path: Toernberechnung/Views/SkipperProfileView.swift
       - path: Toernberechnung/Engine/AppDateFormatters.swift
+      - path: Toernberechnung/Engine/HarbourCatalog.swift
+      - path: Toernberechnung/Engine/MarineWeatherModels.swift
+      - path: Toernberechnung/Engine/MaritimeNoticeModels.swift
+      - path: Toernberechnung/Engine/NautiModels.swift
+      - path: Toernberechnung/Engine/NautiDeterministicIntentRouter.swift
+      - path: Toernberechnung/Engine/NautiChatViewModel.swift
+      - path: Toernberechnung/Engine/SocialAuthViewModel.swift
+      - path: Toernberechnung/Engine/SocialFeedModels.swift
       - path: Toernberechnung/Engine/RoutePlanModels.swift
       - path: Toernberechnung/Engine/TidalHeightStrategy.swift
       - path: Toernberechnung/Engine/RuleOfTwelfths.swift
@@ -51,15 +72,18 @@ targets:
       - path: Toernberechnung/Engine/ActiveVoyageManager.swift
       - path: Toernberechnung/Engine/Routing
       - path: Toernberechnung/Services/LocationService.swift
-      - path: Toernberechnung/Services/DWDService.swift
-      - path: Toernberechnung/Services/DWDSeewetterService.swift
+      - path: Toernberechnung/Services/WeatherKitManager.swift
+      - path: Toernberechnung/Services/MaritimeNoticeService.swift
+      - path: Toernberechnung/Services/LocalAIInferenceManager.swift
+      - path: Toernberechnung/Services/NautiConversationRepository.swift
+      - path: Toernberechnung/Services/NautiSpeechInputManager.swift
       - path: Toernberechnung/Services/BSHTideService.swift
-      - path: Toernberechnung/Services/BSHWaterLevelService.swift
       - path: Toernberechnung/Services/BSHWaterLevelForecastService.swift
       - path: Toernberechnung/Services/WattseglerLotungenService.swift
       - path: Toernberechnung/Services/EmdenPlantabelleService.swift
-      - path: Toernberechnung/Services/WindfinderService.swift
       - path: Toernberechnung/Services/TideDataProvider.swift
+      - path: Toernberechnung/Services/CrewspaceStore.swift
+      - path: Toernberechnung/Services/SocialFeedAPI.swift
       - path: Toernberechnung/Resources/wadden_sea_catalog.json
         type: file
         buildPhase: resources
@@ -75,17 +99,29 @@ targets:
       - path: Toernberechnung/Resources/nordsbefv.geojson
         type: file
         buildPhase: resources
+      - path: Toernberechnung/GoogleService-Info.plist
+        type: file
+        buildPhase: resources
+      - path: Toernberechnung/Resources/Assets.xcassets
+        type: folder.assetcatalog
+        buildPhase: resources
       - path: Toernberechnung/Info.plist
         type: file
         buildPhase: none
       - path: Toernberechnung/Toernberechnung.docc
     dependencies:
-      - package: ZIPFoundation
-        product: ZIPFoundation
       - package: MapLibre
         product: MapLibre
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseMessaging
     postCompileScripts:
       - name: SwiftLint
+        inputFiles:
+          - $(SRCROOT)/.swiftlint.yml
+          - $(SRCROOT)/Toernberechnung
+          - $(SRCROOT)/ToernberechnungTests
         script: |
           if command -v swiftlint >/dev/null 2>&1; then
             swiftlint lint --config "${SRCROOT}/.swiftlint.yml"
@@ -97,14 +133,21 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.ios
         INFOPLIST_FILE: Toernberechnung/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Toernberechnung/Toernberechnung.entitlements
         SWIFT_VERSION: "5.9"
+        FIREBASE_WEB_API_KEY: ""
+        CREWSPACE_API_BASE_URL: ""
         CURRENT_PROJECT_VERSION: "1"
         MARKETING_VERSION: "1.0"
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
     scheme:
       gatherCoverageData: true
       testTargets:
         - ToernberechnungTests
-        - ToernberechnungUITests
 
   ToernberechnungTests:
     type: bundle.unit-test
@@ -143,5 +186,3 @@ targets:
     scheme:
       testTargets:
         - ToernberechnungUITests
-
-

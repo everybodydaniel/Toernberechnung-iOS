@@ -3,23 +3,41 @@ import SwiftUI
 extension ContentView {
     @MainActor
     func bootstrapIfNeeded() async {
-        // Beim ersten Öffnen werden abgeleitete Routendaten und Startdatensätze vorbereitet.
-        syncRouteDefaults()
-        if viewModel.routePlan == nil {
-            viewModel.onRouteChanged()
-        }
+        // A route is deliberately not seeded. Weather and tides keep their
+        // own independent default locations until the skipper plans a trip.
+        await nautiViewModel.loadHistory()
+        await aiAccess.refresh()
+        await maritimeWeatherService.prepare()
+        await loadWeather(userInitiated: false)
         await loadTides(force: tideReading == nil)
-        await loadWaterLevelForecast(for: destinationHarbour, force: false)
-        await loadWindfinder(for: weatherRegionID, force: false)
-        if crewMembers.isEmpty {
-            modelContext.insert(CrewMemberRecord(name: "Skipper", role: CrewRoleOption.navigation.rawValue, isOnBoard: true))
-            modelContext.insert(CrewMemberRecord(name: "Crew", role: CrewRoleOption.deck.rawValue, isOnBoard: true))
-            try? modelContext.save()
-        }
+        await loadWaterLevelForecast(for: tideStationID, force: false)
+        removeLegacyCrewSeedIfNeeded()
     }
 
     @MainActor
     func writeAudit(action: String, source: String, statement: String, status: String) {
         modelContext.insert(AuditLog(action: action, source: source, statement: statement, status: status))
+    }
+
+    @MainActor
+    private func removeLegacyCrewSeedIfNeeded() {
+        let migrationKey = "crewspace.removedLegacyDemoCrew.v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+        defer { UserDefaults.standard.set(true, forKey: migrationKey) }
+
+        guard crewMembers.count == 2 else { return }
+        let legacyRows = crewMembers.filter { member in
+            member.skipperID.isEmpty
+                && member.conversationID.isEmpty
+                && member.isOnBoard
+                && member.emergencyContact.isEmpty
+                && member.emergencyPhone.isEmpty
+                && member.notes.isEmpty
+                && ((member.name == "Skipper" && member.role == CrewRoleOption.navigation.rawValue)
+                    || (member.name == "Crew" && member.role == CrewRoleOption.deck.rawValue))
+        }
+        guard legacyRows.count == 2 else { return }
+        legacyRows.forEach(modelContext.delete)
+        try? modelContext.save()
     }
 }

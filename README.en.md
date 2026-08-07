@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⛵ TörnCalculator
+# TideNode
 
 **Intelligent Passage & Tidal Route Planning for the East Frisian Islands**
 
@@ -18,7 +18,7 @@ A native iOS app that combines routes, tides, water levels, weather data, and cr
 
 <br/>
 
-<img src="assets/screenshots/01_map_tab.png" alt="TörnCalculator – Map view with route Borkum → Norderney, nautical chart and Go/No-Go status" width="280">
+<img src="assets/screenshots/01_map_tab.png" alt="TideNode – Map view with route Borkum → Norderney, nautical chart and Go/No-Go status" width="280">
 
 <sub><i>Map view: Route Borkum → Norderney with nautical chart, tidal window and Go/No-Go assessment</i></sub>
 
@@ -49,12 +49,12 @@ A native iOS app that combines routes, tides, water levels, weather data, and cr
 
 ## 🎯 Overview
 
-TörnCalculator is a native iOS app for **planning sailing passages and tidal routes** between the East Frisian Islands in the German Wadden Sea. The app targets skippers who need a reliable, data-driven decision basis for their voyage.
+TideNode is a native iOS app for **planning sailing passages and tidal routes** between the East Frisian Islands in the German Wadden Sea. The app targets skippers who need a reliable, data-driven decision basis for their voyage.
 
 The application follows a cleanly decoupled **MVVM architecture** with five main sections:
 
 - **Map** – Nautical chart with route planning, waypoints, and Go/No-Go assessment
-- **Weather** – DWD MOSMIX weather data with hourly forecasts and wind display in knots
+- **Weather** – Apple WeatherKit forecasts with 48-hour wind and gust data in knots
 - **Tides** – BSH tidal data with astronomical high/low water times and water level forecasts
 - **Crew** – Crew management with roles (Skipper, Co-Skipper, Navigator), emergency contacts, and board status
 - **Logbook** – Complete ship's log with PDF export and audit trail via SwiftData
@@ -68,7 +68,7 @@ The application follows a cleanly decoupled **MVVM architecture** with five main
 <table>
   <tr>
     <td align="center"><img src="assets/screenshots/01_map_tab.png" width="200" alt="Map Tab"/><br/><sub><b>Map</b><br/>Route & Passage</sub></td>
-    <td align="center"><img src="assets/screenshots/02_weather_tab.png" width="200" alt="Weather Tab"/><br/><sub><b>Weather</b><br/>DWD Forecast</sub></td>
+    <td align="center"><img src="assets/screenshots/02_weather_tab.png" width="200" alt="Weather Tab"/><br/><sub><b>Weather</b><br/>WeatherKit Forecast</sub></td>
     <td align="center"><img src="assets/screenshots/03_tides_tab.png" width="200" alt="Tides Tab"/><br/><sub><b>Tides</b><br/>BSH Tide Calendar</sub></td>
   </tr>
   <tr>
@@ -90,7 +90,8 @@ The application follows a cleanly decoupled **MVVM architecture** with five main
 | 🧮 | **Tide-Based Calculations** | Automatic computation of fall height (FmW), water depth (WT), and water column above keel (WuK) using the Rule of Twelfths |
 | 🔍 | **Passage Window Scanner** | Automatic search for the next safe departure window based on tidal and water level conditions |
 | 🌊 | **BSH Tidal Data** | Real-time retrieval of astronomical high/low water predictions and water level curves from the German Federal Maritime and Hydrographic Agency |
-| 🌤️ | **DWD MOSMIX Weather** | Hourly weather forecasts with temperature, wind, and gusts in knots for all East Frisian Islands |
+| 🌤️ | **Apple WeatherKit** | Current conditions, 48-hour wind forecasts, and seven-day outlooks for all East Frisian Islands |
+| ✨ | **Nauti On-Device** | Local skipper assistant powered by Apple Foundation Models on supported iOS 26 devices without sending chat history to an AI server |
 | 🚦 | **Go / Warning / No-Go** | Combined assessment from tidal and weather status into a clear passage recommendation |
 | 🧭 | **Multi-Leg Routing** | Route planning with intermediate stops and automatic leg calculation via the Wadden Sea catalog |
 | 👥 | **Crew Management** | Roles (Skipper, Co-Skipper, Navigator), emergency contacts, and onboard status tracking |
@@ -107,9 +108,9 @@ The app follows an **MVVM architecture** with strict separation between the UI l
 graph TD
     BSH["BSH Tidal API<br/>(High/Low Water)"]:::source
     BSHWL["BSH Water Level API<br/>(Forecast & Measurement)"]:::source
-    DWD["DWD Open Data<br/>(MOSMIX Weather)"]:::source
+    APPLE["Apple WeatherKit<br/>(Weather, Wind & Gusts)"]:::source
 
-    subgraph App ["TörnCalculator iOS (SwiftUI)"]
+    subgraph App ["TideNode iOS (SwiftUI)"]
         VM["RoutePlannerViewModel<br/>(State & Control)"]:::core
         ENGINE["Engine<br/>(Tidal Calc, Routing, Scanner)"]:::core
         CATALOG["Wadden Sea Catalog<br/>(JSON – Offline)"]:::storage
@@ -118,7 +119,7 @@ graph TD
     subgraph Services ["External Services"]
         BSHS["BSHTideService"]:::service
         BSHWLS["BSHWaterLevelService"]:::service
-        DWDS["DWDService"]:::service
+        WKS["WeatherKitManager"]:::service
     end
 
     subgraph UI ["SwiftUI Views (5 Tabs)"]
@@ -131,10 +132,10 @@ graph TD
 
     BSH -->|JSON| BSHS
     BSHWL -->|JSON| BSHWLS
-    DWD -->|KML/ZIP| DWDS
+    APPLE -->|WeatherKit| WKS
     BSHS --> VM
     BSHWLS --> VM
-    DWDS --> VM
+    WKS --> VM
     CATALOG --> ENGINE
     ENGINE --> VM
     VM --> MAP
@@ -157,7 +158,7 @@ graph TD
 | **Views** | SwiftUI interface with 5-tab navigation, MapLibre map view, and Liquid Glass styling |
 | **ViewModel** | `RoutePlannerViewModel` – central state, calculation control, and data fetching |
 | **Engine** | Tidal calculations (Rule of Twelfths), route planning, passage window scanning, and status combination |
-| **Services** | HTTP clients for BSH tides, BSH water levels, DWD weather, and Windfinder |
+| **Services** | Clients for BSH tides, BSH water levels, Apple WeatherKit, and local Nauti inference |
 | **Resources** | Curated Wadden Sea catalog, GeoJSON protected area data, and nautical chart resources |
 
 ---
@@ -168,11 +169,11 @@ graph TD
 |---|---|---|
 | **BSH Tides** | Astronomical high/low water predictions for island tide gauges | JSON retrieval, parsing of HW/LW times and heights |
 | **BSH Water Level** | Water level forecast and measurement (SKN reference) | Time series retrieval, rendered as level curve |
-| **DWD Open Data** | MOSMIX weather forecasts (temperature, wind, gusts, precipitation) | KML download, ZIP extraction, hourly grid parsing |
-| **DWD Sea Weather** | Maritime weather warnings for the German Bight | HTML parsing of current sea weather report |
+| **Apple WeatherKit** | Current weather, wind, gusts, precipitation, hourly forecasts, and daily outlooks | Native async/await queries, nautical units, and local cache |
+| **Apple Foundation Models** | Local language understanding for Nauti, voyage intents, and general seamanship questions | Entirely on device with structured Swift output and no AI network request |
 | **Local Catalog** | 20+ routes, waypoints, depth values, and tide gauges | Offline JSON with pre-computed catalog data |
 
-> The app works without network connectivity for core calculations thanks to the local catalog. Tidal and weather data require an active internet connection.
+> Core calculations and Nauti responses run locally on supported devices. Tide, weather, and Crewspace data still require an active internet connection.
 
 ---
 
@@ -191,9 +192,13 @@ graph TD
 
 ### External Services
 - **Tides:** BSH Tidal API + BSH Water Level API
-- **Weather:** DWD Open Data (MOSMIX_L) + DWD Sea Weather
-- **Wind:** Windfinder web service
+- **Weather and Wind:** Apple WeatherKit
 - **Soundings:** Wadden Sea Sailing Association sounding data
+
+### Local AI
+- **Framework:** Apple Foundation Models on iOS 26
+- **Privacy:** Nauti prompts and responses never leave the device
+- **Fallback:** Manual features remain available on unsupported devices; there is no remote AI fallback
 
 ### Calculation Engine
 - **Tidal Computation:** Rule of Twelfths for water level interpolation
@@ -206,7 +211,7 @@ graph TD
 - **Code Analysis:** SwiftLint
 - **Documentation:** DocC (automatically deployed via GitHub Pages)
 - **CI/CD:** GitHub Actions (SwiftLint → Build & Test → SonarCloud → DocC Deploy)
-- **Dependencies:** Swift Package Manager (MapLibre, ZIPFoundation)
+- **Dependencies:** Swift Package Manager (MapLibre, Firebase)
 
 ---
 
@@ -219,7 +224,8 @@ Toernberechnung-iOS/
 │   ├── Views/
 │   │   ├── ContentView.swift           # Main view with tab navigation
 │   │   ├── ContentView+MapTab.swift    # 🗺️ Map tab: route, chart, Go/No-Go
-│   │   ├── ContentView+Weather.swift   # 🌤️ Weather tab: DWD forecast, wind, gusts
+│   │   ├── ContentView+Weather.swift   # 🌤️ Conditions tab: WeatherKit, wind, gusts
+│   │   ├── WeatherDetailViews.swift    # Wind map, charts, and daily details
 │   │   ├── ContentView+Tides.swift     # 🌊 Tides tab: BSH tides, water level curve
 │   │   ├── ContentView+Crew.swift      # 👥 Crew tab: roles, emergency contacts, status
 │   │   ├── ContentView+Logbook.swift   # 📒 Logbook tab: voyage history, PDF export
@@ -247,14 +253,17 @@ Toernberechnung-iOS/
 │   │   ├── NavigationTracker.swift      # GPS position tracking
 │   │   ├── ActiveVoyageManager.swift    # Active voyage management
 │   │   ├── AppDateFormatters.swift      # Central date formatting
+│   │   ├── HarbourCatalog.swift         # Neutral harbour and coordinate catalog
+│   │   ├── MarineWeatherModels.swift    # Nautical weather domain models
+│   │   ├── NautiModels.swift            # Typed local AI actions and availability
+│   │   ├── NautiChatViewModel.swift     # Chat state without network dependencies
 │   │   └── Routing/                     # Routing algorithms and graphs
 │   ├── Services/
 │   │   ├── BSHTideService.swift         # BSH tidal API client
 │   │   ├── BSHWaterLevelService.swift   # BSH water level measurement data
 │   │   ├── BSHWaterLevelForecastService.swift  # BSH water level forecast
-│   │   ├── DWDService.swift             # DWD MOSMIX weather data
-│   │   ├── DWDSeewetterService.swift    # DWD sea weather report
-│   │   ├── WindfinderService.swift      # Windfinder wind data
+│   │   ├── WeatherKitManager.swift      # Apple WeatherKit client and cache
+│   │   ├── LocalAIInferenceManager.swift # Apple Foundation Models inference
 │   │   ├── WattseglerLotungenService.swift  # Wadden Sea sailing soundings
 │   │   ├── EmdenPlantabelleService.swift    # Emden tidal table
 │   │   ├── TideDataProvider.swift       # Abstracted tidal data provider
@@ -315,9 +324,13 @@ xcodegen generate
 open Toernberechnung.xcodeproj
 ```
 
-Dependencies (MapLibre, ZIPFoundation) are automatically resolved via **Swift Package Manager**.
+Dependencies (MapLibre and Firebase) are automatically resolved via **Swift Package Manager**.
 
-### 4 · Install SwiftLint (recommended)
+### 4 · Enable WeatherKit
+
+Enable **WeatherKit** under *Signing & Capabilities* for the app target and for its App ID in the Apple Developer portal. Regenerate the provisioning profile afterwards if necessary.
+
+### 5 · Install SwiftLint (recommended)
 
 ```bash
 brew install swiftlint

@@ -6,7 +6,7 @@ import Foundation
 // the app. Every formatter is pre-configured with the German locale
 // (`de_DE`) and the Berlin time zone (`Europe/Berlin`) so the UI never
 // shows English month names, AM/PM clocks, or off-by-one-hour values when
-// the underlying timestamp is UTC-based (BSH / DWD payloads are).
+// the underlying timestamp is UTC-based (BSH and WeatherKit payloads are).
 
 enum AppDateFormatters {
 
@@ -30,6 +30,10 @@ enum AppDateFormatters {
     static let weekdayLong: DateFormatter = make("EEEE, dd.MM.yyyy")
     /// `EE dd.MM. HH:mm` (e.g. "Do 14.05. 14:30").
     static let shortWeekdayDateTime: DateFormatter = make("EE dd.MM. HH:mm")
+    /// `EEE` (e.g. "Do").
+    static let weekdayShort: DateFormatter = make("EEE")
+    /// `EEE dd.MM.` (e.g. "Do 14.05.").
+    static let weekdayDay: DateFormatter = make("EEE dd.MM.")
 
     private static func make(_ pattern: String) -> DateFormatter {
         let f = DateFormatter()

@@ -54,7 +54,8 @@ final class RouteCalculationService {
     func calculate(
         route: RoutePlan,
         boatSettings: BoatSettings,
-        tideDataProvider: TideDataProvider
+        tideDataProvider: TideDataProvider,
+        confirmedComparisonGaugeIDs: [String: String] = [:]
     ) async -> RouteCalculationResult {
         var messages: [String] = []
 
@@ -91,13 +92,11 @@ final class RouteCalculationService {
         var waypointResults: [WaypointCalculationResult] = []
         for (index, waypoint) in route.waypoints.enumerated() {
             let arrivalTime = arrivalTimes[index]
-            let bshCorrection = waypoint.bshWaterLevelCorrectionOverride
-                ?? route.bshWaterLevelCorrectionMeters
-
             let result = await calculateWaypoint(
                 waypoint: waypoint,
                 arrivalTime: arrivalTime,
-                bshWaterLevelCorrectionMeters: bshCorrection,
+                routeWaterLevelCorrectionMeters: route.bshWaterLevelCorrectionMeters,
+                confirmedComparisonStationID: confirmedComparisonGaugeIDs[waypoint.tidalReferenceStationID],
                 boatSettings: boatSettings,
                 tideDataProvider: tideDataProvider
             )
@@ -134,22 +133,34 @@ final class RouteCalculationService {
 
     // MARK: - Per-Waypoint Calculation
 
+    // The calculation is intentionally kept linear so every safety input remains auditable.
+    // swiftlint:disable:next function_body_length
     private func calculateWaypoint(
         waypoint: RouteWaypoint,
         arrivalTime: Date,
-        bshWaterLevelCorrectionMeters: Double,
+        routeWaterLevelCorrectionMeters: Double,
+        confirmedComparisonStationID: String?,
         boatSettings: BoatSettings,
         tideDataProvider: TideDataProvider
     ) async -> WaypointCalculationResult {
         var messages: [String] = []
+
+        let stationReference = try? await tideDataProvider.stationReference(
+            for: waypoint.tidalReferenceStationID,
+            around: arrivalTime
+        )
 
         // Resolve MTH using priority chain:
         // 1. waypoint value (user override or template)
         // 2. TideDataProvider value
         // 3. incomplete
         let mthMeters: Double?
-        if let sourced = waypoint.meanTidalRangeMeters {
+        if let sourced = waypoint.meanTidalRangeMeters, sourced.source == .manual {
             mthMeters = sourced.value
+        } else if let referenceValue = stationReference?.meanTidalRangeMeters {
+            mthMeters = referenceValue
+        } else if let catalogValue = waypoint.meanTidalRangeMeters?.value {
+            mthMeters = catalogValue
         } else {
             mthMeters = try? await tideDataProvider.meanTidalRange(
                 for: waypoint.tidalReferenceStationID
@@ -160,7 +171,8 @@ final class RouteCalculationService {
             messages.append("MTH (Mittlerer Tidenhub) fehlt oder ist ungültig für \(waypoint.name).")
             return incompleteWaypointResult(
                 waypoint: waypoint, arrivalTime: arrivalTime,
-                bshCorrection: bshWaterLevelCorrectionMeters,
+                bshCorrection: 0,
+                correctionQuality: .unavailable,
                 boatDraft: boatSettings.draftMeters, messages: messages
             )
         }
@@ -181,7 +193,8 @@ final class RouteCalculationService {
             messages.append("Kein Hochwasser für \(waypoint.tidalReferenceStation) verfügbar.")
             return incompleteWaypointResult(
                 waypoint: waypoint, arrivalTime: arrivalTime,
-                bshCorrection: bshWaterLevelCorrectionMeters,
+                bshCorrection: 0,
+                correctionQuality: .unavailable,
                 boatDraft: boatSettings.draftMeters, messages: messages
             )
         }
@@ -191,6 +204,38 @@ final class RouteCalculationService {
             referenceHWTime: referenceHWTime,
             offsetMinutes: waypoint.highWaterOffsetMinutes
         )
+
+        let correction: WaterLevelCorrectionResolution
+        if let manual = waypoint.bshWaterLevelCorrectionOverride {
+            correction = WaterLevelCorrectionResolution(
+                meters: manual,
+                quality: .manual,
+                localStationID: waypoint.tidalReferenceStationID,
+                sourceStationID: nil,
+                sourceStationName: nil,
+                issuedAt: nil,
+                detail: "Manuell eingetragene Wasserstandskorrektur."
+            )
+        } else if abs(routeWaterLevelCorrectionMeters) > 0.000_1 {
+            correction = WaterLevelCorrectionResolution(
+                meters: routeWaterLevelCorrectionMeters,
+                quality: .manual,
+                localStationID: waypoint.tidalReferenceStationID,
+                sourceStationID: nil,
+                sourceStationName: nil,
+                issuedAt: nil,
+                detail: "Manuell eingetragene Korrektur für den Törn."
+            )
+        } else {
+            correction = await tideDataProvider.waterLevelCorrection(
+                for: waypoint.tidalReferenceStationID,
+                at: referenceHWTime,
+                confirmedComparisonStationID: confirmedComparisonStationID
+            )
+        }
+        if correction.quality != .localOfficial {
+            messages.append(correction.detail)
+        }
 
         // Calculate deviation from HW.
         let deviation = Self.calculateDeviationHours(
@@ -214,7 +259,8 @@ final class RouteCalculationService {
                 oneTwelfthMeters: tidalResult.oneTwelfthMeters,
                 missingWaterFmWMeters: nil,
                 baseWaterAtTideMeters: nil,
-                bshWaterLevelCorrectionMeters: bshWaterLevelCorrectionMeters,
+                bshWaterLevelCorrectionMeters: correction.meters,
+                waterLevelCorrectionQuality: correction.quality,
                 chartDepthMetersApplied: nil,
                 tideHeightHGMeters: nil,
                 availableWaterDepthWTMeters: nil,
@@ -229,17 +275,21 @@ final class RouteCalculationService {
         let depthResult = calculateDepth(
             waypoint: waypoint,
             fmwMeters: tidalResult.fmwMeters,
-            bshCorrectionMeters: bshWaterLevelCorrectionMeters,
-            boatDraftMeters: boatSettings.draftMeters,
-            tideDataProvider: tideDataProvider
+            resolvedMeanHighWaterMeters: resolvedMeanHighWater(
+                waypoint: waypoint,
+                stationReference: stationReference
+            ),
+            bshCorrectionMeters: correction.meters,
+            boatDraftMeters: boatSettings.draftMeters
         )
 
         switch depthResult {
         case .calculated(let depth):
-            let status = Self.determineWaypointStatus(
+            let baseStatus = Self.determineWaypointStatus(
                 clearanceUnderKeel: depth.wuK,
                 safetyMargin: boatSettings.safetyMarginMeters
             )
+            let status = Self.applyCorrectionQuality(correction.quality, to: baseStatus)
             messages.append(contentsOf: depth.messages)
 
             return WaypointCalculationResult(
@@ -250,7 +300,8 @@ final class RouteCalculationService {
                 oneTwelfthMeters: tidalResult.oneTwelfthMeters,
                 missingWaterFmWMeters: tidalResult.fmwMeters,
                 baseWaterAtTideMeters: depth.baseWater,
-                bshWaterLevelCorrectionMeters: bshWaterLevelCorrectionMeters,
+                bshWaterLevelCorrectionMeters: correction.meters,
+                waterLevelCorrectionQuality: correction.quality,
                 chartDepthMetersApplied: depth.chartDepthApplied,
                 tideHeightHGMeters: depth.hg,
                 availableWaterDepthWTMeters: depth.wt,
@@ -264,7 +315,8 @@ final class RouteCalculationService {
             messages.append(contentsOf: errorMessages)
             return incompleteWaypointResult(
                 waypoint: waypoint, arrivalTime: arrivalTime,
-                bshCorrection: bshWaterLevelCorrectionMeters,
+                bshCorrection: correction.meters,
+                correctionQuality: correction.quality,
                 boatDraft: boatSettings.draftMeters, messages: messages
             )
         }
@@ -289,18 +341,18 @@ final class RouteCalculationService {
     private func calculateDepth(
         waypoint: RouteWaypoint,
         fmwMeters: Double,
+        resolvedMeanHighWaterMeters: Double?,
         bshCorrectionMeters: Double,
-        boatDraftMeters: Double,
-        tideDataProvider: TideDataProvider
+        boatDraftMeters: Double
     ) -> DepthResult {
         switch waypoint.calculationMode {
         case .meanHighWater:
             return calculateMHWDepth(
                 waypoint: waypoint,
                 fmwMeters: fmwMeters,
+                resolvedMeanHighWaterMeters: resolvedMeanHighWaterMeters,
                 bshCorrectionMeters: bshCorrectionMeters,
-                boatDraftMeters: boatDraftMeters,
-                tideDataProvider: tideDataProvider
+                boatDraftMeters: boatDraftMeters
             )
         case .lottiefe:
             return calculateLottiefeDepth(
@@ -316,12 +368,11 @@ final class RouteCalculationService {
     private func calculateMHWDepth(
         waypoint: RouteWaypoint,
         fmwMeters: Double,
+        resolvedMeanHighWaterMeters: Double?,
         bshCorrectionMeters: Double,
-        boatDraftMeters: Double,
-        tideDataProvider: TideDataProvider
+        boatDraftMeters: Double
     ) -> DepthResult {
-        // Resolve MHW using priority chain.
-        guard let mhw = waypoint.meanHighWaterMeters?.value else {
+        guard let mhw = resolvedMeanHighWaterMeters else {
             return .missingData(["MHW (Mittleres Hochwasser) fehlt für \(waypoint.name)."])
         }
         guard let chartDepth = waypoint.chartDepthMeters?.value else {
@@ -359,6 +410,17 @@ final class RouteCalculationService {
             baseWater: baseWater, hg: nil, chartDepthApplied: nil,
             wt: wt, wuK: wuK, messages: []
         ))
+    }
+
+    private func resolvedMeanHighWater(
+        waypoint: RouteWaypoint,
+        stationReference: TideStationReference?
+    ) -> Double? {
+        if let sourced = waypoint.meanHighWaterMeters, sourced.source == .manual {
+            return sourced.value
+        }
+        return stationReference?.meanHighWaterAboveSknMeters
+            ?? waypoint.meanHighWaterMeters?.value
     }
 
     // MARK: - Static Helper Functions (Pure, Testable)
@@ -476,6 +538,21 @@ final class RouteCalculationService {
         }
     }
 
+    static func applyCorrectionQuality(
+        _ quality: WaterLevelCorrectionQuality,
+        to status: WaypointStatus
+    ) -> WaypointStatus {
+        if status == .noGo || status == .invalid { return status }
+        switch quality {
+        case .localOfficial:
+            return status
+        case .confirmedComparison, .manual:
+            return status == .go ? .warning : status
+        case .stale, .outsideForecastHorizon, .unavailable:
+            return .incomplete
+        }
+    }
+
     /// Determine overall route status from all waypoint statuses.
     ///
     /// - `invalid` if any waypoint is invalid (calculation error)
@@ -517,6 +594,7 @@ final class RouteCalculationService {
         waypoint: RouteWaypoint,
         arrivalTime: Date,
         bshCorrection: Double,
+        correctionQuality: WaterLevelCorrectionQuality,
         boatDraft: Double,
         messages: [String]
     ) -> WaypointCalculationResult {
@@ -529,6 +607,7 @@ final class RouteCalculationService {
             missingWaterFmWMeters: nil,
             baseWaterAtTideMeters: nil,
             bshWaterLevelCorrectionMeters: bshCorrection,
+            waterLevelCorrectionQuality: correctionQuality,
             chartDepthMetersApplied: nil,
             tideHeightHGMeters: nil,
             availableWaterDepthWTMeters: nil,

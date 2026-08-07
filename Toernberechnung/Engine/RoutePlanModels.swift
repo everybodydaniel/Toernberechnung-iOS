@@ -50,7 +50,7 @@ enum ValueSource: String, Codable {
         case .catalog: return "Vorgabe"
         case .cache: return "Cache"
         case .manual: return "Manuell"
-        case .weatherService: return "DWD"
+        case .weatherService: return "Apple Weather"
         case .unknown: return "Unbekannt"
         }
     }
@@ -202,6 +202,7 @@ struct WaypointCalculationResult: Identifiable, Equatable {
     var missingWaterFmWMeters: Double?
     var baseWaterAtTideMeters: Double?
     var bshWaterLevelCorrectionMeters: Double
+    var waterLevelCorrectionQuality: WaterLevelCorrectionQuality
     /// Chart depth applied. Nil for Lottiefe mode.
     var chartDepthMetersApplied: Double?
     /// Tide height (HG). Nil for Lottiefe mode.
@@ -228,8 +229,7 @@ enum WeatherStatus: String, Codable, Equatable {
 /// Final status = combine(tidalStatus, weatherStatus):
 /// - No-Go if either is No-Go
 /// - Warning if either is Warning and neither is No-Go
-/// - If weather is not available yet, the tidal decision remains visible
-/// - Incomplete if critical tidal data is missing
+/// - Incomplete while critical tide or weather data is still unavailable
 enum CombinedRouteStatus: String, Equatable {
     case go
     case warning
@@ -238,7 +238,7 @@ enum CombinedRouteStatus: String, Equatable {
 
     static func combine(tidal: RouteStatus, weather: WeatherStatus) -> CombinedRouteStatus {
         if tidal == .noGo || weather == .noGo { return .noGo }
-        if tidal == .incomplete { return .incomplete }
+        if tidal == .incomplete || weather == .incomplete { return .incomplete }
         if tidal == .warning || weather == .warning { return .warning }
         return .go
     }

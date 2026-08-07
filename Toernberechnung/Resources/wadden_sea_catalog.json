@@ -65,15 +65,15 @@
       "meanHighWaterMeters": { "value": 3.3, "source": "catalog", "sourceNotes": "BSH, Planungswert" }
     },
     {
-      "id": "504P",
-      "name": "Norddeich",
+      "id": "790A",
+      "name": "Norddeich, Westerriede",
       "latitude": 53.632,
       "longitude": 7.159,
       "meanTidalRangeMeters": { "value": 2.5, "source": "catalog", "sourceNotes": "BSH, Planungswert" },
       "meanHighWaterMeters": { "value": 3.1, "source": "catalog", "sourceNotes": "BSH, Planungswert" }
     },
     {
-      "id": "786P",
+      "id": "782P",
       "name": "Bensersiel",
       "latitude": 53.681,
       "longitude": 7.575,
@@ -81,7 +81,7 @@
       "meanHighWaterMeters": { "value": 3.2, "source": "catalog", "sourceNotes": "BSH, Planungswert" }
     },
     {
-      "id": "783P",
+      "id": "780P",
       "name": "Neuharlingersiel",
       "latitude": 53.706,
       "longitude": 7.706,
@@ -89,15 +89,15 @@
       "meanHighWaterMeters": { "value": 3.3, "source": "catalog", "sourceNotes": "BSH, Planungswert" }
     },
     {
-      "id": "780P",
-      "name": "Harlesiel",
+      "id": "778P",
+      "name": "Harlesiel, Hafen",
       "latitude": 53.712,
       "longitude": 7.811,
       "meanTidalRangeMeters": { "value": 2.8, "source": "catalog", "sourceNotes": "BSH, Planungswert" },
       "meanHighWaterMeters": { "value": 3.3, "source": "catalog", "sourceNotes": "BSH, Planungswert" }
     },
     {
-      "id": "776P",
+      "id": "765P",
       "name": "Hooksiel",
       "latitude": 53.641,
       "longitude": 8.084,
@@ -105,8 +105,8 @@
       "meanHighWaterMeters": { "value": 4.0, "source": "catalog", "sourceNotes": "BSH, Planungswert" }
     },
     {
-      "id": "775P",
-      "name": "Wilhelmshaven",
+      "id": "512P",
+      "name": "Wilhelmshaven, Alter Vorhafen",
       "latitude": 53.513,
       "longitude": 8.143,
       "meanTidalRangeMeters": { "value": 3.8, "source": "catalog", "sourceNotes": "BSH, Planungswert" },
@@ -289,8 +289,8 @@
       "name": "Norddeich Hafen",
       "latitude": 53.632,
       "longitude": 7.159,
-      "tidalReferenceStationID": "504P",
-      "tidalReferenceStationName": "Norddeich",
+      "tidalReferenceStationID": "790A",
+      "tidalReferenceStationName": "Norddeich, Westerriede",
       "highWaterOffsetMinutes": 0,
       "calculationMode": "meanHighWater",
       "defaultMTH": { "value": 2.5, "source": "catalog", "sourceNotes": "BSH, Planungswert" },
@@ -306,7 +306,7 @@
       "name": "Bensersiel Hafen",
       "latitude": 53.681,
       "longitude": 7.575,
-      "tidalReferenceStationID": "786P",
+      "tidalReferenceStationID": "782P",
       "tidalReferenceStationName": "Bensersiel",
       "highWaterOffsetMinutes": 0,
       "calculationMode": "meanHighWater",
@@ -323,7 +323,7 @@
       "name": "Neuharlingersiel Hafen",
       "latitude": 53.706,
       "longitude": 7.706,
-      "tidalReferenceStationID": "783P",
+      "tidalReferenceStationID": "780P",
       "tidalReferenceStationName": "Neuharlingersiel",
       "highWaterOffsetMinutes": 0,
       "calculationMode": "meanHighWater",
@@ -340,8 +340,8 @@
       "name": "Harlesiel Hafen",
       "latitude": 53.712,
       "longitude": 7.811,
-      "tidalReferenceStationID": "780P",
-      "tidalReferenceStationName": "Harlesiel",
+      "tidalReferenceStationID": "778P",
+      "tidalReferenceStationName": "Harlesiel, Hafen",
       "highWaterOffsetMinutes": 0,
       "calculationMode": "meanHighWater",
       "defaultMTH": { "value": 2.8, "source": "catalog", "sourceNotes": "BSH, Planungswert" },

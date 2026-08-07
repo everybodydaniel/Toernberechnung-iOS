@@ -1,0 +1,45 @@
+# SwiftLint Configuration
+
+# Paths to exclude from linting
+excluded:
+  - Pods
+  - Carthage
+  - DerivedData
+  - .build
+  - Scripts
+
+# Opt-in rules to enable useful but not overly strict checks
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - first_where
+  - leading_whitespace
+  - missing_docs
+  - no_fallthrough_only
+  - sorted_imports
+  - toggle_bool
+  - vertical_parameter_alignment_on_call
+
+# Disabled rules that are commonly noisy in mixed codebases
+disabled_rules:
+  - line_length
+  - type_body_length
+  - file_length
+  - function_body_length
+  - force_cast
+  - force_try
+  - force_unwrapping
+  - identifier_name
+  - nesting
+
+# Custom rule configurations
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+
+type_body_length:
+  warning: 300
+  error: 400
+  ignores_comments: true
