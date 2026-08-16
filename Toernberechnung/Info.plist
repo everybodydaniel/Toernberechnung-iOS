@@ -20,12 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>FirebaseWebAPIKey</key>
-	<string>$(FIREBASE_WEB_API_KEY)</string>
-	<key>CrewspaceAPIBaseURL</key>
-	<string>$(CREWSPACE_API_BASE_URL)</string>
-	<key>FirebaseMessagingInstallationIdEnabled</key>
-	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -33,7 +29,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Die App zeichnet während eines aktiven Törns die GPS-Route und den Fortschritt für das Logbuch auf.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>TideNode benötigt Zugriff auf das Mikrofon für Sprachnachrichten im Crewspace und lokale Nauti-Diktate.</string>
+	<string>TideNode benötigt Zugriff auf das Mikrofon für lokale Nauti-Diktate.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>TideNode wandelt deine gesprochenen Nauti-Anfragen auf dem Gerät in Text um.</string>
 	<key>UIApplicationSceneManifest</key>
@@ -48,7 +44,6 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
-		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

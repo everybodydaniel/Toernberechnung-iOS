@@ -28,7 +28,7 @@ enum AppTab: Hashable, CaseIterable {
         switch self {
         case .map: return "map.fill"
         case .conditions: return "cloud.sun.rain.fill"
-        case .crew: return "bubble.left.and.bubble.right.fill"
+        case .crew: return "person.3.fill"
         case .logbook: return "book.closed.fill"
         }
     }
@@ -55,23 +55,12 @@ enum ConditionsSection: String, CaseIterable, Identifiable {
     }
 }
 
-private struct CrewMember: Identifiable {
-    let id = UUID()
-    let name: String
-    let role: String
-    let status: String
-    let accent: Color
-}
-
 struct ContentView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(LocationService.self) var locationService
     @Environment(NavigationTracker.self) var navigationTracker
     @Environment(ActiveVoyageManager.self) var voyageManager
-    @Environment(SocialAuthViewModel.self) var socialAuth
-    @Environment(CrewspaceStore.self) var crewspaceStore
-    @Environment(MaritimeNoticeCenter.self) var maritimeNoticeCenter
     @Environment(\.maritimeWeatherService) var maritimeWeatherService
     @Query(sort: \CalculationRecord.createdAt, order: .reverse) var calculations: [CalculationRecord]
     @Query(sort: \WeatherSnapshot.fetchedAt, order: .reverse) var weatherSnapshots: [WeatherSnapshot]
@@ -82,15 +71,14 @@ struct ContentView: View {
     @State var selectedTab: AppTab = .map
     @State var selectedConditionsSection: ConditionsSection = .weather
     @State var settingsShown = false
-    @State var maritimeNoticesShown = false
-    @State var selectedMaritimeNotice: MaritimeNoticeSummary?
-    @State var maritimeNoticeDetent: PresentationDetent = .medium
     @State var nautiDashboardMode: NautiDashboardMode = .dashboard
     @State var dashboardDetentBeforeNauti: DashboardDetent = .nautiOnly
     @State var nautiFocusDismissTrigger = 0
     @State var mapPlanningShown = false
     @State var intermediateStopPickerShown = false
-    @State var mapHeaderHidden = false
+    /// Drives the map dashboard's bottom inset so the Nauti chat input keeps
+    /// sitting directly above the software keyboard instead of behind it.
+    @State var keyboardVisible = false
     @State var pendingNautiAction: NautiPendingAction?
     @State var pendingNautiConversationID: UUID?
     @State var dismissedNautiIssueID: String?
@@ -135,7 +123,6 @@ struct ContentView: View {
     @State var waterLevelForecasts: [String: WaterLevelForecast] = [:]
     @State var waterLevelLoading = false
     @State var waterLevelError: String?
-    @AppStorage("crewspace.activeCrewGroupID") var activeCrewGroupID = ""
 
     var harbours: [HarbourOption] { HarbourOption.options }
     var weatherHarbour: HarbourOption { HarbourOption.byID(weatherRegionID) }
@@ -153,19 +140,11 @@ struct ContentView: View {
 
     var body: some View {
         mainContent
-            .task {
-                if crewspaceStore.pendingConversationID != nil {
-                    selectedTab = .crew
-                }
-            }
-            .onChange(of: crewspaceStore.pendingConversationID) { _, conversationID in
-                if conversationID != nil {
-                    selectedTab = .crew
-                }
-            }
     }
 
-    private var mainContent: some View {
+    // Split from `mainContent` purely so the Swift type checker can cope: the
+    // combined presentation + lifecycle chain exceeded its budget.
+    private var presentationSurface: some View {
         appNavigation
         .background(Color.appBackground.ignoresSafeArea())
         .blur(radius: selectedWeatherDay == nil ? 0 : 12)
@@ -175,19 +154,9 @@ struct ContentView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $maritimeNoticesShown, onDismiss: {
-            selectedMaritimeNotice = nil
-        }) {
-            MaritimeNoticesView(initialNotice: selectedMaritimeNotice)
-                .environment(maritimeNoticeCenter)
-                .presentationDetents([.medium, .large], selection: $maritimeNoticeDetent)
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.ultraThinMaterial)
-                .presentationCornerRadius(30)
-        }
         .sheet(isPresented: $mapPlanningShown) {
             manualPlanningSheet
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.fraction(0.70), .large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedWeatherDay) { selection in
@@ -254,9 +223,12 @@ struct ContentView: View {
         } message: {
             Text("Die aufgezeichnete Strecke wird ins Logbuch übernommen und das GPS-Tracking gestoppt.")
         }
+    }
+
+    private var dataLifecycleSurface: some View {
+        presentationSurface
         .task {
             await bootstrapIfNeeded()
-            await maritimeNoticeCenter.setActive(scenePhase == .active)
         }
         .task(id: routeWeatherRequestKey) {
             await validateCurrentRouteWeather()
@@ -295,6 +267,12 @@ struct ContentView: View {
         .onChange(of: viewModel.departure) { _, _ in
             Task { await loadTides(force: false) }
         }
+    }
+
+    // A third segment, again only to keep each modifier chain inside the type
+    // checker's budget.
+    private var mainContent: some View {
+        dataLifecycleSurface
         .onChange(of: proactiveNautiIssue?.id) { _, _ in
             dismissedNautiIssueID = nil
         }
@@ -326,25 +304,41 @@ struct ContentView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            Task { await maritimeNoticeCenter.setActive(phase == .active) }
-            if phase != .active {
-                nautiSpeechController.cancel()
-            }
-            // When the app comes back to the foreground, re-check the BSH
-            // peak forecast for whatever the user is currently looking at.
-            // Cache TTL keeps the actual network calls cheap.
-            guard phase == .active else { return }
-            Task {
-                await aiAccess.refresh()
-                await loadWaterLevelForecast(for: tideStationID, force: false)
-                if selectedTab == .map {
-                    await loadWaterLevelForecast(for: destinationHarbour.tideStationID, force: false)
-                }
-            }
+            handleScenePhaseChange(phase)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
             nautiSpeechController.cancel()
             nautiViewModel.releaseResources()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardVisible = false
+        }
+    }
+
+    @MainActor
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        if phase != .active {
+            nautiSpeechController.cancel()
+        }
+        // When the app comes back to the foreground, re-check the BSH peak
+        // forecast for whatever the user is currently looking at. Cache TTL
+        // keeps the actual network calls cheap.
+        guard phase == .active else { return }
+        Task {
+            await aiAccess.refresh()
+            await loadWaterLevelForecast(for: tideStationID, force: false)
+            if selectedTab == .map {
+                await loadWaterLevelForecast(for: destinationHarbour.tideStationID, force: false)
+            }
+            // Weather used to be revalidated only on tab entry, so a long
+            // background stint left a stale forecast on screen. The TTL cache
+            // makes this free when the data is still fresh.
+            if selectedTab == .conditions, selectedConditionsSection == .weather {
+                await loadWeather(userInitiated: false)
+            }
         }
     }
 
@@ -418,14 +412,16 @@ struct ContentView: View {
     private func screen(for tab: AppTab, @ViewBuilder content: @escaping () -> some View) -> some View {
         if tab == .map {
             ZStack(alignment: .top) {
+                // `.container` only — the bare `.ignoresSafeArea()` also
+                // covers the `.keyboard` region, which opted the whole map
+                // tab (and with it the Nauti chat input) out of keyboard
+                // avoidance. The chart itself still bleeds edge to edge via
+                // its own `.ignoresSafeArea()` inside `calculatorTab()`.
                 content()
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container)
 
                 appHeader(brandStyle: .white)
-                .opacity(mapHeaderHidden ? 0 : 1)
-                .offset(y: mapHeaderHidden ? -34 : 0)
-                .allowsHitTesting(!mapHeaderHidden)
-                .animation(.spring(response: 0.28, dampingFraction: 0.86), value: mapHeaderHidden)
+                    .zIndex(1)
             }
             .background(Color.black.ignoresSafeArea())
         } else if tab == .conditions {
@@ -433,6 +429,7 @@ struct ContentView: View {
                 content()
 
                 appHeader(brandStyle: .white)
+                    .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
         } else if tab == .crew {
@@ -442,6 +439,7 @@ struct ContentView: View {
                     .padding(.bottom, crewspaceContainerBottomPadding)
 
                 appHeader(brandStyle: .primary)
+                    .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
         } else if tab == .logbook {
@@ -449,6 +447,7 @@ struct ContentView: View {
                 content()
 
                 appHeader(brandStyle: .primary)
+                    .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
         } else {
@@ -466,6 +465,7 @@ struct ContentView: View {
                 }
 
                 appHeader(brandStyle: .primary)
+                    .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
         }
@@ -474,35 +474,7 @@ struct ContentView: View {
     private func appHeader(brandStyle: AppHeaderBrandStyle) -> some View {
         AppHeader(
             brandStyle: brandStyle,
-            unreadNoticeCount: maritimeNoticeCenter.unreadCount,
-            noticePulseTrigger: maritimeNoticeCenter.pulseTrigger,
-            noticesAction: { notice in
-                selectedMaritimeNotice = notice
-                maritimeNoticeDetent = .medium
-                maritimeNoticesShown = true
-            },
-            refreshAction: { Task { await reloadEntirePage() } },
             settingsAction: { settingsShown = true }
         )
-    }
-
-    /// Full page reload (the header refresh button). Regardless of the active
-    /// tab, this re-syncs the route defaults, recomputes the route + passage
-    /// window and force-refreshes every data source the app shows — Apple
-    /// Weather, island tides, the destination/Pegel tides and the BSH
-    /// water-level forecasts — so the whole page reflects fresh data.
-    @MainActor
-    func reloadEntirePage() async {
-        writeAudit(action: "READ", source: "ui", statement: "SELECT * FROM page_state -- full reload", status: "ok")
-
-        if viewModel.hasCompleteRouteInput {
-            viewModel.onRouteChanged()
-        }
-
-        await loadWeather(userInitiated: true)
-        await loadTides(force: true)
-        await loadIslandTides(force: true)
-        await loadWaterLevelForecast(for: tideStationID, force: true)
-        await maritimeNoticeCenter.refresh(force: true)
     }
 }

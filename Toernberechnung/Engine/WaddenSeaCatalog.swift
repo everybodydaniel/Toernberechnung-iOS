@@ -185,7 +185,7 @@ struct WaddenSeaCatalog: Codable, Equatable {
         date: Date,
         startTime: Date,
         speedKnots: Double? = nil,
-        bshCorrectionMeters: Double = 0,
+        bshCorrectionMeters: Double? = nil,
         tidalStateLabel: String = "Mitteltide"
     ) -> RoutePlan? {
         let waypointTemplates = template.waypointTemplateIDs.compactMap { waypointTemplate(byID: $0) }
@@ -232,7 +232,7 @@ struct WaddenSeaCatalog: Codable, Equatable {
         startTime: Date,
         distanceNm: Double,
         speedKnots: Double,
-        bshCorrectionMeters: Double = 0
+        bshCorrectionMeters: Double? = nil
     ) -> RoutePlan {
         let startWP: RouteWaypoint
         if let template = waypointTemplate(forHarbourID: startHarbourID) {

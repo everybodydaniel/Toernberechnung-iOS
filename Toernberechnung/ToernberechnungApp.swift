@@ -1,9 +1,6 @@
 import SwiftUI
 import SwiftData
-import FirebaseCore
-import FirebaseMessaging
 import UIKit
-import UserNotifications
 
 enum AppAppearanceMode: String, CaseIterable, Identifiable, Sendable {
     case light
@@ -189,8 +186,6 @@ final class AuditLog {
 
 @Model
 final class CrewMemberRecord {
-    var skipperID: String = ""
-    var conversationID: String = ""
     var name: String
     var role: String
     var emergencyContact: String = ""
@@ -200,8 +195,6 @@ final class CrewMemberRecord {
     var createdAt: Date
 
     init(
-        skipperID: String = "",
-        conversationID: String = "",
         name: String,
         role: String,
         emergencyContact: String = "",
@@ -210,8 +203,6 @@ final class CrewMemberRecord {
         isOnBoard: Bool = true,
         createdAt: Date = .now
     ) {
-        self.skipperID = skipperID
-        self.conversationID = conversationID
         self.name = name
         self.role = role
         self.emergencyContact = emergencyContact
@@ -222,126 +213,57 @@ final class CrewMemberRecord {
     }
 }
 
-extension Notification.Name {
-    static let crewspacePushInstallationDidChange = Notification.Name("crewspacePushInstallationDidChange")
-    static let crewspacePushConversationRequested = Notification.Name("crewspacePushConversationRequested")
-}
+/// Locally planned crew appointment. Everything lives on the device; there is
+/// no account, no sync and no sharing.
+@Model
+final class CrewEventRecord {
+    var title: String
+    var startsAt: Date
+    var endsAt: Date
+    var location: String = ""
+    var notes: String = ""
+    /// Raw value of `CrewEventCategory`. Stored as text so adding a category
+    /// later stays a lightweight schema change.
+    var category: String = CrewEventCategory.other.rawValue
+    var isAllDay: Bool = false
+    /// Names of the crew members assigned to this appointment. Plain strings
+    /// rather than a relationship — a deleted crew member should not silently
+    /// rewrite an already planned appointment.
+    var attendees: [String] = []
+    var createdAt: Date
 
-final class CrewspacePushRouteCenter: @unchecked Sendable {
-    static let shared = CrewspacePushRouteCenter()
-
-    private let lock = NSLock()
-    private var storedActiveConversationID: String?
-    private var storedInstallationID: String?
-    private var storedPendingConversationID: String?
-
-    var activeConversationID: String? {
-        get { lock.withLock { storedActiveConversationID } }
-        set { lock.withLock { storedActiveConversationID = newValue } }
-    }
-
-    var installationID: String? {
-        get { lock.withLock { storedInstallationID } }
-        set { lock.withLock { storedInstallationID = newValue } }
-    }
-
-    var pendingConversationID: String? {
-        get { lock.withLock { storedPendingConversationID } }
-        set { lock.withLock { storedPendingConversationID = newValue } }
-    }
-}
-
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
-    func application(_ application: UIApplication,
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        FirebaseApp.configure()
-        UNUserNotificationCenter.current().delegate = self
-        Messaging.messaging().delegate = self
-        return true
-    }
-
-    func enableCrewspacePush() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-            guard granted else { return }
-            DispatchQueue.main.async {
-                UIApplication.shared.registerForRemoteNotifications()
-                Messaging.messaging().register { _ in }
-            }
-        }
-    }
-
-    func application(
-        _ application: UIApplication,
-        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    init(
+        title: String,
+        startsAt: Date,
+        endsAt: Date,
+        location: String = "",
+        notes: String = "",
+        category: String = CrewEventCategory.other.rawValue,
+        isAllDay: Bool = false,
+        attendees: [String] = [],
+        createdAt: Date = .now
     ) {
-        Messaging.messaging().apnsToken = deviceToken
-        Messaging.messaging().register { _ in }
-    }
-
-    func application(
-        _ application: UIApplication,
-        didFailToRegisterForRemoteNotificationsWithError error: Error
-    ) {
-        // The app remains fully usable; REST recovery covers missed pushes.
-    }
-
-    func messaging(_ messaging: Messaging, didReceiveRegistration installationId: String?) {
-        guard let installationId, !installationId.isEmpty else { return }
-        CrewspacePushRouteCenter.shared.installationID = installationId
-        NotificationCenter.default.post(
-            name: .crewspacePushInstallationDidChange,
-            object: installationId
-        )
-    }
-
-    func messaging(_ messaging: Messaging, didUnregister installationId: String) {
-        if CrewspacePushRouteCenter.shared.installationID == installationId {
-            CrewspacePushRouteCenter.shared.installationID = nil
-        }
-    }
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([])
-    }
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        defer { completionHandler() }
-        guard let conversationID = Self.conversationID(from: response.notification.request.content.userInfo) else {
-            return
-        }
-        CrewspacePushRouteCenter.shared.pendingConversationID = conversationID
-        NotificationCenter.default.post(
-            name: .crewspacePushConversationRequested,
-            object: conversationID
-        )
-    }
-
-    static func conversationID(from userInfo: [AnyHashable: Any]) -> String? {
-        (userInfo["conversation_id"] as? String)?.nilIfEmpty
+        self.title = title
+        self.startsAt = startsAt
+        self.endsAt = endsAt
+        self.location = location
+        self.notes = notes
+        self.category = category
+        self.isAllDay = isAllDay
+        self.attendees = attendees
+        self.createdAt = createdAt
     }
 }
 
 @main
 struct ToernberechnungApp: App {
-    // Register app delegate for Firebase setup
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     private let modelContainer: ModelContainer = {
         let schema = Schema([
             CalculationRecord.self,
             WeatherSnapshot.self,
             AuditLog.self,
             CrewMemberRecord.self,
-            FeedPost.self,
-            FeedComment.self,
-            SkipperProfile.self
+            CrewEventRecord.self
         ])
         let configuration = ModelConfiguration(isStoredInMemoryOnly: false)
         return try! ModelContainer(for: schema, configurations: [configuration])
@@ -352,10 +274,6 @@ struct ToernberechnungApp: App {
     @State private var locationService = LocationService()
     @State private var navigationTracker = NavigationTracker()
     @State private var voyageManager: ActiveVoyageManager
-    @State private var socialAuth: SocialAuthViewModel
-    @State private var boatProfileStore: BoatProfileStore
-    @State private var crewspaceStore: CrewspaceStore
-    @State private var maritimeNoticeCenter: MaritimeNoticeCenter
     @AppStorage("appearanceMode") private var appearanceMode = AppAppearanceMode.light.rawValue
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     private let weatherService: MaritimeWeatherService
@@ -367,15 +285,6 @@ struct ToernberechnungApp: App {
         let loc = LocationService()
         let tracker = NavigationTracker()
         let weather = MaritimeWeatherService()
-        let noticeCenter = MaritimeNoticeCenter(service: MaritimeNoticeService())
-        let auth = SocialAuthViewModel()
-        let boatProfile = BoatProfileStore()
-        let crewspace = CrewspaceStore(authTokenProvider: { try await auth.validIDToken() })
-        auth.beforeSignOut = {
-            await crewspace.deactivateAccount(
-                installationID: CrewspacePushRouteCenter.shared.installationID
-            )
-        }
         let voyage = ActiveVoyageManager(
             locationService: loc,
             tracker: tracker,
@@ -385,10 +294,6 @@ struct ToernberechnungApp: App {
         _locationService = State(initialValue: loc)
         _navigationTracker = State(initialValue: tracker)
         _voyageManager = State(initialValue: voyage)
-        _socialAuth = State(initialValue: auth)
-        _boatProfileStore = State(initialValue: boatProfile)
-        _crewspaceStore = State(initialValue: crewspace)
-        _maritimeNoticeCenter = State(initialValue: noticeCenter)
 
         // Start SeaMask building asynchronously on launch
         NauticalRouteService.shared.buildSeaMask()
@@ -409,13 +314,12 @@ struct ToernberechnungApp: App {
                     .transition(.opacity)
                 }
             }
+                // Window-level tap recognizer so tapping next to a field
+                // closes the keyboard, in sheets as well as in the tabs.
+                .background(KeyboardDismissGestureInstaller())
                 .environment(locationService)
                 .environment(navigationTracker)
                 .environment(voyageManager)
-                .environment(socialAuth)
-                .environment(boatProfileStore)
-                .environment(crewspaceStore)
-                .environment(maritimeNoticeCenter)
                 .environment(\.maritimeWeatherService, weatherService)
                 // Force German locale + Berlin timezone for every native
                 // SwiftUI control (DatePicker, formatted dates, …) so the
@@ -438,66 +342,6 @@ struct ToernberechnungApp: App {
                 }
                 .onChange(of: appearanceMode) { _, newValue in
                     applyAppearance(AppAppearanceMode.resolved(from: newValue))
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .crewspacePushInstallationDidChange)) { note in
-                    guard socialAuth.isAuthenticated, let installationID = note.object as? String else { return }
-                    Task { await crewspaceStore.registerDevice(installationID: installationID) }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .crewspacePushConversationRequested)) { note in
-                    guard let conversationID = note.object as? String else { return }
-                    CrewspacePushRouteCenter.shared.pendingConversationID = conversationID
-                    guard let accountID = socialAuth.skipperID,
-                          crewspaceStore.isActiveAccount(accountID) else { return }
-                    Task {
-                        let isPrepared = await crewspaceStore.prepareConversationRouteAfterPush(
-                            conversationID: conversationID
-                        )
-                        if isPrepared,
-                           CrewspacePushRouteCenter.shared.pendingConversationID == conversationID {
-                            CrewspacePushRouteCenter.shared.pendingConversationID = nil
-                        }
-                    }
-                }
-                .task(id: socialAuth.skipperID) {
-                    let activeSkipperID = socialAuth.skipperID
-                    if let activeSkipperID {
-                        await crewspaceStore.activateAccount(
-                            accountID: activeSkipperID,
-                            displayName: socialAuth.displayName
-                        )
-                        delegate.enableCrewspacePush()
-                        if let installationID = CrewspacePushRouteCenter.shared.installationID {
-                            await crewspaceStore.registerDevice(installationID: installationID)
-                        }
-                        if let pendingConversationID = CrewspacePushRouteCenter.shared.pendingConversationID {
-                            let isPrepared = await crewspaceStore.prepareConversationRouteAfterPush(
-                                conversationID: pendingConversationID
-                            )
-                            if isPrepared,
-                               CrewspacePushRouteCenter.shared.pendingConversationID == pendingConversationID {
-                                CrewspacePushRouteCenter.shared.pendingConversationID = nil
-                            }
-                        }
-                    } else {
-                        crewspaceStore.reset()
-                    }
-                    boatProfileStore.activateAccount(skipperID: activeSkipperID) { skipperID, boatType in
-                        guard socialAuth.skipperID == skipperID else { throw CancellationError() }
-                        let api = SocialFeedAPI(
-                            authTokenProvider: { try await socialAuth.validIDToken() },
-                            skipperIDProvider: { socialAuth.skipperID }
-                        )
-                        let updated = try await api.updateBoatType(
-                            skipperID: skipperID,
-                            boatType: boatType
-                        )
-                        try Task.checkCancellation()
-                        guard socialAuth.skipperID == skipperID else { throw CancellationError() }
-                        SocialFeedCache.upsert(
-                            profile: updated,
-                            in: modelContainer.mainContext
-                        )
-                    }
                 }
         }
         .modelContainer(modelContainer)
@@ -537,7 +381,7 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .route: return "Sicher planen.\nKlar navigieren."
         case .weather: return "Wind und Wetter vorausdenken."
-        case .crew: return "Crew, Chats und Termine verbinden."
+        case .crew: return "Crew und Termine\nim Blick behalten."
         }
     }
 
@@ -552,7 +396,7 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         case .weather:
             return "Behalte Wind, Böen und Vorhersagen für dein Revier und deine Route kompakt im Blick."
         case .crew:
-            return "Organisiere Rollen, tausche Nachrichten aus und teile Termine mit deiner Crewspace-Gruppe."
+            return "Erfasse Rollen, Notfallkontakte, Termine und die Anwesenheit an Bord."
         }
     }
 
@@ -561,6 +405,17 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         case .route: return Color(hex: 0x0EA5E9)
         case .weather: return Color(hex: 0xF59E0B)
         case .crew: return Color(hex: 0x0D9488)
+        }
+    }
+
+    /// Shown as a badge under the page copy. Sets expectations for beta
+    /// testers about what is still on the way.
+    var comingSoon: String? {
+        switch self {
+        case .crew:
+            return "Crew-Chat folgt mit dem vollen Release."
+        case .route, .weather:
+            return nil
         }
     }
 }
@@ -638,27 +493,31 @@ private struct TideNodeOnboardingView: View {
                         safetyNoticeAccepted.toggle()
                     }
                 } label: {
-                    HStack(alignment: .top, spacing: 11) {
+                    HStack(alignment: .top, spacing: 10) {
                         Image(systemName: safetyNoticeAccepted ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 19, weight: .semibold))
                             .foregroundStyle(safetyNoticeAccepted ? selection.accent : Color.secondary)
                             .contentTransition(.symbolEffect(.replace))
 
+                        // Shown in full. The page above is top-aligned in its
+                        // scroll view, so the slack there absorbs the extra
+                        // height without pushing any copy off screen.
                         Text(
                             "Ich habe verstanden, dass TideNode nur eine Planungshilfe ist und keine " +
                                 "amtlichen nautischen Veröffentlichungen, aktuellen Bekanntmachungen, " +
                                 "Revierinformationen, Wetterbeurteilung oder die Verantwortung der " +
                                 "Schiffsführung ersetzt."
                         )
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Color.primary)
                             .multilineTextAlignment(.leading)
+                            .lineSpacing(1)
                             .fixedSize(horizontal: false, vertical: true)
 
                         Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
                     .background(Color(uiColor: .secondarySystemBackground).opacity(0.82), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -700,7 +559,6 @@ private struct TideNodeOnboardingView: View {
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
     }
 
     private func advance() {
@@ -748,7 +606,10 @@ private struct OnboardingPageView: View {
             VStack(spacing: 22) {
                 OnboardingIllustration(page: page, isActive: isActive, reduceMotion: reduceMotion)
                     .frame(maxWidth: 560)
-                    .frame(height: 280)
+                    // Pages with a badge get a shorter card. The illustration
+                    // content is scaled to match, so nothing overflows and the
+                    // gap to the eyebrow stays identical on every page.
+                    .frame(height: page.comingSoon == nil ? 280 : 240)
 
                 VStack(spacing: 12) {
                     Text(page.eyebrow)
@@ -767,14 +628,32 @@ private struct OnboardingPageView: View {
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
                         .frame(maxWidth: 520)
+
+                    if let comingSoon = page.comingSoon {
+                        HStack(spacing: 7) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text(comingSoon)
+                                .font(.system(size: 11, weight: .heavy))
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.85)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .foregroundStyle(page.accent)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 9)
+                        .background(page.accent.opacity(0.12), in: Capsule())
+                        .padding(.top, 2)
+                        .accessibilityLabel("Bald verfügbar: \(comingSoon)")
+                    }
                 }
                 .opacity(isActive ? 1 : 0.35)
                 .offset(y: isActive || reduceMotion ? 0 : 14)
                 .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.5, dampingFraction: 0.84).delay(0.08), value: isActive)
             }
             .padding(.horizontal, 22)
-            .padding(.top, 18)
-            .padding(.bottom, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 18)
         }
         .scrollIndicators(.hidden)
     }
@@ -891,7 +770,17 @@ private struct OnboardingIllustration: View {
         .shadow(color: Color(hex: 0x083B66).opacity(0.5), radius: 4, y: 2)
     }
 
+    // The weather card sizes to its own content and is pinned to the top, so
+    // the card never grows into the container edge — that keeps the same
+    // breathing room below the illustration as on the route and crew pages.
     private var weatherIllustration: some View {
+        VStack(spacing: 0) {
+            weatherCard
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var weatherCard: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !isActive)) { timeline in
             let phase = timeline.date.timeIntervalSinceReferenceDate
             ZStack(alignment: .topTrailing) {
@@ -911,18 +800,18 @@ private struct OnboardingIllustration: View {
                     .scaleEffect(reduceMotion ? 1 : 1 + CGFloat(sin(phase * 1.1) * 0.08))
                     .offset(x: 25, y: -38)
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {
                             Label("Norderney", systemImage: "location.fill")
-                                .font(.system(size: 18, weight: .heavy))
+                                .font(.system(size: 17, weight: .heavy))
                             Text("Heute · Jetzt")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.72))
                         }
                         Spacer()
                         Image(systemName: "sun.max.fill")
-                            .font(.system(size: 47, weight: .semibold))
+                            .font(.system(size: 38, weight: .semibold))
                             .foregroundStyle(Color.yellow)
                             .rotationEffect(.degrees(reduceMotion ? 0 : phase * 7))
                             .scaleEffect(reduceMotion ? 1 : 1 + CGFloat(sin(phase * 1.25) * 0.035))
@@ -931,10 +820,10 @@ private struct OnboardingIllustration: View {
 
                     HStack(alignment: .lastTextBaseline, spacing: 12) {
                         Text("21°")
-                            .font(.system(size: 54, weight: .thin))
+                            .font(.system(size: 44, weight: .thin))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Sonnig")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 16, weight: .bold))
                             Text("H: 23°  T: 17°")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.76))
@@ -947,7 +836,7 @@ private struct OnboardingIllustration: View {
                         weatherHour("21:00", symbol: "cloud.sun.fill", temperature: "19°")
                         weatherHour("22:00", symbol: "moon.stars.fill", temperature: "18°")
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                     .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                     HStack(spacing: 18) {
@@ -958,7 +847,7 @@ private struct OnboardingIllustration: View {
                     .foregroundStyle(.white.opacity(0.88))
                 }
                 .foregroundStyle(.white)
-                .padding(18)
+                .padding(15)
             }
             .clipShape(RoundedRectangle(cornerRadius: 25, style: .continuous))
             .overlay {
@@ -1033,7 +922,7 @@ private struct OnboardingIllustration: View {
     }
 
     private var crewIllustration: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 15) {
             GeometryReader { proxy in
                 let size = proxy.size
                 let left = CGPoint(x: size.width * 0.28, y: size.height * 0.62)
@@ -1041,11 +930,13 @@ private struct OnboardingIllustration: View {
                 let pulse = reduceMotion || !isActive ? CGFloat.zero : CGFloat((sin(Date().timeIntervalSinceReferenceDate * 2.0) + 1) * 0.5)
 
                 ZStack {
-                    chatBubble("Törn um 14:00?", tail: .left, tint: Color.appPrimary)
-                        .position(x: size.width * 0.34, y: size.height * 0.22 - pulse * 3)
+                    // Both chips float on one line just above the avatars and
+                    // share the same offset, so they stay level with each other.
+                    planningChip("Sa · 14:00", icon: "calendar", tint: Color.appPrimary)
+                        .position(x: size.width * 0.31, y: size.height * 0.20 - pulse * 3)
 
-                    chatBubble("Bin dabei.", tail: .right, tint: Color(hex: 0x0EA5E9))
-                        .position(x: size.width * 0.66, y: size.height * 0.28 + pulse * 2)
+                    planningChip("Langeoog", icon: "mappin.and.ellipse", tint: Color(hex: 0x0D9488))
+                        .position(x: size.width * 0.70, y: size.height * 0.20 - pulse * 3)
 
                     Path { path in
                         path.move(to: CGPoint(x: left.x + 34, y: left.y - 6))
@@ -1063,11 +954,11 @@ private struct OnboardingIllustration: View {
                         .position(right)
                 }
             }
-            .frame(height: 145)
+            .frame(height: 112)
             .animation(reduceMotion ? nil : .easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: isActive)
 
             HStack(spacing: 10) {
-                crewFeature("bubble.left.and.bubble.right.fill", title: "Chat", tint: Color(hex: 0x0EA5E9))
+                crewFeature("person.3.fill", title: "Crew", tint: Color(hex: 0x0EA5E9))
                 crewFeature("calendar.badge.checkmark", title: "Termine", tint: Color.orange)
                 crewFeature("person.badge.shield.checkmark.fill", title: "Rollen", tint: Color(hex: 0x0D9488))
             }
@@ -1075,24 +966,15 @@ private struct OnboardingIllustration: View {
         .frame(maxHeight: .infinity)
     }
 
-    private enum ChatBubbleTail {
-        case left
-        case right
-    }
-
-    private func chatBubble(_ text: String, tail: ChatBubbleTail, tint: Color) -> some View {
-        Text(text)
-            .font(.system(size: 13, weight: .heavy))
+    private func planningChip(_ text: String, icon: String, tint: Color) -> some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 12, weight: .heavy))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.white)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
-            .background(tint, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-            .overlay(alignment: tail == .left ? .bottomLeading : .bottomTrailing) {
-                Image(systemName: tail == .left ? "arrowtriangle.down.fill" : "arrowtriangle.down.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(tint)
-                    .offset(x: tail == .left ? 12 : -12, y: 7)
-            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(tint, in: Capsule())
             .shadow(color: tint.opacity(0.22), radius: 10, y: 6)
     }
 
@@ -1111,7 +993,7 @@ private struct OnboardingIllustration: View {
             Text(title).font(.system(size: 10, weight: .heavy))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 15)
+        .padding(.vertical, 12)
         .background(Color.fieldBackground.opacity(0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }

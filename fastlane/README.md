@@ -55,6 +55,22 @@ Führt XCUITest UI-Tests aus (erfordert UI-Test-Target/-Scheme)
 
 Vollständiger lokaler CI-Lauf (Lint → Test → Coverage)
 
+### ios beta
+
+```sh
+[bundle exec] fastlane ios beta
+```
+
+Baut und veröffentlicht eine interne TestFlight-Beta
+
+### ios public_beta
+
+```sh
+[bundle exec] fastlane ios public_beta
+```
+
+Baut und veröffentlicht eine externe TestFlight-Beta über den Public Link
+
 ----
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.

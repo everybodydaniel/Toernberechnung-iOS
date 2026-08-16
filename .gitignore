@@ -17,6 +17,7 @@ vendor/bundle/
 # ── Fastlane ──────────────────────────
 fastlane/report.xml
 fastlane/test_output/
+fastlane/ui_test_output/
 fastlane/screenshots/
 fastlane/Preview.html
 
@@ -32,3 +33,10 @@ test_output.log
 # ── IDEs/Tools ─────────────────────────
 .claude/
 
+# ── Secrets ───────────────────────────
+GoogleService-Info.plist
+AuthKey_*.p8
+.env
+.env.*
+fastlane/.env
+fastlane/.env.*

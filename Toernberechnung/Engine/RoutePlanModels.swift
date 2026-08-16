@@ -147,8 +147,10 @@ struct RoutePlan: Identifiable, Codable, Equatable {
     var waypoints: [RouteWaypoint]
     /// Legs connecting consecutive waypoints.
     var legs: [RouteLeg]
-    /// Route-level BSH water-level correction in meters. Can be positive, zero, or negative.
-    var bshWaterLevelCorrectionMeters: Double
+    /// Excel `$AD$13` — one manually entered BSH water level for the whole trip.
+    /// `nil` means "use the BSH forecast"; an explicit `0` means "no surge" and
+    /// is honoured as such.
+    var bshWaterLevelCorrectionMeters: Double?
     /// Display label for tidal state (e.g. "Springtide", "Mitteltide", "Nipptide").
     var tidalStateLabel: String
 }
@@ -191,26 +193,46 @@ struct LegCalculationResult: Equatable {
 }
 
 /// Full result for a single waypoint's tidal calculation.
+///
+/// The property comments name the corresponding cell of the reference tool
+/// "Excel-Tool-Törnberechnung_V2.1" so the chain stays auditable end to end.
 struct WaypointCalculationResult: Identifiable, Equatable {
     var id: UUID { waypoint.id }
     var waypoint: RouteWaypoint
+    /// Excel `L31` — time at the waypoint.
     var arrivalTime: Date
+    /// Excel `L23` — relevant high water at the **reference gauge**, before the
+    /// waypoint offset. Distinct from `relevantHighWaterTime`.
+    var referenceHighWaterTime: Date?
+    /// Excel `L29` — high water at the waypoint, i.e. `L23 ± M25/M27`.
     var relevantHighWaterTime: Date?
+    /// Excel `L37`.
     var deviationHours: Double?
+    /// Excel `L33` — the mean tidal range actually used after the
+    /// manual → BSH → catalog resolution chain.
+    var meanTidalRangeMeters: Double?
+    /// Excel `L41` (MHW) or `L43` (Lottiefe) — whichever the mode selected.
+    var referenceLevelMeters: Double?
+    /// Excel `L35`.
     var oneTwelfthMeters: Double?
-    /// "Fehlmenge Wasser" — water deficit relative to HW.
+    /// Excel `L39` — "Fehlmenge Wasser", the water deficit relative to HW.
     var missingWaterFmWMeters: Double?
+    /// Excel `L45`.
     var baseWaterAtTideMeters: Double?
+    /// Excel `L47`.
     var bshWaterLevelCorrectionMeters: Double
     var waterLevelCorrectionQuality: WaterLevelCorrectionQuality
-    /// Chart depth applied. Nil for Lottiefe mode.
+    /// Provenance of the water level correction, shown next to `L47`.
+    var waterLevelCorrectionDetail: String?
+    /// Excel `L51`. Nil for Lottiefe mode.
     var chartDepthMetersApplied: Double?
-    /// Tide height (HG). Nil for Lottiefe mode.
+    /// Excel `L49` — tide height (HG). Nil for Lottiefe mode ("leer").
     var tideHeightHGMeters: Double?
-    /// Available water depth (WT).
+    /// Excel `L53` — available water depth (WT).
     var availableWaterDepthWTMeters: Double?
+    /// Excel `M55`.
     var boatDraftMeters: Double
-    /// Clearance under keel (WuK).
+    /// Excel `L57` — clearance under keel (WuK).
     var clearanceUnderKeelWuKMeters: Double?
     var status: WaypointStatus
     var messages: [String]

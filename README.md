@@ -56,7 +56,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Haupt
 - **Karte** – Nautische Seekarte mit Routenplanung, Wegpunkten und Go/No-Go-Bewertung
 - **Wetter** – Apple-WeatherKit-Prognosen mit 48-Stunden-Wind- und Böendarstellung in Knoten
 - **Gezeiten** – BSH-Gezeitenabruf mit astronomischen Hoch-/Niedrigwasserzeiten und Wasserstandsvorhersage
-- **Crew** – Crewverwaltung mit Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakten und Bordstatus
+- **Crewspace** – Crewverwaltung mit Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakten und Bordstatus sowie lokale Terminplanung
 - **Logbuch** – Vollständiges Schiffstagebuch mit PDF-Export und Auditprotokoll via SwiftData
 
 ---
@@ -94,7 +94,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Haupt
 | ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten, ohne Übertragung des Chatverlaufs an einen KI-Server |
 | 🚦 | **Go / Warning / No-Go** | Kombinierte Bewertung aus Gezeiten- und Wetterstatus zu einer klaren Passage-Empfehlung |
 | 🧭 | **Mehrstrecken-Routing** | Routenplanung mit Zwischenstopps und automatischer Streckenberechnung über den Wattenmeer-Katalog |
-| 👥 | **Crewverwaltung** | Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakte und Bordstatus-Tracking |
+| 👥 | **Crewspace** | Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakte, Bordstatus und Terminplanung — vollständig auf dem Gerät |
 | 📒 | **Digitales Logbuch** | Schiffstagebuch mit vollständiger Reisehistorie und PDF-Export via SwiftData |
 | 🗃️ | **Offline-Katalog** | Kuratierter Wattenmeer-Katalog mit 20+ Routen, Wegpunkten und Tiefenwerten |
 
@@ -173,7 +173,7 @@ graph TD
 | **Apple Foundation Models** | Lokales Sprachverständnis für Nauti, Törn-Intents und allgemeine Seefragen | Vollständig auf dem Gerät; strukturierte Swift-Ausgaben ohne KI-Netzwerkaufruf |
 | **Lokaler Katalog** | 20+ Routen, Wegpunkte, Tiefenwerte und Pegel | Offline-JSON mit vorberechneten Katalogdaten |
 
-> Die Kernberechnung und Nauti-Antworten funktionieren auf unterstützten Geräten lokal. Gezeiten-, Wetter- und Crewspace-Daten erfordern weiterhin eine aktive Internetverbindung.
+> Die Kernberechnung und Nauti-Antworten funktionieren auf unterstützten Geräten lokal. Gezeiten- und Wetterdaten erfordern weiterhin eine aktive Internetverbindung; Crew, Termine und Logbuch bleiben vollständig auf dem Gerät.
 
 ---
 
@@ -211,7 +211,7 @@ graph TD
 - **Code-Analyse:** SwiftLint
 - **Dokumentation:** DocC (automatisch via GitHub Pages)
 - **CI/CD:** GitHub Actions (SwiftLint → Build & Test → SonarCloud → DocC Deploy)
-- **Dependencies:** Swift Package Manager (MapLibre, Firebase)
+- **Dependencies:** Swift Package Manager (MapLibre)
 
 ---
 
@@ -324,7 +324,7 @@ xcodegen generate
 open Toernberechnung.xcodeproj
 ```
 
-Dependencies (MapLibre und Firebase) werden automatisch über **Swift Package Manager** aufgelöst.
+Die Dependency (MapLibre) wird automatisch über **Swift Package Manager** aufgelöst.
 
 ### 4 · WeatherKit aktivieren
 

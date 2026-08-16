@@ -138,7 +138,7 @@ final class RouteCalculationService {
     private func calculateWaypoint(
         waypoint: RouteWaypoint,
         arrivalTime: Date,
-        routeWaterLevelCorrectionMeters: Double,
+        routeWaterLevelCorrectionMeters: Double?,
         confirmedComparisonStationID: String?,
         boatSettings: BoatSettings,
         tideDataProvider: TideDataProvider
@@ -216,9 +216,11 @@ final class RouteCalculationService {
                 issuedAt: nil,
                 detail: "Manuell eingetragene Wasserstandskorrektur."
             )
-        } else if abs(routeWaterLevelCorrectionMeters) > 0.000_1 {
+        } else if let routeCorrection = routeWaterLevelCorrectionMeters {
+            // Excel's global $AD$13. A typed 0,00 is a real answer ("no surge"),
+            // so the value is optional rather than sentinel-checked against zero.
             correction = WaterLevelCorrectionResolution(
-                meters: routeWaterLevelCorrectionMeters,
+                meters: routeCorrection,
                 quality: .manual,
                 localStationID: waypoint.tidalReferenceStationID,
                 sourceStationID: nil,
@@ -227,11 +229,19 @@ final class RouteCalculationService {
                 detail: "Manuell eingetragene Korrektur für den Törn."
             )
         } else {
-            correction = await tideDataProvider.waterLevelCorrection(
+            // The anchor selects the gauge's HW cycle (and its uncertainty
+            // band); the sample is taken at the time the boat is actually
+            // there. Both matter: two waypoints on the same gauge with
+            // different `highWaterOffsetMinutes` are passed at different times
+            // and must not receive an identical surge.
+            let series = await tideDataProvider.waterLevelCorrectionSeries(
                 for: waypoint.tidalReferenceStationID,
-                at: referenceHWTime,
+                covering: arrivalTime.addingTimeInterval(-3 * 3_600)
+                    ... arrivalTime.addingTimeInterval(3 * 3_600),
+                anchorHighWaterTime: referenceHWTime,
                 confirmedComparisonStationID: confirmedComparisonStationID
             )
+            correction = series.resolution(at: arrivalTime)
         }
         if correction.quality != .localOfficial {
             messages.append(correction.detail)
@@ -243,24 +253,98 @@ final class RouteCalculationService {
             highWaterTime: waypointHWTime
         )
 
-        // Apply tidal height strategy (1/12 rule).
-        let tidalResult = tidalHeightStrategy.missingWater(
-            deviationHours: deviation,
-            meanTidalRangeMeters: mth
+        // Resolve the reference level (Excel L41 or L43) for the waypoint's mode.
+        let referenceLevel: Double?
+        switch waypoint.calculationMode {
+        case .meanHighWater:
+            referenceLevel = resolvedMeanHighWater(
+                waypoint: waypoint,
+                stationReference: stationReference
+            )
+            if referenceLevel == nil {
+                messages.append("MHW (Mittleres Hochwasser) fehlt für \(waypoint.name).")
+            }
+        case .lottiefe:
+            referenceLevel = waypoint.lottiefeMeters?.value
+            if referenceLevel == nil {
+                messages.append("Lottiefe fehlt für \(waypoint.name).")
+            }
+        }
+
+        guard let level = referenceLevel else {
+            return incompleteWaypointResult(
+                waypoint: waypoint, arrivalTime: arrivalTime,
+                referenceHighWaterTime: referenceHWTime,
+                meanTidalRangeMeters: mth,
+                bshCorrection: correction.meters,
+                correctionQuality: correction.quality,
+                correctionDetail: correction.detail,
+                boatDraft: boatSettings.draftMeters, messages: messages
+            )
+        }
+
+        // The depth chain itself lives in `WaypointDepthSolver` so the passage
+        // window search evaluates the identical arithmetic.
+        let solved = WaypointDepthSolver.solve(
+            WaypointDepthSolver.Inputs(
+                calculationMode: waypoint.calculationMode,
+                referenceLevelMeters: level,
+                chartDepthMeters: waypoint.chartDepthMeters?.value,
+                meanTidalRangeMeters: mth,
+                deviationHours: deviation,
+                waterLevelCorrectionMeters: correction.meters,
+                draftMeters: boatSettings.draftMeters
+            ),
+            strategy: tidalHeightStrategy
         )
 
-        guard tidalResult.isValid else {
-            messages.append(contentsOf: tidalResult.messages)
+        switch solved {
+        case .success(let depth):
+            let baseStatus = Self.determineWaypointStatus(
+                clearanceUnderKeel: depth.clearanceUnderKeelMeters,
+                safetyMargin: boatSettings.safetyMarginMeters
+            )
+            let status = Self.applyCorrectionQuality(correction.quality, to: baseStatus)
+
             return WaypointCalculationResult(
                 waypoint: waypoint,
                 arrivalTime: arrivalTime,
+                referenceHighWaterTime: referenceHWTime,
                 relevantHighWaterTime: waypointHWTime,
                 deviationHours: deviation,
-                oneTwelfthMeters: tidalResult.oneTwelfthMeters,
+                meanTidalRangeMeters: mth,
+                referenceLevelMeters: level,
+                oneTwelfthMeters: depth.oneTwelfthMeters,
+                missingWaterFmWMeters: depth.missingWaterMeters,
+                baseWaterAtTideMeters: depth.baseMeters,
+                bshWaterLevelCorrectionMeters: correction.meters,
+                waterLevelCorrectionQuality: correction.quality,
+                waterLevelCorrectionDetail: correction.detail,
+                chartDepthMetersApplied: depth.chartDepthApplied,
+                tideHeightHGMeters: depth.tideHeightHGMeters,
+                availableWaterDepthWTMeters: depth.availableWaterDepthMeters,
+                boatDraftMeters: boatSettings.draftMeters,
+                clearanceUnderKeelWuKMeters: depth.clearanceUnderKeelMeters,
+                status: status,
+                messages: messages
+            )
+
+        case .failure(.deviationExceedsTidalCycle(let tidalMessages)):
+            messages.append(contentsOf: tidalMessages)
+            return WaypointCalculationResult(
+                waypoint: waypoint,
+                arrivalTime: arrivalTime,
+                referenceHighWaterTime: referenceHWTime,
+                relevantHighWaterTime: waypointHWTime,
+                deviationHours: deviation,
+                meanTidalRangeMeters: mth,
+                referenceLevelMeters: level,
+                oneTwelfthMeters: mth / 12,
                 missingWaterFmWMeters: nil,
                 baseWaterAtTideMeters: nil,
                 bshWaterLevelCorrectionMeters: correction.meters,
                 waterLevelCorrectionQuality: correction.quality,
+                waterLevelCorrectionDetail: correction.detail,
                 chartDepthMetersApplied: nil,
                 tideHeightHGMeters: nil,
                 availableWaterDepthWTMeters: nil,
@@ -269,147 +353,19 @@ final class RouteCalculationService {
                 status: .invalid,
                 messages: messages
             )
-        }
 
-        // Calculate water depth based on mode.
-        let depthResult = calculateDepth(
-            waypoint: waypoint,
-            fmwMeters: tidalResult.fmwMeters,
-            resolvedMeanHighWaterMeters: resolvedMeanHighWater(
-                waypoint: waypoint,
-                stationReference: stationReference
-            ),
-            bshCorrectionMeters: correction.meters,
-            boatDraftMeters: boatSettings.draftMeters
-        )
-
-        switch depthResult {
-        case .calculated(let depth):
-            let baseStatus = Self.determineWaypointStatus(
-                clearanceUnderKeel: depth.wuK,
-                safetyMargin: boatSettings.safetyMarginMeters
-            )
-            let status = Self.applyCorrectionQuality(correction.quality, to: baseStatus)
-            messages.append(contentsOf: depth.messages)
-
-            return WaypointCalculationResult(
-                waypoint: waypoint,
-                arrivalTime: arrivalTime,
-                relevantHighWaterTime: waypointHWTime,
-                deviationHours: deviation,
-                oneTwelfthMeters: tidalResult.oneTwelfthMeters,
-                missingWaterFmWMeters: tidalResult.fmwMeters,
-                baseWaterAtTideMeters: depth.baseWater,
-                bshWaterLevelCorrectionMeters: correction.meters,
-                waterLevelCorrectionQuality: correction.quality,
-                chartDepthMetersApplied: depth.chartDepthApplied,
-                tideHeightHGMeters: depth.hg,
-                availableWaterDepthWTMeters: depth.wt,
-                boatDraftMeters: boatSettings.draftMeters,
-                clearanceUnderKeelWuKMeters: depth.wuK,
-                status: status,
-                messages: messages
-            )
-
-        case .missingData(let errorMessages):
-            messages.append(contentsOf: errorMessages)
+        case .failure(.missingChartDepth):
+            messages.append("Kartentiefe / Peilplanwert fehlt für \(waypoint.name) (MHW-Modus).")
             return incompleteWaypointResult(
                 waypoint: waypoint, arrivalTime: arrivalTime,
+                referenceHighWaterTime: referenceHWTime,
+                meanTidalRangeMeters: mth,
                 bshCorrection: correction.meters,
                 correctionQuality: correction.quality,
+                correctionDetail: correction.detail,
                 boatDraft: boatSettings.draftMeters, messages: messages
             )
         }
-    }
-
-    // MARK: - Depth Calculation
-
-    private struct DepthCalculation {
-        let baseWater: Double
-        let hg: Double?     // nil for Lottiefe mode
-        let chartDepthApplied: Double?
-        let wt: Double
-        let wuK: Double
-        let messages: [String]
-    }
-
-    private enum DepthResult {
-        case calculated(DepthCalculation)
-        case missingData([String])
-    }
-
-    private func calculateDepth(
-        waypoint: RouteWaypoint,
-        fmwMeters: Double,
-        resolvedMeanHighWaterMeters: Double?,
-        bshCorrectionMeters: Double,
-        boatDraftMeters: Double
-    ) -> DepthResult {
-        switch waypoint.calculationMode {
-        case .meanHighWater:
-            return calculateMHWDepth(
-                waypoint: waypoint,
-                fmwMeters: fmwMeters,
-                resolvedMeanHighWaterMeters: resolvedMeanHighWaterMeters,
-                bshCorrectionMeters: bshCorrectionMeters,
-                boatDraftMeters: boatDraftMeters
-            )
-        case .lottiefe:
-            return calculateLottiefeDepth(
-                waypoint: waypoint,
-                fmwMeters: fmwMeters,
-                bshCorrectionMeters: bshCorrectionMeters,
-                boatDraftMeters: boatDraftMeters
-            )
-        }
-    }
-
-    /// MHW mode: baseWater = MHW - FmW; HG = baseWater + bshCorrection; WT = HG + chartDepth
-    private func calculateMHWDepth(
-        waypoint: RouteWaypoint,
-        fmwMeters: Double,
-        resolvedMeanHighWaterMeters: Double?,
-        bshCorrectionMeters: Double,
-        boatDraftMeters: Double
-    ) -> DepthResult {
-        guard let mhw = resolvedMeanHighWaterMeters else {
-            return .missingData(["MHW (Mittleres Hochwasser) fehlt für \(waypoint.name)."])
-        }
-        guard let chartDepth = waypoint.chartDepthMeters?.value else {
-            return .missingData(["Kartentiefe / Peilplanwert fehlt für \(waypoint.name) (MHW-Modus)."])
-        }
-
-        let baseWater = mhw - fmwMeters
-        let hg = baseWater + bshCorrectionMeters
-        let wt = hg + chartDepth
-        let wuK = wt - boatDraftMeters
-
-        return .calculated(DepthCalculation(
-            baseWater: baseWater, hg: hg, chartDepthApplied: chartDepth,
-            wt: wt, wuK: wuK, messages: []
-        ))
-    }
-
-    /// Lottiefe mode: baseWater = Lottiefe - FmW; WT = baseWater + bshCorrection; chartDepth NOT applied.
-    private func calculateLottiefeDepth(
-        waypoint: RouteWaypoint,
-        fmwMeters: Double,
-        bshCorrectionMeters: Double,
-        boatDraftMeters: Double
-    ) -> DepthResult {
-        guard let lottiefe = waypoint.lottiefeMeters?.value else {
-            return .missingData(["Lottiefe fehlt für \(waypoint.name)."])
-        }
-
-        let baseWater = lottiefe - fmwMeters
-        let wt = baseWater + bshCorrectionMeters
-        let wuK = wt - boatDraftMeters
-
-        // HG is "leer" (empty) in Lottiefe mode — chart depth is not applied.
-        return .calculated(DepthCalculation(
-            baseWater: baseWater, hg: nil, chartDepthApplied: nil,
-            wt: wt, wuK: wuK, messages: []
-        ))
     }
 
     private func resolvedMeanHighWater(
@@ -567,7 +523,9 @@ final class RouteCalculationService {
         if waypointStatuses.contains(.noGo) { return .noGo }
         if waypointStatuses.contains(.incomplete) { return .incomplete }
         if waypointStatuses.contains(.warning) { return .warning }
-        return .go
+        // An empty list means nothing was evaluated — that is missing data,
+        // never a green light.
+        return waypointStatuses.isEmpty ? .incomplete : .go
     }
 
     // MARK: - Private Helpers
@@ -593,21 +551,28 @@ final class RouteCalculationService {
     private func incompleteWaypointResult(
         waypoint: RouteWaypoint,
         arrivalTime: Date,
+        referenceHighWaterTime: Date? = nil,
+        meanTidalRangeMeters: Double? = nil,
         bshCorrection: Double,
         correctionQuality: WaterLevelCorrectionQuality,
+        correctionDetail: String? = nil,
         boatDraft: Double,
         messages: [String]
     ) -> WaypointCalculationResult {
         WaypointCalculationResult(
             waypoint: waypoint,
             arrivalTime: arrivalTime,
+            referenceHighWaterTime: referenceHighWaterTime,
             relevantHighWaterTime: nil,
             deviationHours: nil,
+            meanTidalRangeMeters: meanTidalRangeMeters,
+            referenceLevelMeters: nil,
             oneTwelfthMeters: nil,
             missingWaterFmWMeters: nil,
             baseWaterAtTideMeters: nil,
             bshWaterLevelCorrectionMeters: bshCorrection,
             waterLevelCorrectionQuality: correctionQuality,
+            waterLevelCorrectionDetail: correctionDetail,
             chartDepthMetersApplied: nil,
             tideHeightHGMeters: nil,
             availableWaterDepthWTMeters: nil,

@@ -56,7 +56,7 @@ The application follows a cleanly decoupled **MVVM architecture** with five main
 - **Map** – Nautical chart with route planning, waypoints, and Go/No-Go assessment
 - **Weather** – Apple WeatherKit forecasts with 48-hour wind and gust data in knots
 - **Tides** – BSH tidal data with astronomical high/low water times and water level forecasts
-- **Crew** – Crew management with roles (Skipper, Co-Skipper, Navigator), emergency contacts, and board status
+- **Crewspace** – Crew management with roles (Skipper, Co-Skipper, Navigator), emergency contacts, and board status plus local appointment planning
 - **Logbook** – Complete ship's log with PDF export and audit trail via SwiftData
 
 ---
@@ -94,7 +94,7 @@ The application follows a cleanly decoupled **MVVM architecture** with five main
 | ✨ | **Nauti On-Device** | Local skipper assistant powered by Apple Foundation Models on supported iOS 26 devices without sending chat history to an AI server |
 | 🚦 | **Go / Warning / No-Go** | Combined assessment from tidal and weather status into a clear passage recommendation |
 | 🧭 | **Multi-Leg Routing** | Route planning with intermediate stops and automatic leg calculation via the Wadden Sea catalog |
-| 👥 | **Crew Management** | Roles (Skipper, Co-Skipper, Navigator), emergency contacts, and onboard status tracking |
+| 👥 | **Crewspace** | Roles (Skipper, Co-Skipper, Navigator), emergency contacts, onboard status, and appointment planning — entirely on device |
 | 📒 | **Digital Logbook** | Ship's log with complete voyage history and PDF export via SwiftData |
 | 🗃️ | **Offline Catalog** | Curated Wadden Sea catalog with 20+ routes, waypoints, and depth values |
 
@@ -173,7 +173,7 @@ graph TD
 | **Apple Foundation Models** | Local language understanding for Nauti, voyage intents, and general seamanship questions | Entirely on device with structured Swift output and no AI network request |
 | **Local Catalog** | 20+ routes, waypoints, depth values, and tide gauges | Offline JSON with pre-computed catalog data |
 
-> Core calculations and Nauti responses run locally on supported devices. Tide, weather, and Crewspace data still require an active internet connection.
+> Core calculations and Nauti responses run locally on supported devices. Tide and weather data still require an active internet connection; crew, appointments, and the logbook stay entirely on device.
 
 ---
 
@@ -211,7 +211,7 @@ graph TD
 - **Code Analysis:** SwiftLint
 - **Documentation:** DocC (automatically deployed via GitHub Pages)
 - **CI/CD:** GitHub Actions (SwiftLint → Build & Test → SonarCloud → DocC Deploy)
-- **Dependencies:** Swift Package Manager (MapLibre, Firebase)
+- **Dependencies:** Swift Package Manager (MapLibre)
 
 ---
 
@@ -324,7 +324,7 @@ xcodegen generate
 open Toernberechnung.xcodeproj
 ```
 
-Dependencies (MapLibre and Firebase) are automatically resolved via **Swift Package Manager**.
+The dependency (MapLibre) is automatically resolved via **Swift Package Manager**.
 
 ### 4 · Enable WeatherKit
 

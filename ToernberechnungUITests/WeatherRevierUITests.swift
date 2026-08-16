@@ -22,7 +22,7 @@ final class WeatherRevierUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Sicher planen. Klar navigieren."].waitForExistence(timeout: 5))
         app.buttons["Überspringen"].tap()
-        XCTAssertTrue(app.staticTexts["Crew, Chats und Termine verbinden."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Crew und Termine im Blick behalten."].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["Loslegen"].isEnabled)
         app.buttons["onboardingSafetyAcknowledgement"].tap()
         XCTAssertTrue(app.buttons["Loslegen"].isEnabled)
@@ -44,7 +44,7 @@ final class WeatherRevierUITests: XCTestCase {
                 .waitForExistence(timeout: 3)
         )
         continueButton.tap()
-        XCTAssertTrue(app.staticTexts["Crew, Chats und Termine verbinden."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Crew und Termine im Blick behalten."].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["Loslegen"].isEnabled)
         app.buttons["onboardingSafetyAcknowledgement"].tap()
         XCTAssertTrue(app.buttons["Loslegen"].isEnabled)
@@ -242,9 +242,8 @@ final class WeatherRevierUITests: XCTestCase {
         crewspaceTab.tap()
 
         XCTAssertTrue(app.staticTexts["Crewspace"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Chats"].isHittable)
-        XCTAssertTrue(app.buttons["Planung"].isHittable)
-        XCTAssertTrue(app.buttons["Crew"].isHittable)
+        XCTAssertTrue(app.buttons["CrewspaceSectionCrew"].isHittable)
+        XCTAssertTrue(app.buttons["CrewspaceSectionPlanung"].isHittable)
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Crewspace-volle-Tabhoehe"

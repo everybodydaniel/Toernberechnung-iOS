@@ -21,6 +21,54 @@ protocol TidalHeightStrategy {
         deviationHours: Double,
         meanTidalRangeMeters: Double
     ) -> TidalHeightResult
+
+    /// Inverse of `missingWater`: the largest deviation from high water at which
+    /// the missing water still does not exceed `maxMissingWaterMeters`.
+    ///
+    /// This turns the passage question around. Instead of asking "how much water
+    /// is missing when I arrive at 14:30?" it answers "until when may I arrive
+    /// and still float?" — which is what a passage window needs, and it answers
+    /// it without sampling hundreds of candidate times.
+    ///
+    /// Returns `nil` when even an arrival exactly at high water is not enough.
+    func maxDeviationHours(
+        forMaxMissingWaterMeters maxMissingWaterMeters: Double,
+        meanTidalRangeMeters: Double
+    ) -> Double?
+}
+
+extension TidalHeightStrategy {
+    /// Generic inverse via bisection. Correct for any strategy whose missing
+    /// water grows monotonically with the deviation, which every tidal curve
+    /// does between high and low water.
+    func maxDeviationHours(
+        forMaxMissingWaterMeters maxMissingWaterMeters: Double,
+        meanTidalRangeMeters: Double
+    ) -> Double? {
+        guard maxMissingWaterMeters >= 0 else { return nil }
+
+        let atFullCycle = missingWater(
+            deviationHours: 12,
+            meanTidalRangeMeters: meanTidalRangeMeters
+        )
+        if atFullCycle.isValid, atFullCycle.fmwMeters <= maxMissingWaterMeters { return 12 }
+
+        var low = 0.0
+        var high = 12.0
+        for _ in 0 ..< 60 {
+            let middle = (low + high) / 2
+            let result = missingWater(
+                deviationHours: middle,
+                meanTidalRangeMeters: meanTidalRangeMeters
+            )
+            if result.isValid, result.fmwMeters <= maxMissingWaterMeters {
+                low = middle
+            } else {
+                high = middle
+            }
+        }
+        return low
+    }
 }
 
 // MARK: - Tidal Height Result
@@ -120,5 +168,44 @@ struct TwelfthsRuleStrategy: TidalHeightStrategy {
             isValid: true,
             messages: []
         )
+    }
+
+    /// Closed form of the inverse — the staircase read from right to left.
+    ///
+    /// Because the rule is a step function, the answer is always the upper edge
+    /// of the last bucket whose twelfths still fit into the budget:
+    ///
+    /// ```
+    /// budget < 1/12  → 0 h  (only exactly at high water)
+    /// budget < 3/12  → 1 h
+    /// budget < 6/12  → 2 h
+    /// budget < 9/12  → 3 h
+    /// budget < 11/12 → 4 h
+    /// budget < 12/12 → 5 h
+    /// otherwise      → 12 h (the whole cycle floats)
+    /// ```
+    func maxDeviationHours(
+        forMaxMissingWaterMeters maxMissingWaterMeters: Double,
+        meanTidalRangeMeters: Double
+    ) -> Double? {
+        guard maxMissingWaterMeters >= 0 else { return nil }
+
+        let oneTwelfth = meanTidalRangeMeters / 12
+        // Without a tidal range there is no deficit to begin with.
+        guard oneTwelfth > 0 else { return 12 }
+
+        // A hair of tolerance so a budget that is mathematically exactly N/12
+        // is not pushed into the previous bucket by floating point noise.
+        let budgetInTwelfths = maxMissingWaterMeters / oneTwelfth + 1e-9
+
+        switch budgetInTwelfths {
+        case ..<1: return 0
+        case ..<3: return 1
+        case ..<6: return 2
+        case ..<9: return 3
+        case ..<11: return 4
+        case ..<12: return 5
+        default: return 12
+        }
     }
 }

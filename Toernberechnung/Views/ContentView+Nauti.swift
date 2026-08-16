@@ -84,42 +84,6 @@ extension ContentView {
             openNautiWeather(action)
         case .showTides, .showWaterLevel:
             openNautiTides(action)
-        case .sendMessage, .createEvent, .addCrewMember, .removeCrewMember:
-            Task {
-                await prepareNautiCrewspaceAction(action, conversationID: conversationID)
-            }
-        }
-    }
-
-    @MainActor
-    func prepareNautiCrewspaceAction(_ action: NautiAppAction, conversationID: UUID) async {
-        guard socialAuth.isAuthenticated else {
-            replaceNautiPreparationMessage(
-                action,
-                with: "Melde dich zuerst in den Einstellungen bei Crewspace an.",
-                conversationID: conversationID
-            )
-            return
-        }
-
-        if crewspaceStore.conversations.isEmpty {
-            await crewspaceStore.refresh()
-        }
-
-        let prepared = await NautiCommandDispatcher.prepare(
-            action,
-            store: crewspaceStore,
-            currentSkipperID: socialAuth.skipperID,
-            activeGroupID: activeCrewGroupID
-        )
-        switch prepared {
-        case .pending(let pending):
-            pendingNautiConversationID = conversationID
-            pendingNautiAction = pending
-        case .clarification(let question):
-            replaceNautiPreparationMessage(action, with: question, conversationID: conversationID)
-        case .direct:
-            break
         }
     }
 
@@ -146,91 +110,6 @@ extension ContentView {
             }
             nautiViewModel.appendAssistantMessage(
                 "Ich habe die vorgeschlagene Abfahrt gesetzt. Du kannst den Törn weiterhin manuell anpassen.",
-                conversationID: conversationID
-            )
-        case .sendMessage(let action):
-            Task { await executeNautiMessage(action, conversationID: conversationID) }
-        case .createEvent(let action):
-            Task { await executeNautiEvent(action, conversationID: conversationID) }
-        case .addCrewMember(let action):
-            Task { await executeNautiCrewChange(action, adding: true, conversationID: conversationID) }
-        case .removeCrewMember(let action):
-            Task { await executeNautiCrewChange(action, adding: false, conversationID: conversationID) }
-        }
-    }
-
-    @MainActor
-    func executeNautiMessage(_ action: NautiResolvedMessageAction, conversationID: UUID?) async {
-        do {
-            _ = try await crewspaceStore.sendMessage(
-                conversationID: action.conversationID,
-                text: action.text
-            )
-            nautiViewModel.appendAssistantMessage(
-                "Die Nachricht an \(action.conversationTitle) wurde gesendet.",
-                conversationID: conversationID
-            )
-        } catch {
-            nautiViewModel.appendAssistantMessage(
-                "Die Nachricht wurde nicht gesendet: \(error.localizedDescription)",
-                conversationID: conversationID
-            )
-        }
-    }
-
-    @MainActor
-    func executeNautiEvent(_ action: NautiResolvedEventAction, conversationID: UUID?) async {
-        do {
-            _ = try await crewspaceStore.createEvent(CrewspaceEventDraft(
-                conversationID: action.conversationID,
-                title: action.title,
-                startsAt: action.startsAt,
-                endsAt: action.endsAt,
-                location: action.location,
-                notes: action.notes,
-                attachmentURL: nil,
-                attachmentName: nil,
-                attachmentContentType: nil
-            ))
-            nautiViewModel.appendAssistantMessage(
-                "Der Termin „\(action.title)“ wurde in \(action.targetTitle) eingetragen.",
-                conversationID: conversationID
-            )
-        } catch {
-            nautiViewModel.appendAssistantMessage(
-                "Der Termin wurde nicht erstellt: \(error.localizedDescription)",
-                conversationID: conversationID
-            )
-        }
-    }
-
-    @MainActor
-    func executeNautiCrewChange(
-        _ action: NautiResolvedCrewAction,
-        adding: Bool,
-        conversationID: UUID?
-    ) async {
-        do {
-            if adding {
-                _ = try await crewspaceStore.addCrewMember(
-                    conversationID: action.conversationID,
-                    skipperID: action.skipperID,
-                    crewRole: action.crewRole ?? "Crew"
-                )
-            } else {
-                try await crewspaceStore.removeCrewMember(
-                    conversationID: action.conversationID,
-                    skipperID: action.skipperID
-                )
-            }
-            let verb = adding ? "hinzugefügt" : "entfernt"
-            nautiViewModel.appendAssistantMessage(
-                "Die Skipper-ID \(action.skipperID) wurde in \(action.groupTitle) \(verb).",
-                conversationID: conversationID
-            )
-        } catch {
-            nautiViewModel.appendAssistantMessage(
-                "Die Crew wurde nicht geändert: \(error.localizedDescription)",
                 conversationID: conversationID
             )
         }

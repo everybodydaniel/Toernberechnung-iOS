@@ -15,6 +15,14 @@ import SwiftUI
 //     a `GlassEffectContainer` so the morphing animation is consistent.
 //   • Use `.tint(...)` for semantic glass colour (prominent action),
 //     never just for decoration.
+//   • NEVER apply interactive glass inside a `Button` label. The
+//     `.interactive()` effect installs its own press handling and
+//     swallows the tap as soon as a scroll view or a UIKit map sits
+//     underneath the control. Put the glass modifier OUTSIDE the button
+//     and make `.contentShape(...)` the last modifier inside the label
+//     (see `tideHero` in ContentView+Tides.swift for the reference
+//     shape). Every `interactive:` parameter below therefore defaults
+//     to `false`.
 //
 // All helpers are non-mutating extensions on `View` and `ButtonStyle`,
 // so existing call sites stay compact and the fallback path is invisible
@@ -115,33 +123,17 @@ extension View {
         }
     }
 
-    /// Clear glass used by the ELWIS quick look and its top-level cards.
-    /// It intentionally matches the untinted glass of the header buttons.
+    /// Circular floating button used by the AppHeader and the FullScreen
+    /// top-bar. Apply it OUTSIDE the `Button`, with `.contentShape(Circle())`
+    /// as the last modifier inside the label.
     @ViewBuilder
-    func appNoticeGlass(cornerRadius: CGFloat = 26) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    func appCircularGlass(diameter: CGFloat = 44, tint: Color? = nil, interactive: Bool = false) -> some View {
         if #available(iOS 26.0, *) {
-            self
-                .glassEffect(.regular, in: shape)
-                .shadow(color: .black.opacity(0.12), radius: 18, y: 10)
-        } else {
-            self
-                .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.stroke(Color.white.opacity(0.08), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.10), radius: 14, y: 8)
-        }
-    }
-
-    /// Circular floating button. Match what the existing `CircleButton`
-    /// rendered before so the AppHeader and the FullScreen top-bar can
-    /// reuse the same call.
-    @ViewBuilder
-    func appCircularGlass(diameter: CGFloat = 44, tint: Color? = nil) -> some View {
-        if #available(iOS 26.0, *) {
+            let glass = tint.map { Glass.regular.tint($0) } ?? .regular
             self
                 .frame(width: diameter, height: diameter)
                 .glassEffect(
-                    (tint.map { Glass.regular.tint($0) } ?? .regular).interactive(),
+                    interactive ? glass.interactive() : glass,
                     in: Circle()
                 )
         } else {
@@ -157,12 +149,12 @@ extension View {
     /// and nautical maps. The dark tint keeps white SF Symbols legible over
     /// bright chart details without turning the control into an opaque chip.
     @ViewBuilder
-    func appDarkCircularLiquidGlass(diameter: CGFloat = 44) -> some View {
+    func appDarkCircularLiquidGlass(diameter: CGFloat = 44, interactive: Bool = false) -> some View {
         let tint = Color(hex: 0x08243A).opacity(0.78)
         if #available(iOS 26.0, *) {
             self
                 .frame(width: diameter, height: diameter)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .glassEffect(interactive ? Glass.regular.interactive() : .regular, in: Circle())
         } else {
             self
                 .frame(width: diameter, height: diameter)
@@ -176,12 +168,12 @@ extension View {
     /// Interactive route control over the map. iOS 26 deliberately stays
     /// untinted so the system can refract and adapt to the chart underneath.
     @ViewBuilder
-    func appDarkFloatingOverlay(cornerRadius: CGFloat = 18) -> some View {
+    func appDarkFloatingOverlay(cornerRadius: CGFloat = 18, interactive: Bool = false) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let tint = Color(hex: 0x202746)
         if #available(iOS 26.0, *) {
             self
-                .glassEffect(.regular.interactive(), in: shape)
+                .glassEffect(interactive ? Glass.regular.interactive() : .regular, in: shape)
         } else {
             self
                 .background(.ultraThinMaterial, in: shape)
@@ -309,7 +301,20 @@ extension View {
                 .background(tint.opacity(0.12), in: Capsule())
         }
     }
+
+    /// Transparent Liquid Glass background for small circular icons.
+    @ViewBuilder
+    func appGlassIconBackground() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: Circle())
+        } else {
+            self
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+        }
+    }
 }
+
 
 // MARK: - Button Styles
 //
@@ -399,6 +404,17 @@ extension View {
             self.background(Color.clear)
         } else {
             self.background(fallback())
+        }
+    }
+
+    @ViewBuilder
+    func appSheetGlassBackground() -> some View {
+        if #available(iOS 26.0, *) {
+            self.presentationBackground {
+                Color.clear.glassEffect(.regular, in: Rectangle())
+            }
+        } else {
+            self.presentationBackground(.ultraThinMaterial)
         }
     }
 }

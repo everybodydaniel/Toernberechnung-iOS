@@ -124,21 +124,6 @@ enum NautiActionKind: String, Equatable, Codable, Sendable {
     case showWeather
     case showTides
     case showWaterLevel
-    case sendMessage
-    case createEvent
-    case addCrewMember
-    case removeCrewMember
-}
-
-enum NautiRecipientKind: String, Equatable, Codable, Sendable {
-    case direct
-    case group
-}
-
-enum NautiEventTargetKind: String, Equatable, Codable, Sendable {
-    case personal
-    case direct
-    case group
 }
 
 struct NautiAppAction: Equatable, Codable, Sendable {
@@ -152,19 +137,6 @@ struct NautiAppAction: Equatable, Codable, Sendable {
     var message: String?
     var openNavigation: Bool
     var saveTrip: Bool
-    var recipientKind: NautiRecipientKind?
-    var recipientQuery: String?
-    var messageText: String?
-    var eventTitle: String?
-    var eventNotes: String?
-    var eventLocation: String?
-    var eventStartAt: String?
-    var eventEndAt: String?
-    var eventTargetKind: NautiEventTargetKind?
-    var eventTargetQuery: String?
-    var skipperID: String?
-    var crewRole: String?
-    var groupQuery: String?
 
     init(
         kind: NautiActionKind,
@@ -176,20 +148,7 @@ struct NautiAppAction: Equatable, Codable, Sendable {
         targetDate: String? = nil,
         message: String? = nil,
         openNavigation: Bool = false,
-        saveTrip: Bool = false,
-        recipientKind: NautiRecipientKind? = nil,
-        recipientQuery: String? = nil,
-        messageText: String? = nil,
-        eventTitle: String? = nil,
-        eventNotes: String? = nil,
-        eventLocation: String? = nil,
-        eventStartAt: String? = nil,
-        eventEndAt: String? = nil,
-        eventTargetKind: NautiEventTargetKind? = nil,
-        eventTargetQuery: String? = nil,
-        skipperID: String? = nil,
-        crewRole: String? = nil,
-        groupQuery: String? = nil
+        saveTrip: Bool = false
     ) {
         self.kind = kind
         self.startHarbourID = startHarbourID
@@ -201,19 +160,6 @@ struct NautiAppAction: Equatable, Codable, Sendable {
         self.message = message
         self.openNavigation = openNavigation
         self.saveTrip = saveTrip
-        self.recipientKind = recipientKind
-        self.recipientQuery = recipientQuery
-        self.messageText = messageText
-        self.eventTitle = eventTitle
-        self.eventNotes = eventNotes
-        self.eventLocation = eventLocation
-        self.eventStartAt = eventStartAt
-        self.eventEndAt = eventEndAt
-        self.eventTargetKind = eventTargetKind
-        self.eventTargetQuery = eventTargetQuery
-        self.skipperID = skipperID
-        self.crewRole = crewRole
-        self.groupQuery = groupQuery
     }
 
     var departureDate: Date? {
@@ -222,14 +168,6 @@ struct NautiAppAction: Equatable, Codable, Sendable {
 
     var targetDay: Date? {
         Self.date(from: targetDate, includeTime: false)
-    }
-
-    var eventStartDate: Date? {
-        Self.date(from: eventStartAt, includeTime: true)
-    }
-
-    var eventEndDate: Date? {
-        Self.date(from: eventEndAt, includeTime: true)
     }
 
     private static func date(from rawValue: String?, includeTime: Bool) -> Date? {
@@ -456,48 +394,6 @@ enum NautiActionValidator {
 
         case .saveTrip, .openNavigation:
             break
-
-        case .sendMessage:
-            guard let recipient = normalized(action.recipientQuery), !recipient.isEmpty else {
-                return clarification("An wen möchtest du die Nachricht senden?")
-            }
-            guard let text = normalized(action.messageText), !text.isEmpty else {
-                return clarification("Welchen Text soll die Nachricht enthalten?")
-            }
-            action.recipientQuery = recipient
-            action.messageText = text
-
-        case .createEvent:
-            guard let title = normalized(action.eventTitle), !title.isEmpty else {
-                return clarification("Welchen Titel soll der Termin haben?")
-            }
-            guard let startsAt = action.eventStartDate else {
-                return clarification("An welchem Tag und um welche Uhrzeit beginnt der Termin?")
-            }
-            guard let endsAt = action.eventEndDate, endsAt > startsAt else {
-                return clarification("Wann endet der Termin? Die Endzeit muss nach der Startzeit liegen.")
-            }
-            if action.eventTargetKind != nil, action.eventTargetKind != .personal,
-               normalized(action.eventTargetQuery) == nil {
-                return clarification("Mit welchem Kontakt oder welcher Gruppe soll der Termin geteilt werden?")
-            }
-            action.eventTitle = title
-            action.eventNotes = normalized(action.eventNotes)
-            action.eventLocation = normalized(action.eventLocation)
-            action.eventTargetQuery = normalized(action.eventTargetQuery)
-
-        case .addCrewMember, .removeCrewMember:
-            guard let skipperID = normalized(action.skipperID), isValidSkipperID(skipperID) else {
-                return clarification("Welche gültige Skipper-ID soll ich verwenden?")
-            }
-            action.skipperID = skipperID
-            if action.kind == .addCrewMember {
-                guard let role = canonicalCrewRole(action.crewRole) else {
-                    return clarification("Welche Rolle soll das Crewmitglied erhalten?")
-                }
-                action.crewRole = role
-            }
-            action.groupQuery = normalized(action.groupQuery)
         }
 
         return NautiInferenceResult(text: reply, action: action)
@@ -505,28 +401,6 @@ enum NautiActionValidator {
 
     static func clarification(_ question: String) -> NautiInferenceResult {
         NautiInferenceResult(text: question, action: nil)
-    }
-
-    static func canonicalCrewRole(_ rawValue: String?) -> String? {
-        guard let normalized = normalized(rawValue)?.folding(
-            options: [.caseInsensitive, .diacriticInsensitive],
-            locale: Locale(identifier: "de_DE")
-        ).lowercased() else { return nil }
-
-        switch normalized {
-        case "skipper": return "Skipper"
-        case "co skipper", "co-skipper", "coskipper": return "Co-Skipper"
-        case "navigation", "navigator": return "Navigation"
-        case "wachfuhrung", "wache", "watch lead": return "Wachführung"
-        case "deck": return "Deck"
-        case "sicherheit medizin", "sicherheit/medizin", "medizin", "sanitater": return "Sicherheit/Medizin"
-        case "crew", "crewmitglied": return "Crew"
-        default: return nil
-        }
-    }
-
-    static func isValidSkipperID(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9_-]{6,128}$"#, options: .regularExpression) != nil
     }
 
     private static func normalized(_ value: String?) -> String? {
@@ -670,38 +544,11 @@ enum NautiProactiveIssueResolver {
     }
 }
 
-struct NautiResolvedMessageAction: Equatable, Sendable {
-    let conversationID: String
-    let conversationTitle: String
-    let text: String
-}
-
-struct NautiResolvedEventAction: Equatable, Sendable {
-    let conversationID: String?
-    let targetTitle: String
-    let title: String
-    let notes: String?
-    let location: String?
-    let startsAt: Date
-    let endsAt: Date
-}
-
-struct NautiResolvedCrewAction: Equatable, Sendable {
-    let conversationID: String
-    let groupTitle: String
-    let skipperID: String
-    let crewRole: String?
-}
-
 enum NautiPendingAction: Identifiable {
     case tripPlan(NautiAppAction)
     case saveTrip
     case openNavigation
     case suggestedDeparture(Date)
-    case sendMessage(NautiResolvedMessageAction)
-    case createEvent(NautiResolvedEventAction)
-    case addCrewMember(NautiResolvedCrewAction)
-    case removeCrewMember(NautiResolvedCrewAction)
 
     var id: String {
         switch self {
@@ -710,10 +557,6 @@ enum NautiPendingAction: Identifiable {
         case .saveTrip: return "save-trip"
         case .openNavigation: return "open-navigation"
         case .suggestedDeparture(let date): return "suggested-departure-\(date.timeIntervalSince1970)"
-        case .sendMessage(let action): return "message-\(action.conversationID)-\(action.text)"
-        case .createEvent(let action): return "event-\(action.startsAt.timeIntervalSince1970)-\(action.title)"
-        case .addCrewMember(let action): return "crew-add-\(action.conversationID)-\(action.skipperID)"
-        case .removeCrewMember(let action): return "crew-remove-\(action.conversationID)-\(action.skipperID)"
         }
     }
 
@@ -723,10 +566,6 @@ enum NautiPendingAction: Identifiable {
         case .saveTrip: return "Törn speichern?"
         case .openNavigation: return "Navigation starten?"
         case .suggestedDeparture: return "Abfahrt anpassen?"
-        case .sendMessage: return "Nachricht senden?"
-        case .createEvent: return "Termin erstellen?"
-        case .addCrewMember: return "Crewmitglied hinzufügen?"
-        case .removeCrewMember: return "Crewmitglied entfernen?"
         }
     }
 
@@ -736,10 +575,6 @@ enum NautiPendingAction: Identifiable {
         case .saveTrip: return "Im Logbuch speichern"
         case .openNavigation: return "Weiter zur Navigation"
         case .suggestedDeparture: return "Zeit übernehmen"
-        case .sendMessage: return "Nachricht senden"
-        case .createEvent: return "Termin eintragen"
-        case .addCrewMember: return "Crewmitglied hinzufügen"
-        case .removeCrewMember: return "Crewmitglied entfernen"
         }
     }
 
@@ -763,180 +598,11 @@ enum NautiPendingAction: Identifiable {
             return "Die Navigation wird erst nach dem bekannten Sicherheitshinweis gestartet."
         case .suggestedDeparture(let date):
             return "Nauti schlägt \(AppDateFormatters.dayMonthYear.string(from: date)) um \(AppDateFormatters.hourMinute.string(from: date)) Uhr als sichere Abfahrt vor."
-        case .sendMessage(let action):
-            return "An: \(action.conversationTitle)\n\n\(action.text)"
-        case .createEvent(let action):
-            let start = "\(AppDateFormatters.dayMonthYear.string(from: action.startsAt)) um \(AppDateFormatters.hourMinute.string(from: action.startsAt)) Uhr"
-            let end = AppDateFormatters.hourMinute.string(from: action.endsAt)
-            return "\(action.title)\n\(start) bis \(end) Uhr\nKalender: \(action.targetTitle)"
-        case .addCrewMember(let action):
-            return "Skipper-ID: \(action.skipperID)\nRolle: \(action.crewRole ?? "Crew")\nGruppe: \(action.groupTitle)"
-        case .removeCrewMember(let action):
-            return "Skipper-ID: \(action.skipperID)\nGruppe: \(action.groupTitle)"
         }
     }
 
     private static func harbourDisplayName(for id: String) -> String {
         guard let harbour = HarbourOption.optionalByID(id) else { return id }
         return harbour.name.components(separatedBy: ",").first ?? harbour.name
-    }
-}
-
-enum NautiPreparedCommand {
-    case direct(NautiAppAction)
-    case pending(NautiPendingAction)
-    case clarification(String)
-}
-
-@MainActor
-enum NautiCommandDispatcher {
-    static func prepare(
-        _ action: NautiAppAction,
-        store: CrewspaceStore,
-        currentSkipperID: String?,
-        activeGroupID: String
-    ) async -> NautiPreparedCommand {
-        switch action.kind {
-        case .sendMessage:
-            return resolveMessage(action, store: store, currentSkipperID: currentSkipperID)
-        case .createEvent:
-            return resolveEvent(action, store: store, currentSkipperID: currentSkipperID)
-        case .addCrewMember, .removeCrewMember:
-            return await resolveCrew(
-                action,
-                store: store,
-                currentSkipperID: currentSkipperID,
-                activeGroupID: activeGroupID
-            )
-        default:
-            return .direct(action)
-        }
-    }
-
-    private static func resolveMessage(
-        _ action: NautiAppAction,
-        store: CrewspaceStore,
-        currentSkipperID: String?
-    ) -> NautiPreparedCommand {
-        guard let query = action.recipientQuery, let text = action.messageText else {
-            return .clarification("An wen und welchen Text soll ich senden?")
-        }
-        let matches = store.resolveConversations(
-            matching: query,
-            isGroup: action.recipientKind.map { $0 == .group },
-            currentSkipperID: currentSkipperID
-        )
-        return resolvedConversation(matches, query: query) { conversation in
-            .pending(.sendMessage(NautiResolvedMessageAction(
-                conversationID: conversation.id,
-                conversationTitle: conversation.title,
-                text: text
-            )))
-        }
-    }
-
-    private static func resolveEvent(
-        _ action: NautiAppAction,
-        store: CrewspaceStore,
-        currentSkipperID: String?
-    ) -> NautiPreparedCommand {
-        guard let title = action.eventTitle,
-              let startsAt = action.eventStartDate,
-              let endsAt = action.eventEndDate else {
-            return .clarification("Für den Termin fehlen Titel, Start oder Endzeit.")
-        }
-
-        let makePending: (CrewspaceConversationDTO?) -> NautiPreparedCommand = { conversation in
-            .pending(.createEvent(NautiResolvedEventAction(
-                conversationID: conversation?.id,
-                targetTitle: conversation?.title ?? "Persönlicher Kalender",
-                title: title,
-                notes: action.eventNotes,
-                location: action.eventLocation,
-                startsAt: startsAt,
-                endsAt: endsAt
-            )))
-        }
-
-        let targetKind = action.eventTargetKind ?? .personal
-        guard targetKind != .personal else { return makePending(nil) }
-        guard let query = action.eventTargetQuery else {
-            return .clarification("Mit wem soll der Termin geteilt werden?")
-        }
-        let matches = store.resolveConversations(
-            matching: query,
-            isGroup: targetKind == .group,
-            currentSkipperID: currentSkipperID
-        )
-        return resolvedConversation(matches, query: query, transform: makePending)
-    }
-
-    private static func resolveCrew(
-        _ action: NautiAppAction,
-        store: CrewspaceStore,
-        currentSkipperID: String?,
-        activeGroupID: String
-    ) async -> NautiPreparedCommand {
-        guard let skipperID = action.skipperID else {
-            return .clarification("Welche Skipper-ID soll ich verwenden?")
-        }
-
-        let groups: [CrewspaceConversationDTO]
-        if let query = action.groupQuery {
-            groups = store.resolveConversations(matching: query, isGroup: true, currentSkipperID: currentSkipperID)
-        } else if let active = store.conversations.first(where: { $0.id == activeGroupID && $0.isGroup }) {
-            groups = [active]
-        } else {
-            return .clarification("Für welche Crewspace-Gruppe soll ich die Crew ändern?")
-        }
-
-        guard groups.count == 1, let group = groups.first else {
-            return conversationClarification(groups, query: action.groupQuery ?? "aktive Crew")
-        }
-
-        do {
-            let info = try await store.groupInfo(conversationID: group.id)
-            guard info.canManage else {
-                return .clarification("Du darfst die Crew dieser Gruppe nicht verwalten.")
-            }
-            let existing = info.members.first { $0.skipperID == skipperID }
-            if action.kind == .addCrewMember, existing != nil {
-                return .clarification("Diese Skipper-ID gehört bereits zur Crew von \(group.title).")
-            }
-            if action.kind == .removeCrewMember, existing == nil {
-                return .clarification("Diese Skipper-ID ist nicht Teil der Crew von \(group.title).")
-            }
-            let resolved = NautiResolvedCrewAction(
-                conversationID: group.id,
-                groupTitle: group.title,
-                skipperID: skipperID,
-                crewRole: action.crewRole
-            )
-            return .pending(action.kind == .addCrewMember ? .addCrewMember(resolved) : .removeCrewMember(resolved))
-        } catch {
-            return .clarification("Die Crewgruppe konnte nicht geprüft werden: \(error.localizedDescription)")
-        }
-    }
-
-    private static func resolvedConversation(
-        _ matches: [CrewspaceConversationDTO],
-        query: String,
-        transform: (CrewspaceConversationDTO) -> NautiPreparedCommand
-    ) -> NautiPreparedCommand {
-        guard matches.count == 1, let match = matches.first else {
-            return conversationClarification(matches, query: query)
-        }
-        return transform(match)
-    }
-
-    private static func conversationClarification(
-        _ matches: [CrewspaceConversationDTO],
-        query: String
-    ) -> NautiPreparedCommand {
-        if matches.isEmpty {
-            return .clarification("Ich finde keinen bekannten Chat oder keine Gruppe für „\(query)“. Öffne zuerst den Kontakt in Crewspace.")
-        }
-        let names = matches.prefix(4).map(\.title).joined(separator: ", ")
-        return .clarification("„\(query)“ ist mehrdeutig. Meinst du \(names)?")
     }
 }

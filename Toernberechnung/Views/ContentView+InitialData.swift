@@ -27,9 +27,7 @@ extension ContentView {
 
         guard crewMembers.count == 2 else { return }
         let legacyRows = crewMembers.filter { member in
-            member.skipperID.isEmpty
-                && member.conversationID.isEmpty
-                && member.isOnBoard
+            member.isOnBoard
                 && member.emergencyContact.isEmpty
                 && member.emergencyPhone.isEmpty
                 && member.notes.isEmpty

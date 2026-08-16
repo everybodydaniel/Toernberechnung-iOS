@@ -102,6 +102,7 @@ struct NautiPremiumChatOverlay: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NautiInlineChat")
     }
 
@@ -201,6 +202,7 @@ struct NautiPremiumChatOverlay: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NautiInlineHistory")
     }
 
@@ -660,6 +662,9 @@ private struct MessageInputView: View {
     private func send() {
         guard sendEnabled else { return }
         onSend()
+        // The window-wide tap-to-dismiss recogniser also fires for this button,
+        // so without re-focusing, sending would collapse the keyboard mid-chat.
+        inputFocused = true
     }
 
     private func joinedDraft(prefix: String, transcript: String) -> String {

@@ -12,7 +12,9 @@ enum DashboardDetent: CaseIterable {
         switch self {
         case .nautiOnly: return 58
         case .summary: return 440
-        case .full: return 540
+        // Tall enough for the voyage actions with the bottleneck list closed;
+        // opening the list adds its rows on top (see `mapDraggableBottomPanel`).
+        case .full: return 570
         }
     }
 
@@ -243,13 +245,14 @@ extension ContentView {
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .ignoresSafeArea()
                 .allowsHitTesting(false)
 
                 VStack(spacing: 0) {
                     mapRouteControls
                         .padding(.top, 148) // Increased from 88 to avoid overlapping with AppHeader
                         .padding(.horizontal, 16)
-                        .opacity(nautiDashboardMode.isExpanded ? 0 : (mapHeaderHidden ? 0.96 : 1))
+                        .opacity(nautiDashboardMode.isExpanded ? 0 : 1)
                         .allowsHitTesting(!nautiDashboardMode.isExpanded)
 
                     Spacer(minLength: 20)
@@ -268,7 +271,10 @@ extension ContentView {
                             ? 12
                             : (dashboardDetent == .nautiOnly ? 0 : 14)
                     )
-                    .padding(.bottom, dashboardDetent == .nautiOnly ? 104 : 86)
+                    // With the keyboard up the tab bar is hidden anyway, so the
+                    // 86/104pt reserved for it would only push the chat input
+                    // back behind the keyboard.
+                    .padding(.bottom, dashboardBottomInset)
             }
         }
     }
@@ -280,7 +286,20 @@ extension ContentView {
             mapPlanningSummaryPill
         }
         .buttonStyle(.plain)
+        // Glass outside the button, `.contentShape` inside the label — with
+        // the interactive glass inside, only the leading icon (which carries
+        // its own glass circle) was hit-testable.
+        .appDarkFloatingOverlay(cornerRadius: 22)
         .accessibilityLabel("Törnplanung bearbeiten")
+        .accessibilityIdentifier("MapPlanningPill")
+    }
+
+    /// Space reserved under the map dashboard. Normally that is the floating
+    /// tab bar; while the keyboard is open the tab bar is gone and the panel
+    /// should sit right on top of the keyboard instead.
+    var dashboardBottomInset: CGFloat {
+        if keyboardVisible, nautiDashboardMode.isExpanded { return 8 }
+        return dashboardDetent == .nautiOnly ? 104 : 86
     }
 
     /// One graphite Glass surface with three inline modes: route dashboard,
@@ -291,7 +310,10 @@ extension ContentView {
             DashboardDetent.nautiOnly.height
         )
         let panelHeight = nautiDashboardMode.isExpanded
-            ? NautiDashboardGeometry.panelHeight(availableHeight: availableHeight)
+            ? NautiDashboardGeometry.panelHeight(
+                availableHeight: availableHeight,
+                bottomInset: dashboardBottomInset
+            )
             : dashboardHeight
 
         return Group {
@@ -309,6 +331,7 @@ extension ContentView {
                         Task { await aiAccess.refresh() }
                     }
                 )
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("NautiInlinePanel")
             } else {
                 mapDashboardContent
@@ -422,6 +445,7 @@ extension ContentView {
                     dashboardDetent == .nautiOnly ? Color.clear : Color.white.opacity(0.06),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Nauti Chat öffnen")
@@ -505,7 +529,7 @@ extension ContentView {
                     .font(.system(size: 21, weight: .bold))
                     .foregroundStyle(accent)
                     .frame(width: 32, height: 32)
-                    .background(mapGlassInsetFill, in: Circle())
+                    .appGlassIconBackground()
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -544,7 +568,7 @@ extension ContentView {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color.appPrimary)
                 .frame(width: 30, height: 30)
-                .background(mapGlassInsetFill, in: Circle())
+                .appGlassIconBackground()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sicheres Abfahrtsfenster")
@@ -574,7 +598,7 @@ extension ContentView {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.appPrimary)
                     .frame(width: 34, height: 34)
-                    .background(mapGlassInsetFill, in: Circle())
+                    .appGlassIconBackground()
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Passagefenster aktualisieren")
@@ -589,7 +613,7 @@ extension ContentView {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Color.appPrimary)
                 .frame(width: 25, height: 25)
-                .background(mapGlassInsetFill, in: Circle())
+                .appGlassIconBackground()
             Text(title.uppercased())
                 .font(.system(size: 8, weight: .heavy))
                 .foregroundStyle(mapGlassSecondary)
@@ -652,7 +676,7 @@ extension ContentView {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color.appPrimary)
                 .frame(width: 36, height: 36)
-                .background(mapGlassInsetFill, in: Circle())
+                .appGlassIconBackground()
 
             VStack(alignment: .leading, spacing: 5) {
                 if viewModel.hasCompleteRouteInput {
@@ -692,7 +716,7 @@ extension ContentView {
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .appDarkFloatingOverlay(cornerRadius: 22)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var routeControlPanel: some View {
@@ -712,7 +736,7 @@ extension ContentView {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Color(hex: 0x3C82FF))
                         .frame(width: 44, height: 44)
-                        .background(Color(hex: 0x3C82FF).opacity(0.12), in: Circle())
+                        .appGlassIconBackground()
                 }
 
                 VStack(spacing: 12) {
@@ -734,6 +758,7 @@ extension ContentView {
                     planningPassageWindowCard
                 }
                 .padding(16)
+                .padding(.bottom, 28)
             }
             .appSheetBackground {
                 Color.appBackground.ignoresSafeArea()
@@ -1078,22 +1103,32 @@ extension ContentView {
         }
     }
 
+    // The compact date picker plus the label is wider than a 402pt phone can
+    // fit, which used to wrap "Abfahrt" onto a second line. `fixedSize` keeps
+    // the label on one line and the tighter metrics buy back the space it
+    // needs.
     private var routeDatePicker: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 14, weight: .heavy))
                 .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
+                .frame(width: 34, height: 34)
                 .background(Color(hex: 0x14B8A6), in: Circle())
 
-            DatePicker("Abfahrt", selection: $viewModel.departure, displayedComponents: [.date, .hourAndMinute])
-                .datePickerStyle(.compact)
-                .environment(\.locale, AppDateFormatters.germanLocale)
-                .environment(\.timeZone, AppDateFormatters.berlinTimeZone)
-                .font(.system(size: 15, weight: .semibold))
+            Text("Abfahrt")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.primary)
+                .lineLimit(1)
+                .fixedSize()
+
+            Spacer(minLength: 6)
+
+            CustomCompactDatePicker(selection: $viewModel.departure, backgroundColor: .clear)
+                .fixedSize()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.leading, 8)
+        .padding(.trailing, 10)
+        .padding(.vertical, 8)
         .background(Color.fieldBackground, in: Capsule(style: .continuous))
     }
 
@@ -1340,7 +1375,10 @@ extension ContentView {
     private func revealRouteDashboard() {
         routeDashboardRevealPending = false
         withAnimation(reduceMotion ? .easeOut(duration: 0.20) : .spring(response: 0.50, dampingFraction: 0.82)) {
-            dashboardDetent = .summary
+            // `.full` rather than `.summary`: the voyage actions ("Speichern",
+            // "Fahrt starten") live in the bottom section, and having to drag
+            // the sheet up once more to reach them was a needless step.
+            dashboardDetent = .full
             dashboardDragOffset = 0
         }
     }

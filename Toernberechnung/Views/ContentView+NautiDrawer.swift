@@ -9,8 +9,16 @@ enum NautiDashboardMode: Equatable {
 }
 
 enum NautiDashboardGeometry {
-    static func panelHeight(availableHeight: CGFloat) -> CGFloat {
-        min(max(availableHeight * 0.56, 380), 520)
+    /// The panel is hard-clipped, so it must never be taller than what is
+    /// actually left above `bottomInset` — otherwise the chat input at its
+    /// bottom edge gets cut off once the keyboard shrinks the container.
+    static func panelHeight(availableHeight: CGFloat, bottomInset: CGFloat = 0) -> CGFloat {
+        let ideal = min(max(availableHeight * 0.56, 380), 520)
+        // `headerClearance` keeps the AppHeader visible above the panel; without
+        // it the 380pt floor can exceed what is left once the keyboard shrinks
+        // the container on smaller devices.
+        let headerClearance: CGFloat = 76
+        return max(min(ideal, availableHeight - bottomInset - headerClearance), 220)
     }
 
     static func animation(reduceMotion: Bool) -> Animation {

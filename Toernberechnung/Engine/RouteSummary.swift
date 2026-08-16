@@ -20,7 +20,12 @@ import Foundation
 struct RouteSummary: Equatable {
 
     struct Leg: Equatable, Identifiable {
-        let id = UUID()
+        /// Derived from the endpoint waypoints, not freshly generated, so a
+        /// recalculation keeps SwiftUI's per-leg state (e.g. an expanded
+        /// calculation table) instead of resetting it.
+        var id: String { "\(fromWaypointID.uuidString)-\(toWaypointID.uuidString)" }
+        let fromWaypointID: UUID
+        let toWaypointID: UUID
         let fromName: String
         let toName: String
         let departureTime: Date
@@ -112,6 +117,8 @@ struct RouteSummary: Equatable {
             }
 
             legs.append(Leg(
+                fromWaypointID: fromWP.waypoint.id,
+                toWaypointID: toWP.waypoint.id,
                 fromName: fromWP.waypoint.name,
                 toName: toWP.waypoint.name,
                 departureTime: fromWP.arrivalTime,

@@ -111,8 +111,11 @@ struct FullScreenNavigationView: View {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.primary)
-                    .appCircularGlass(diameter: 40)
+                    .frame(width: 40, height: 40)
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
+            .appCircularGlass(diameter: 40)
             .accessibilityLabel("Vollbild minimieren")
 
             VStack(alignment: .leading, spacing: 1) {

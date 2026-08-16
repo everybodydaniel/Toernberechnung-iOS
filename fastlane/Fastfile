@@ -7,7 +7,11 @@
 #                bundle exec fastlane coverage
 #                bundle exec fastlane ui_tests
 #                bundle exec fastlane ci
+#                bundle exec fastlane --env testflight ios beta changelog:"Was getestet werden soll"
+#                bundle exec fastlane --env testflight ios public_beta changelog:"Was getestet werden soll"
 # ──────────────────────────────────────────────
+
+require "shellwords"
 
 default_platform(:ios)
 
@@ -15,10 +19,16 @@ XCODE_PROJECT = "Toernberechnung.xcodeproj"
 XCODE_SCHEME  = "Toernberechnung"
 UI_SCHEME     = "ToernberechnungUITests"
 DERIVED_DATA  = "build/DerivedData"
+APP_IDENTIFIER = "com.toernberechnung.ios"
+DEVELOPMENT_TEAM_ID = "L9T7RPMW5H"
+ASC_KEY_ID = "7T4P2X6UQ2"
+APP_STORE_PROFILE_NAME = "TideNode App Store"
+PUBLIC_BETA_GROUP_NAME = "Öffentliche Beta"
 
 # Dynamisch das erste verfügbare iPhone-Modell ermitteln
-available_simulators = `xcrun simctl list devices available`.scan(/iPhone [0-9a-zA-Z ]+/)
+available_simulators = `xcrun simctl list devices available`.scan(/iPhone [0-9a-zA-Z ]+/).map(&:strip)
 SIM_DEVICE = available_simulators.first || "iPhone 16"
+SIM_DESTINATION = "platform=iOS Simulator,name=#{SIM_DEVICE},OS=latest"
 
 platform :ios do
 
@@ -40,7 +50,8 @@ platform :ios do
     scan(
       project: XCODE_PROJECT,
       scheme: XCODE_SCHEME,
-      devices: [SIM_DEVICE],
+      destination: SIM_DESTINATION,
+      skip_detect_devices: true,
       clean: true,
       code_coverage: true,
       output_types: "junit,html",
@@ -92,7 +103,8 @@ platform :ios do
     scan(
       project: XCODE_PROJECT,
       scheme:  UI_SCHEME,
-      devices: [SIM_DEVICE],
+      destination: SIM_DESTINATION,
+      skip_detect_devices: true,
       clean: false,
       output_types: "junit,html",
       output_directory: "fastlane/ui_test_output",
@@ -112,5 +124,113 @@ platform :ios do
     coverage
   end
 
-end
+  # ── Lane: Interne TestFlight-Beta ───────────
+  desc "Baut und veröffentlicht eine interne TestFlight-Beta"
+  lane :beta do |options|
+    distribute_externally = options[:external] == true || options[:external].to_s == "true"
+    issuer_id = ENV["ASC_ISSUER_ID"].to_s.strip
+    key_path_value = ENV["ASC_KEY_FILEPATH"].to_s.strip
 
+    UI.user_error!("ASC_ISSUER_ID fehlt.") if issuer_id.empty?
+    UI.user_error!("ASC_KEY_FILEPATH fehlt.") if key_path_value.empty?
+
+    key_path = File.expand_path(key_path_value)
+    UI.user_error!("API-Schlüssel nicht gefunden: #{key_path}") unless File.file?(key_path)
+
+    api_key = app_store_connect_api_key(
+      key_id: ASC_KEY_ID,
+      issuer_id: issuer_id,
+      key_filepath: key_path,
+      duration: 1200,
+      in_house: false
+    )
+
+    if distribute_externally
+      app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+      public_beta_group = app&.get_beta_groups&.find do |group|
+        group.name == PUBLIC_BETA_GROUP_NAME && !group.is_internal_group
+      end
+
+      UI.user_error!("Externe TestFlight-Gruppe '#{PUBLIC_BETA_GROUP_NAME}' fehlt.") unless public_beta_group
+      UI.user_error!("Public Link für '#{PUBLIC_BETA_GROUP_NAME}' ist nicht aktiv.") unless public_beta_group.public_link_enabled
+    end
+
+    xcode_authentication = [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath #{Shellwords.escape(key_path)}",
+      "-authenticationKeyID #{Shellwords.escape(ASC_KEY_ID)}",
+      "-authenticationKeyIssuerID #{Shellwords.escape(issuer_id)}"
+    ].join(" ")
+
+    version = get_version_number(
+      xcodeproj: XCODE_PROJECT,
+      target: XCODE_SCHEME,
+      configuration: "Release"
+    )
+
+    next_build = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      version: version,
+      initial_build_number: 0
+    ) + 1
+
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      team_id: DEVELOPMENT_TEAM_ID,
+      provisioning_name: APP_STORE_PROFILE_NAME,
+      ignore_profiles_with_different_name: true,
+      output_path: "build/signing",
+      filename: "TideNode_AppStore.mobileprovision",
+      force: false
+    )
+
+    UI.message("Erzeuge TideNode #{version} (#{next_build}) für TestFlight.")
+
+    build_app(
+      project: XCODE_PROJECT,
+      scheme: XCODE_SCHEME,
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      output_directory: "build/TestFlight",
+      output_name: "TideNode-#{version}-#{next_build}.ipa",
+      include_symbols: true,
+      skip_profile_detection: true,
+      xcargs: "#{xcode_authentication} CURRENT_PROJECT_VERSION=#{next_build}",
+      export_options: {
+        signingStyle: "manual",
+        signingCertificate: "Apple Distribution",
+        provisioningProfiles: {
+          APP_IDENTIFIER => APP_STORE_PROFILE_NAME
+        },
+        teamID: DEVELOPMENT_TEAM_ID,
+        manageAppVersionAndBuildNumber: false
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      changelog: options[:changelog] || (distribute_externally ? "Öffentliche TideNode-Beta" : "Interne TideNode-Beta"),
+      distribute_external: distribute_externally,
+      groups: distribute_externally ? [PUBLIC_BETA_GROUP_NAME] : nil,
+      submit_beta_review: distribute_externally,
+      notify_external_testers: distribute_externally,
+      skip_waiting_for_build_processing: false
+    )
+
+    UI.success("TideNode #{version} (#{next_build}) wurde zu TestFlight hochgeladen.")
+  end
+
+  # ── Lane: Öffentliche TestFlight-Beta ───────
+  desc "Baut und veröffentlicht eine externe TestFlight-Beta über den Public Link"
+  lane :public_beta do |options|
+    beta(
+      external: true,
+      changelog: options[:changelog] || "Öffentliche TideNode-Beta"
+    )
+  end
+
+end

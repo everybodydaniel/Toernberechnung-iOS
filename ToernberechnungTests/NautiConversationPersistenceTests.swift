@@ -202,9 +202,32 @@ final class NautiConversationPersistenceTests: XCTestCase {
             380,
             accuracy: 0.001
         )
+        // Previously this returned the full 380pt floor, leaving only 10pt of
+        // the container — enough to push the chat header up behind the
+        // AppHeader. The panel is hard-clipped, so it now reserves 76pt of
+        // header clearance instead.
         XCTAssertEqual(
             NautiDashboardGeometry.panelHeight(availableHeight: 390),
-            380,
+            314,
+            accuracy: 0.001
+        )
+    }
+
+    /// With the keyboard up, `availableHeight` shrinks and the panel must stay
+    /// inside it so the chat input is never clipped away.
+    func testInlineDashboardHeightLeavesRoomForKeyboardAndHeader() {
+        // iPhone 17 (874pt) minus a ~336pt German keyboard, 8pt bottom inset.
+        let withKeyboard = NautiDashboardGeometry.panelHeight(
+            availableHeight: 538,
+            bottomInset: 8
+        )
+        XCTAssertLessThanOrEqual(withKeyboard, 538 - 8 - 76)
+        XCTAssertGreaterThanOrEqual(withKeyboard, 220)
+
+        // The floor still wins over an absurdly small container.
+        XCTAssertEqual(
+            NautiDashboardGeometry.panelHeight(availableHeight: 200, bottomInset: 8),
+            220,
             accuracy: 0.001
         )
     }
@@ -260,161 +283,7 @@ private struct ConversationTestInferenceClient: LocalAIInferenceClient {
     func releaseResources() async { }
 }
 
-final class BoatProfileStoreTests: XCTestCase {
-    @MainActor
-    func testBoatTypeCatalogNormalizesKnownAndCustomValues() {
-        XCTAssertEqual(BoatTypeCatalog.normalized(" motoryacht "), "Motoryacht")
-        XCTAssertEqual(BoatTypeCatalog.normalized(""), BoatTypeCatalog.defaultType)
-        XCTAssertEqual(BoatTypeCatalog.normalized("Traditionssegler"), "Traditionssegler")
-        XCTAssertTrue(
-            BoatTypeCatalog.selectableTypes(including: "Traditionssegler")
-                .contains("Traditionssegler")
-        )
-    }
-
-    @MainActor
-    func testBoatSelectionPersistsDeviceWideWithoutAnAccount() {
-        let defaults = makeDefaults()
-        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
-
-        let store = BoatProfileStore(defaults: defaults)
-        store.selectBoatType("Katamaran")
-        let reopenedStore = BoatProfileStore(defaults: defaults)
-
-        XCTAssertEqual(reopenedStore.boatType, "Katamaran")
-        XCTAssertEqual(reopenedStore.syncState, .localOnly)
-    }
-
-    @MainActor
-    func testAccountActivationImmediatelySynchronizesCurrentBoat() async {
-        let defaults = makeDefaults()
-        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
-        defaults.set("Jolle", forKey: "boatType")
-        let store = BoatProfileStore(defaults: defaults)
-        var synchronizedValue: (String, String)?
-
-        store.activateAccount(skipperID: "skipper-a") { skipperID, boatType in
-            synchronizedValue = (skipperID, boatType)
-        }
-        await waitForSync(store)
-
-        XCTAssertEqual(synchronizedValue?.0, "skipper-a")
-        XCTAssertEqual(synchronizedValue?.1, "Jolle")
-        XCTAssertEqual(store.syncState, .synced)
-    }
-
-    @MainActor
-    func testFailedSyncCanBeRetriedAndAccountSwitchIgnoresOldCompletion() async {
-        let defaults = makeDefaults()
-        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
-        let store = BoatProfileStore(defaults: defaults)
-        var shouldFail = true
-
-        store.activateAccount(skipperID: "skipper-a") { _, _ in
-            if shouldFail {
-                throw BoatProfileTestError.offline
-            }
-        }
-        await waitForSync(store)
-        guard case .failed = store.syncState else {
-            return XCTFail("Ein Offline-Fehler muss als ausstehende Synchronisierung sichtbar bleiben.")
-        }
-
-        shouldFail = false
-        store.retrySync()
-        await waitForSync(store)
-        XCTAssertEqual(store.syncState, .synced)
-
-        store.activateAccount(skipperID: "skipper-old") { _, _ in
-            try await Task.sleep(for: .seconds(2))
-        }
-        store.activateAccount(skipperID: "skipper-new") { skipperID, _ in
-            XCTAssertEqual(skipperID, "skipper-new")
-        }
-        await waitForSync(store)
-
-        XCTAssertEqual(store.activeSkipperID, "skipper-new")
-        XCTAssertEqual(store.syncState, .synced)
-    }
-
-    @MainActor
-    private func waitForSync(_ store: BoatProfileStore) async {
-        for _ in 0..<100 where store.syncState == .syncing {
-            await Task.yield()
-        }
-    }
-
-    private var defaultsSuiteName: String {
-        "BoatProfileStoreTests"
-    }
-
-    private func makeDefaults() -> UserDefaults {
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        return defaults
-    }
-}
-
-private enum BoatProfileTestError: LocalizedError {
-    case offline
-
-    var errorDescription: String? { "Offline" }
-}
-
-final class CrewspaceProfileIsolationTests: XCTestCase {
-    @MainActor
-    func testAccountSwitchSelectsOnlyTheActiveProfilesAvatar() {
-        let previous = SkipperProfile(
-            id: "skipper-old",
-            name: "Alt",
-            boatType: "Jolle",
-            profileImageURL: "https://example.com/old.jpg"
-        )
-        let active = SkipperProfile(
-            id: "skipper-new",
-            name: "Neu",
-            boatType: "Katamaran",
-            profileImageURL: "https://example.com/new.jpg"
-        )
-
-        XCTAssertIdentical(
-            CrewspaceAccountProfileResolver.profile(
-                in: [previous, active],
-                skipperID: "skipper-new"
-            ),
-            active
-        )
-        XCTAssertNil(
-            CrewspaceAccountProfileResolver.profile(
-                in: [previous],
-                skipperID: "skipper-new"
-            )
-        )
-    }
-
-    func testProfileEditorNeverUsesAnotherAccountsNameOrImageAsFallback() {
-        let fallback = SkipperProfileEditorFallback.resolve(
-            profileID: "skipper-old",
-            profileName: "Alter Name",
-            profileImageURL: "https://example.com/old.jpg",
-            authenticatedSkipperID: "skipper-new",
-            authenticatedDisplayName: "Neuer Name"
-        )
-
-        XCTAssertEqual(fallback.name, "Neuer Name")
-        XCTAssertEqual(fallback.profileImageURL, "")
-
-        let matchingProfile = SkipperProfileEditorFallback.resolve(
-            profileID: "skipper-new",
-            profileName: "Server Name",
-            profileImageURL: "https://example.com/new.jpg",
-            authenticatedSkipperID: "skipper-new",
-            authenticatedDisplayName: "Firebase Name"
-        )
-        XCTAssertEqual(matchingProfile.name, "Server Name")
-        XCTAssertEqual(matchingProfile.profileImageURL, "https://example.com/new.jpg")
-    }
-
+final class SkipperAvatarViewTests: XCTestCase {
     @MainActor
     func testAvatarUsesInitialsForMissingMalformedAndFailedImages() {
         XCTAssertNotNil(
@@ -430,236 +299,4 @@ final class CrewspaceProfileIsolationTests: XCTestCase {
             )
         )
     }
-}
-
-final class SocialFeedBoatTypeRequestTests: XCTestCase {
-    func testBoatTypePatchSendsOnlyNormalizedBoatTypeWithAuthentication() async throws {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [SocialFeedRequestURLProtocol.self]
-        let session = URLSession(configuration: configuration)
-        let recorder = LockedURLRequestRecorder()
-        let responseData = Data(
-            #"""
-            {
-              "id": "skipper-current",
-              "name": "Skipper",
-              "boat_type": "Jolle",
-              "profile_image_url": null,
-              "home_harbour": null,
-              "bio": null,
-              "post_ids": [],
-              "follower_count": 0,
-              "following_count": 0,
-              "is_followed_by_current_skipper": false
-            }
-            """#.utf8
-        )
-        SocialFeedRequestURLProtocol.handler = { request in
-            recorder.record(request)
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 200,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                responseData
-            )
-        }
-        defer {
-            session.invalidateAndCancel()
-            SocialFeedRequestURLProtocol.handler = nil
-        }
-
-        let api = SocialFeedAPI(
-            baseURL: URL(string: "https://example.com")!,
-            session: session,
-            authTokenProvider: { "firebase-token" },
-            skipperIDProvider: { "skipper-current" }
-        )
-
-        let response = try await api.updateBoatType(
-            skipperID: "skipper-current",
-            boatType: " jolle "
-        )
-        let request = try XCTUnwrap(recorder.request)
-        let body = try XCTUnwrap(request.httpBody)
-        let object = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: body) as? [String: Any]
-        )
-
-        XCTAssertEqual(response.boatType, "Jolle")
-        XCTAssertEqual(request.httpMethod, "PATCH")
-        XCTAssertEqual(request.url?.path, "/profiles/skipper-current/boat-type")
-        XCTAssertEqual(
-            request.value(forHTTPHeaderField: "Authorization"),
-            "Bearer firebase-token"
-        )
-        XCTAssertEqual(Set(object.keys), Set(["boat_type"]))
-        XCTAssertEqual(object["boat_type"] as? String, "Jolle")
-    }
-
-    func testBoatTypeFallsBackToProfilePutWhenPatchIsNotDeployed() async throws {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [SocialFeedRequestURLProtocol.self]
-        let session = URLSession(configuration: configuration)
-        let recorder = LockedURLRequestRecorder()
-        let existingProfile = Data(
-            #"""
-            {
-              "id": "skipper-current",
-              "name": "Daniel",
-              "boat_type": "Segelyacht",
-              "profile_image_url": "https://example.com/avatar.jpg",
-              "home_harbour": "Emden",
-              "bio": "Unterwegs im Wattenmeer",
-              "post_ids": [],
-              "follower_count": 0,
-              "following_count": 0,
-              "is_followed_by_current_skipper": false
-            }
-            """#.utf8
-        )
-        let updatedProfile = Data(
-            String(data: existingProfile, encoding: .utf8)!
-                .replacingOccurrences(of: "Segelyacht", with: "Katamaran")
-                .utf8
-        )
-        SocialFeedRequestURLProtocol.handler = { request in
-            recorder.record(request)
-            let statusCode: Int
-            let responseData: Data
-            switch (request.httpMethod, request.url?.path) {
-            case ("PATCH", "/profiles/skipper-current/boat-type"):
-                statusCode = 405
-                responseData = Data()
-            case ("GET", "/profiles/skipper-current"):
-                statusCode = 200
-                responseData = existingProfile
-            case ("PUT", "/profiles/skipper-current"):
-                statusCode = 200
-                responseData = updatedProfile
-            default:
-                statusCode = 404
-                responseData = Data()
-            }
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: statusCode,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                responseData
-            )
-        }
-        defer {
-            session.invalidateAndCancel()
-            SocialFeedRequestURLProtocol.handler = nil
-        }
-
-        let api = SocialFeedAPI(
-            baseURL: URL(string: "https://example.com")!,
-            session: session,
-            authTokenProvider: { "firebase-token" },
-            skipperIDProvider: { "skipper-current" }
-        )
-
-        let response = try await api.updateBoatType(
-            skipperID: "skipper-current",
-            boatType: "Katamaran"
-        )
-        let requests = recorder.requests
-        XCTAssertEqual(requests.map(\.httpMethod), ["PATCH", "GET", "PUT"])
-        XCTAssertEqual(
-            requests.map { $0.url?.path },
-            [
-                "/profiles/skipper-current/boat-type",
-                "/profiles/skipper-current",
-                "/profiles/skipper-current"
-            ]
-        )
-        let putBody = try XCTUnwrap(requests.last?.httpBody)
-        let object = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: putBody) as? [String: Any]
-        )
-        XCTAssertEqual(response.boatType, "Katamaran")
-        XCTAssertEqual(object["name"] as? String, "Daniel")
-        XCTAssertEqual(object["boat_type"] as? String, "Katamaran")
-        XCTAssertEqual(object["home_harbour"] as? String, "Emden")
-        XCTAssertEqual(object["bio"] as? String, "Unterwegs im Wattenmeer")
-        XCTAssertEqual(
-            object["profile_image_url"] as? String,
-            "https://example.com/avatar.jpg"
-        )
-    }
-}
-
-private final class LockedURLRequestRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storedRequests: [URLRequest] = []
-
-    var request: URLRequest? {
-        lock.lock()
-        defer { lock.unlock() }
-        return storedRequests.last
-    }
-
-    var requests: [URLRequest] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storedRequests
-    }
-
-    func record(_ request: URLRequest) {
-        var recordedRequest = request
-        if recordedRequest.httpBody == nil, let stream = request.httpBodyStream {
-            stream.open()
-            defer { stream.close() }
-            var body = Data()
-            var buffer = [UInt8](repeating: 0, count: 1_024)
-            while stream.hasBytesAvailable {
-                let count = stream.read(&buffer, maxLength: buffer.count)
-                guard count > 0 else { break }
-                body.append(contentsOf: buffer.prefix(count))
-            }
-            recordedRequest.httpBody = body
-        }
-        lock.lock()
-        storedRequests.append(recordedRequest)
-        lock.unlock()
-    }
-}
-
-private final class SocialFeedRequestURLProtocol: URLProtocol, @unchecked Sendable {
-    typealias Handler = @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
-
-    nonisolated(unsafe) static var handler: Handler?
-
-    override class func canInit(with request: URLRequest) -> Bool { true }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        guard let handler = Self.handler else {
-            client?.urlProtocol(
-                self,
-                didFailWithError: URLError(.resourceUnavailable)
-            )
-            return
-        }
-
-        do {
-            let (response, data) = try handler(request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
-    }
-
-    override func stopLoading() { }
 }

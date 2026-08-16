@@ -45,6 +45,35 @@ protocol TideDataProvider {
         at highWaterTime: Date,
         confirmedComparisonStationID: String?
     ) async -> WaterLevelCorrectionResolution
+
+    /// Time-dependent correction over `span`, so a waypoint reached hours away
+    /// from high water is not charged the peak surge.
+    ///
+    /// `anchorHighWaterTime` selects the gauge's HW cycle (and its uncertainty
+    /// band); the caller samples the result at the actual arrival time.
+    func waterLevelCorrectionSeries(
+        for stationID: String,
+        covering span: ClosedRange<Date>,
+        anchorHighWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionSeries
+}
+
+extension TideDataProvider {
+    /// Providers without a forecast curve keep the previous behaviour: one
+    /// scalar sampled at the high-water peak, applied flat.
+    func waterLevelCorrectionSeries(
+        for stationID: String,
+        covering span: ClosedRange<Date>,
+        anchorHighWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionSeries {
+        .constant(await waterLevelCorrection(
+            for: stationID,
+            at: anchorHighWaterTime,
+            confirmedComparisonStationID: confirmedComparisonStationID
+        ))
+    }
 }
 
 // MARK: - BSH Tide Data Provider
@@ -94,6 +123,20 @@ final class BSHTideDataProvider: TideDataProvider {
             comparisonStationID: confirmedComparisonStationID
         )
     }
+
+    func waterLevelCorrectionSeries(
+        for stationID: String,
+        covering span: ClosedRange<Date>,
+        anchorHighWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionSeries {
+        await BSHWaterLevelForecastService.shared.correctionSeries(
+            for: stationID,
+            covering: span,
+            anchorHighWaterTime: anchorHighWaterTime,
+            comparisonStationID: confirmedComparisonStationID
+        )
+    }
 }
 
 // MARK: - Mock Tide Data Provider
@@ -108,10 +151,31 @@ final class MockTideDataProvider: TideDataProvider {
     var meanHighWaters: [String: Double] = [:]
     var referencesByStation: [String: TideStationReference] = [:]
     var correctionsByStation: [String: WaterLevelCorrectionResolution] = [:]
+    /// Optional time-dependent corrections. When a station is absent here, the
+    /// protocol's default kicks in and the scalar from `correctionsByStation`
+    /// is used — so tests written before the curve existed keep working.
+    var correctionSeriesByStation: [String: WaterLevelCorrectionSeries] = [:]
     /// If true, throws an error on fetch to simulate network failure.
     var shouldThrow: Bool = false
+    /// Counts `highWaters(for:around:)` calls so tests can prove the passage
+    /// window search resolves tide data once per waypoint instead of once per
+    /// candidate departure time.
+    ///
+    /// Lock-protected: `PassageWindowSolver` resolves its waypoints
+    /// concurrently, so an unsynchronised dictionary would race.
+    var highWatersCallCount: [String: Int] {
+        callCountLock.lock()
+        defer { callCountLock.unlock() }
+        return storedHighWatersCallCount
+    }
+
+    private let callCountLock = NSLock()
+    private var storedHighWatersCallCount: [String: Int] = [:]
 
     func highWaters(for stationID: String, around date: Date) async throws -> [TideEvent] {
+        callCountLock.lock()
+        storedHighWatersCallCount[stationID, default: 0] += 1
+        callCountLock.unlock()
         if shouldThrow {
             throw BSHTideError.badResponse
         }
@@ -142,5 +206,19 @@ final class MockTideDataProvider: TideDataProvider {
             stationID: stationID,
             detail: "Mock enthält keine Wasserstandskorrektur."
         )
+    }
+
+    func waterLevelCorrectionSeries(
+        for stationID: String,
+        covering span: ClosedRange<Date>,
+        anchorHighWaterTime: Date,
+        confirmedComparisonStationID: String?
+    ) async -> WaterLevelCorrectionSeries {
+        if let series = correctionSeriesByStation[stationID] { return series }
+        return .constant(await waterLevelCorrection(
+            for: stationID,
+            at: anchorHighWaterTime,
+            confirmedComparisonStationID: confirmedComparisonStationID
+        ))
     }
 }

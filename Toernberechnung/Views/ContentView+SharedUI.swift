@@ -119,6 +119,62 @@ struct ActivityShareItem: Identifiable {
     let url: URL
 }
 
+struct SkipperAvatarView: View {
+    let urlString: String?
+    let name: String
+    let diameter: CGFloat
+
+    var body: some View {
+        ZStack {
+            if let url = Self.remoteURL(from: urlString) {
+                AsyncImage(url: url) { phase in
+                    if !Self.usesInitials(for: phase), let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        initials
+                    }
+                }
+            } else {
+                initials
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.white.opacity(0.65), lineWidth: 1))
+    }
+
+    static func remoteURL(from urlString: String?) -> URL? {
+        guard let rawValue = urlString?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawValue.isEmpty,
+              let url = URL(string: rawValue),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              url.host != nil else { return nil }
+        return url
+    }
+
+    static func usesInitials(for phase: AsyncImagePhase) -> Bool {
+        if case .success = phase {
+            return false
+        }
+        return true
+    }
+
+    private var initials: some View {
+        Text(String(name.prefix(1)).uppercased())
+            .font(.system(size: diameter * 0.42, weight: .heavy))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                LinearGradient(
+                    colors: [Color(hex: 0x0077B6), Color.appPrimary],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+    }
+}
+
 enum AppHeaderBrandStyle {
     case white
     case primary
@@ -134,18 +190,8 @@ enum AppHeaderBrandStyle {
 // The header floats over the current content without painting a separate
 // surface, so the map remains continuous behind the TideNode wordmark.
 struct AppHeader: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(MaritimeNoticeCenter.self) private var maritimeNoticeCenter
-
     let brandStyle: AppHeaderBrandStyle
-    let unreadNoticeCount: Int
-    let noticePulseTrigger: Int
-    let noticesAction: (MaritimeNoticeSummary?) -> Void
-    let refreshAction: () -> Void
     let settingsAction: () -> Void
-
-    @State private var noticePulse = false
-    @State private var noticePreviewShown = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -162,94 +208,31 @@ struct AppHeader: View {
                     .minimumScaleFactor(0.72)
             }
             Spacer()
-            headerActions
+            settingsButton
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 8)
         .background(Color.clear)
-        .onChange(of: noticePulseTrigger) { _, _ in
-            guard unreadNoticeCount > 0, !reduceMotion else { return }
-            noticePulse = true
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(620))
-                noticePulse = false
-            }
-        }
     }
 
-    @ViewBuilder
-    private var headerActions: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
-                headerActionButtons
-            }
-        } else {
-            headerActionButtons
+    // The glass surface sits OUTSIDE the button and `.contentShape` is the
+    // last modifier inside the label. With the glass inside the label its
+    // interactive effect swallowed the tap wherever a scroll view or the
+    // MapLibre chart sat underneath the header — which was every tab except
+    // Crewspace, the only one that pads its content below the header.
+    private var settingsButton: some View {
+        Button(action: settingsAction) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(headerIconColor)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
-    }
-
-    private var headerActionButtons: some View {
-        HStack(spacing: 10) {
-            Button {
-                noticePreviewShown.toggle()
-            } label: {
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(headerIconColor)
-                    .appDarkCircularLiquidGlass(diameter: 44)
-                    .overlay(alignment: .topTrailing) {
-                        if unreadNoticeCount > 0 {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 9, height: 9)
-                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                                .scaleEffect(noticePulse ? 1.32 : 1)
-                                .shadow(color: .red.opacity(noticePulse ? 0.60 : 0.22), radius: noticePulse ? 6 : 2)
-                                .animation(.spring(response: 0.30, dampingFraction: 0.68), value: noticePulse)
-                                .offset(x: 1, y: -1)
-                                .zIndex(1)
-                                .accessibilityHidden(true)
-                        }
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Nachrichten für Seefahrer")
-            .accessibilityValue(unreadNoticeCount == 0 ? "Keine ungelesenen Meldungen" : "\(unreadNoticeCount) ungelesen")
-            .popover(
-                isPresented: $noticePreviewShown,
-                attachmentAnchor: .rect(.bounds),
-                arrowEdge: .top
-            ) {
-                MaritimeNoticeQuickLook(
-                    onOpenNotice: { notice in
-                        dismissNoticePreview(andOpen: notice)
-                    },
-                    onShowAll: {
-                        dismissNoticePreview(andOpen: nil)
-                    }
-                )
-                .environment(maritimeNoticeCenter)
-                .presentationCompactAdaptation(.popover)
-                .presentationBackground(.clear)
-            }
-
-            Button(action: refreshAction) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(headerIconColor)
-                    .appDarkCircularLiquidGlass(diameter: 44)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: settingsAction) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(headerIconColor)
-                    .appDarkCircularLiquidGlass(diameter: 44)
-            }
-            .buttonStyle(.plain)
-        }
+        .buttonStyle(.plain)
+        .appDarkCircularLiquidGlass(diameter: 44)
+        .accessibilityLabel("Einstellungen")
+        .accessibilityIdentifier("AppHeaderSettingsButton")
     }
 
     private var headerIconColor: Color {
@@ -257,103 +240,6 @@ struct AppHeader: View {
             return .appPrimary
         }
         return .white
-    }
-
-    private func dismissNoticePreview(andOpen notice: MaritimeNoticeSummary?) {
-        noticePreviewShown = false
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            noticesAction(notice)
-        }
-    }
-}
-
-struct CircleButton: View {
-    let systemName: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.primary.opacity(0.85))
-                .appCircularGlass(diameter: 44)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct BoatTypePicker: View {
-    @Environment(BoatProfileStore.self) private var boatProfile
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Bootstyp", systemImage: "sailboat.fill")
-                .font(.system(size: 12, weight: .heavy))
-                .foregroundStyle(Color.secondary)
-
-            HStack(spacing: 10) {
-                Image(systemName: "sailboat.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x3C82FF))
-                    .frame(width: 28, height: 28)
-                    .background(Color(hex: 0x3C82FF).opacity(0.12), in: Circle())
-
-                Picker("Bootstyp", selection: selection) {
-                    ForEach(
-                        BoatTypeCatalog.selectableTypes(including: boatProfile.boatType),
-                        id: \.self
-                    ) { type in
-                        Text(type).tag(type)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(Color(hex: 0x3C82FF))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .appFieldSurface(cornerRadius: 16)
-
-            syncStatus
-        }
-    }
-
-    private var selection: Binding<String> {
-        Binding(
-            get: { boatProfile.boatType },
-            set: { boatProfile.selectBoatType($0) }
-        )
-    }
-
-    @ViewBuilder
-    private var syncStatus: some View {
-        switch boatProfile.syncState {
-        case .localOnly:
-            Label("Auf diesem Gerät gespeichert", systemImage: "iphone")
-                .foregroundStyle(Color.secondary)
-        case .syncing:
-            HStack(spacing: 7) {
-                ProgressView().controlSize(.small)
-                Text("Wird mit Crewspace synchronisiert …")
-            }
-            .foregroundStyle(Color.secondary)
-        case .synced:
-            Label("Mit Crewspace synchronisiert", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(Color.green)
-        case .failed(let message):
-            VStack(alignment: .leading, spacing: 6) {
-                Label("Crewspace-Synchronisierung ausstehend", systemImage: "wifi.exclamationmark")
-                    .foregroundStyle(Color.orange)
-                Text(message)
-                    .foregroundStyle(Color.secondary)
-                    .lineLimit(2)
-                Button("Erneut versuchen") {
-                    boatProfile.retrySync()
-                }
-                .buttonStyle(.plain)
-                .fontWeight(.bold)
-                .foregroundStyle(Color(hex: 0x3C82FF))
-            }
-        }
     }
 }
 
@@ -372,7 +258,6 @@ struct SettingsSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     settingsHero
-                    CrewspaceAccountSettingsView()
                     boatSection
                     appearanceSection
                     onboardingSection
@@ -428,7 +313,6 @@ struct SettingsSheet: View {
     private var boatSection: some View {
         settingsSection(title: "Bootsprofil", icon: "sailboat.fill") {
             settingsTextField("Bootsname", text: $boatName, icon: "tag.fill")
-            BoatTypePicker()
             settingsTextField("Rufzeichen", text: $boatCallsign, icon: "antenna.radiowaves.left.and.right")
             HStack(spacing: 10) {
                 settingsDecimalField("Tiefgang (m)", text: $boatDraft, icon: "arrow.down.to.line")
@@ -504,7 +388,6 @@ struct SettingsSheet: View {
         settingsSection(title: "Datenquellen", icon: "network") {
             sourceRow(name: "BSH", detail: "Gezeiten, Hoch- und Niedrigwasser", icon: "water.waves")
             sourceRow(name: "Apple Weather", detail: "WeatherKit-Prognosen, Wind und Böen", icon: "cloud.sun.rain.fill")
-            sourceRow(name: "Firebase Auth", detail: "Sicherer Crewspace-Zugang mit eindeutiger Skipper-ID", icon: "lock.fill")
         }
     }
 
@@ -695,30 +578,6 @@ extension Color {
         })
     }
 
-    static var chatOverlayBackground: Color {
-        Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x121214) : .systemBackground
-        })
-    }
-
-    static var chatSidebarBackground: Color {
-        Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x1C1C1E) : .secondarySystemBackground
-        })
-    }
-
-    static var chatElementBackground: Color {
-        Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x2C2C2E) : .secondarySystemBackground
-        })
-    }
-
-    static var chatFieldBackground: Color {
-        Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(hex: 0x2C2C2E) : .tertiarySystemBackground
-        })
-    }
-
     static var appPrimary: Color {
         Color(uiColor: UIColor { trait in
             trait.userInterfaceStyle == .dark ? UIColor(hex: 0xA7C8FF) : UIColor.appPrimary
@@ -744,5 +603,24 @@ extension UIColor {
             blue: CGFloat(hex & 0xFF) / 255,
             alpha: 1
         )
+    }
+}
+
+// MARK: - Custom Compact DatePicker with Transparent/White Subview Background
+struct CustomCompactDatePicker: View {
+    @Binding var selection: Date
+    var components: DatePickerComponents = [.date, .hourAndMinute]
+    var backgroundColor: UIColor = .clear
+
+    var body: some View {
+        DatePicker(
+            "",
+            selection: $selection,
+            displayedComponents: components
+        )
+        .labelsHidden()
+        .datePickerStyle(.compact)
+        .environment(\.locale, AppDateFormatters.germanLocale)
+        .environment(\.timeZone, AppDateFormatters.berlinTimeZone)
     }
 }
