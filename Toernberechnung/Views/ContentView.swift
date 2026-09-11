@@ -18,7 +18,7 @@ enum AppTab: Hashable, CaseIterable {
     var label: String {
         switch self {
         case .map: return "Karte"
-        case .conditions: return "Revier"
+        case .conditions: return "Wetter"
         case .crew: return "Crewspace"
         case .logbook: return "Logbuch"
         }
@@ -69,6 +69,9 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
 
     @State var selectedTab: AppTab = .map
+    @State var weatherHeaderVisible = true
+    @State var crewHeaderVisible = true
+    @State var logbookHeaderVisible = true
     @State var selectedConditionsSection: ConditionsSection = .weather
     @State var settingsShown = false
     @State var nautiDashboardMode: NautiDashboardMode = .dashboard
@@ -150,13 +153,18 @@ struct ContentView: View {
         .blur(radius: selectedWeatherDay == nil ? 0 : 12)
         .animation(.easeInOut(duration: 0.24), value: selectedWeatherDay != nil)
         .sheet(isPresented: $settingsShown) {
-            SettingsSheet()
+            SettingsSheet {
+                if let plan = viewModel.routePlan {
+                    viewModel.runCalculation(plan: plan)
+                }
+            }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $mapPlanningShown) {
             manualPlanningSheet
-                .presentationDetents([.fraction(0.70), .large])
+                .presentationSizing(.page)
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedWeatherDay) { selection in
@@ -344,7 +352,17 @@ struct ContentView: View {
 
     @ViewBuilder
     private var appNavigation: some View {
-        if #available(iOS 26.0, *) {
+        if isPad {
+            currentScreen
+                .overlay(alignment: .bottom) {
+                    if !keyboardVisible {
+                        FloatingAppTabBar(selection: $selectedTab, showsLabels: true)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 12)
+                            .zIndex(4)
+                    }
+                }
+        } else if #available(iOS 26.0, *) {
             TabView(selection: $selectedTab) {
                 Tab(AppTab.map.label, systemImage: AppTab.map.icon, value: AppTab.map) {
                     screen(for: .map, content: calculatorTab)
@@ -402,11 +420,14 @@ struct ContentView: View {
     }
 
     private var crewspaceContainerBottomPadding: CGFloat {
+        if isPad { return 104 }
         if #available(iOS 26.0, *) {
             return 0
         }
         return 104
     }
+
+    var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     @ViewBuilder
     private func screen(for tab: AppTab, @ViewBuilder content: @escaping () -> some View) -> some View {
@@ -420,25 +441,32 @@ struct ContentView: View {
                 content()
                     .ignoresSafeArea(.container)
 
-                appHeader(brandStyle: .white)
-                    .zIndex(1)
+                VStack(spacing: 12) {
+                    appHeader(brandStyle: .white)
+                    if isPad {
+                        mapRouteControls
+                            .padding(.horizontal, 16)
+                            .opacity(nautiDashboardMode.isExpanded ? 0 : 1)
+                            .allowsHitTesting(!nautiDashboardMode.isExpanded)
+                    }
+                }
+                .zIndex(1)
             }
             .background(Color.black.ignoresSafeArea())
         } else if tab == .conditions {
             ZStack(alignment: .top) {
                 content()
 
-                appHeader(brandStyle: .white)
+                scrollingAppHeader(brandStyle: .white, isVisible: weatherHeaderVisible)
                     .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
         } else if tab == .crew {
             ZStack(alignment: .top) {
                 content()
-                    .padding(.top, 72)
                     .padding(.bottom, crewspaceContainerBottomPadding)
 
-                appHeader(brandStyle: .primary)
+                scrollingAppHeader(brandStyle: .primary, isVisible: crewHeaderVisible)
                     .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -446,7 +474,7 @@ struct ContentView: View {
             ZStack(alignment: .top) {
                 content()
 
-                appHeader(brandStyle: .primary)
+                scrollingAppHeader(brandStyle: .primary, isVisible: logbookHeaderVisible)
                     .zIndex(1)
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -471,10 +499,20 @@ struct ContentView: View {
         }
     }
 
+    private func scrollingAppHeader(brandStyle: AppHeaderBrandStyle, isVisible: Bool) -> some View {
+        appHeader(brandStyle: brandStyle)
+            .opacity(isVisible ? 1 : 0)
+            .offset(y: isVisible || reduceMotion ? 0 : -16)
+            .allowsHitTesting(isVisible)
+            .accessibilityHidden(!isVisible)
+            .animation(.easeInOut(duration: reduceMotion ? 0.15 : 0.24), value: isVisible)
+    }
+
     private func appHeader(brandStyle: AppHeaderBrandStyle) -> some View {
         AppHeader(
             brandStyle: brandStyle,
             settingsAction: { settingsShown = true }
         )
+        .padding(.top, isPad ? 16 : 0)
     }
 }

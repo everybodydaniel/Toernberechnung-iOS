@@ -56,7 +56,7 @@ final class WeatherRevierUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        let revierTab = app.tabBars.buttons["Revier"]
+        let revierTab = app.tabBars.buttons["Wetter"]
         XCTAssertTrue(revierTab.waitForExistence(timeout: 10))
         revierTab.tap()
 
@@ -75,7 +75,7 @@ final class WeatherRevierUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        let revierTab = app.tabBars.buttons["Revier"]
+        let revierTab = app.tabBars.buttons["Wetter"]
         XCTAssertTrue(revierTab.waitForExistence(timeout: 10))
         revierTab.tap()
 

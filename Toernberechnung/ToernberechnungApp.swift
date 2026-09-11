@@ -408,19 +408,10 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         }
     }
 
-    /// Shown as a badge under the page copy. Sets expectations for beta
-    /// testers about what is still on the way.
-    var comingSoon: String? {
-        switch self {
-        case .crew:
-            return "Crew-Chat folgt mit dem vollen Release."
-        case .route, .weather:
-            return nil
-        }
-    }
+
 }
 
-private struct TideNodeOnboardingView: View {
+struct TideNodeOnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let onFinish: () -> Void
     @State private var selection = OnboardingPage.route
@@ -606,10 +597,7 @@ private struct OnboardingPageView: View {
             VStack(spacing: 22) {
                 OnboardingIllustration(page: page, isActive: isActive, reduceMotion: reduceMotion)
                     .frame(maxWidth: 560)
-                    // Pages with a badge get a shorter card. The illustration
-                    // content is scaled to match, so nothing overflows and the
-                    // gap to the eyebrow stays identical on every page.
-                    .frame(height: page.comingSoon == nil ? 280 : 240)
+                    .frame(height: 280)
 
                 VStack(spacing: 12) {
                     Text(page.eyebrow)
@@ -629,23 +617,7 @@ private struct OnboardingPageView: View {
                         .lineSpacing(3)
                         .frame(maxWidth: 520)
 
-                    if let comingSoon = page.comingSoon {
-                        HStack(spacing: 7) {
-                            Image(systemName: "bubble.left.and.bubble.right.fill")
-                                .font(.system(size: 11, weight: .bold))
-                            Text(comingSoon)
-                                .font(.system(size: 11, weight: .heavy))
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.85)
-                                .multilineTextAlignment(.leading)
-                        }
-                        .foregroundStyle(page.accent)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 9)
-                        .background(page.accent.opacity(0.12), in: Capsule())
-                        .padding(.top, 2)
-                        .accessibilityLabel("Bald verfügbar: \(comingSoon)")
-                    }
+
                 }
                 .opacity(isActive ? 1 : 0.35)
                 .offset(y: isActive || reduceMotion ? 0 : 14)

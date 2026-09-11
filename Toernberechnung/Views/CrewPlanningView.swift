@@ -87,6 +87,9 @@ private extension View {
 /// Local appointment planning for the crew. Everything is stored in SwiftData
 /// on this device — no account, no sync.
 struct CrewPlanningView: View {
+    @Binding var section: CrewspaceSection
+    @Binding var headerVisible: Bool
+    let topContentInset: CGFloat
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CrewEventRecord.startsAt, order: .forward) private var events: [CrewEventRecord]
 
@@ -96,6 +99,9 @@ struct CrewPlanningView: View {
 
     var body: some View {
         List {
+            CrewspaceScrollingHeader(section: $section)
+                .crewPlanningListRow()
+
             CrewMonthCalendar(selectedDate: $selectedDate, markedDays: markedDays)
                 .crewPlanningListRow()
 
@@ -155,9 +161,11 @@ struct CrewPlanningView: View {
                     .crewPlanningListRow()
             }
         }
+        .tracksAppHeaderVisibility($headerVisible)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.horizontal, 16, for: .scrollContent)
+        .contentMargins(.top, topContentInset, for: .scrollContent)
         .contentMargins(.bottom, 28, for: .scrollContent)
         .sheet(isPresented: $newEventShown) {
             CrewEventEditor(initialDate: selectedDate) { draft in

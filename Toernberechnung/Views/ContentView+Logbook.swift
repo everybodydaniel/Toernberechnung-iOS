@@ -48,9 +48,10 @@ extension ContentView {
                 }
             }
         }
+        .tracksAppHeaderVisibility($logbookHeaderVisible)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .contentMargins(.top, 76, for: .scrollContent)
+        .contentMargins(.top, isPad ? 92 : 76, for: .scrollContent)
         .contentMargins(.bottom, 118, for: .scrollContent)
         .sheet(item: $selectedLogbookRecord) { record in
             LogbookDetailSheet(

@@ -22,9 +22,10 @@ extension ContentView {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 84)
+                .padding(.top, isPad ? 100 : 84)
                 .padding(.bottom, 124)
             }
+            .tracksAppHeaderVisibility($weatherHeaderVisible)
             .scrollIndicators(.hidden)
             .refreshable {
                 await loadSelectedConditionsSection(userInitiated: true)

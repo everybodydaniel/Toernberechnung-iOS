@@ -249,11 +249,13 @@ extension ContentView {
                 .allowsHitTesting(false)
 
                 VStack(spacing: 0) {
-                    mapRouteControls
-                        .padding(.top, 148) // Increased from 88 to avoid overlapping with AppHeader
-                        .padding(.horizontal, 16)
-                        .opacity(nautiDashboardMode.isExpanded ? 0 : 1)
-                        .allowsHitTesting(!nautiDashboardMode.isExpanded)
+                    if !isPad {
+                        mapRouteControls
+                            .padding(.top, 148)
+                            .padding(.horizontal, 16)
+                            .opacity(nautiDashboardMode.isExpanded ? 0 : 1)
+                            .allowsHitTesting(!nautiDashboardMode.isExpanded)
+                    }
 
                     Spacer(minLength: 20)
                 }
@@ -279,7 +281,7 @@ extension ContentView {
         }
     }
 
-    private var mapRouteControls: some View {
+    var mapRouteControls: some View {
         Button {
             mapPlanningShown = true
         } label: {
@@ -299,6 +301,7 @@ extension ContentView {
     /// should sit right on top of the keyboard instead.
     var dashboardBottomInset: CGFloat {
         if keyboardVisible, nautiDashboardMode.isExpanded { return 8 }
+        if isPad { return 120 }
         return dashboardDetent == .nautiOnly ? 104 : 86
     }
 
@@ -314,7 +317,9 @@ extension ContentView {
                 availableHeight: availableHeight,
                 bottomInset: dashboardBottomInset
             )
-            : dashboardHeight
+            : (isPad
+                ? min(dashboardHeight, max(58, availableHeight - dashboardBottomInset - 190))
+                : dashboardHeight)
 
         return Group {
             if nautiDashboardMode.isExpanded {
@@ -333,6 +338,12 @@ extension ContentView {
                 )
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("NautiInlinePanel")
+            } else if isPad, dashboardDetent != .nautiOnly {
+                ScrollView {
+                    mapDashboardContent
+                        .padding(14)
+                }
+                .scrollBounceBehavior(.basedOnSize)
             } else {
                 mapDashboardContent
                     .padding(dashboardDetent == .nautiOnly ? 8 : 14)
@@ -754,8 +765,8 @@ extension ContentView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     routeControlPanel
-                    planningWaterLevelSourcesCard
                     planningPassageWindowCard
+                    planningWaterLevelSourcesCard
                 }
                 .padding(16)
                 .padding(.bottom, 28)
@@ -765,6 +776,37 @@ extension ContentView {
             }
             .navigationTitle("Törn planen")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 8) {
+                    if !viewModel.hasCompleteRouteInput {
+                        Text("Bitte Start und Ziel auswählen.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button {
+                        // Input changes already calculate live so passage windows
+                        // remain visible while planning. Reuse that calculation.
+                        if !viewModel.isCalculating, viewModel.calculationResult == nil {
+                            if let plan = viewModel.routePlan {
+                                viewModel.runCalculation(plan: plan)
+                            } else {
+                                viewModel.onRouteChanged()
+                            }
+                        }
+                        routeDashboardRevealPending = true
+                        mapPlanningShown = false
+                    } label: {
+                        Label("Törn berechnen", systemImage: "arrow.right.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .appProminentButton(tint: Color.appPrimary)
+                    .disabled(!viewModel.hasCompleteRouteInput)
+                    .accessibilityIdentifier("CalculateVoyageButton")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.regularMaterial)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

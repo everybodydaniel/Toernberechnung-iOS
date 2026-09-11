@@ -64,7 +64,7 @@ enum CrewRoleOption: String, CaseIterable, Identifiable, Codable, Sendable {
 
 extension ContentView {
     func crewTab() -> some View {
-        CrewspaceView()
+        CrewspaceView(topContentInset: isPad ? 94 : 78, headerVisible: $crewHeaderVisible)
     }
 
     func crewSummaryText() -> String {
@@ -92,25 +92,34 @@ enum CrewspaceSection: String, CaseIterable, Identifiable {
 /// Crewspace is fully local: the crew roster and the appointments both live in
 /// SwiftData on this device. There is no account and nothing leaves the phone.
 struct CrewspaceView: View {
+    let topContentInset: CGFloat
+    @Binding var headerVisible: Bool
     @State private var section: CrewspaceSection = .crew
+
+    var body: some View {
+        Group {
+            switch section {
+            case .crew:
+                CrewspaceCrewView(section: $section, headerVisible: $headerVisible, topContentInset: topContentInset)
+            case .planning:
+                CrewPlanningView(section: $section, headerVisible: $headerVisible, topContentInset: topContentInset)
+            }
+        }
+        .background(Color.appBackground.ignoresSafeArea())
+        .environment(\.locale, Locale(identifier: "de_DE"))
+    }
+
+}
+
+/// A normal list row, so the title and section control scroll with the content.
+struct CrewspaceScrollingHeader: View {
+    @Binding var section: CrewspaceSection
 
     var body: some View {
         VStack(spacing: 0) {
             crewspaceHeader
             sectionPicker
-
-            Group {
-                switch section {
-                case .crew:
-                    CrewspaceCrewView()
-                case .planning:
-                    CrewPlanningView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Color.appBackground.ignoresSafeArea())
-        .environment(\.locale, Locale(identifier: "de_DE"))
     }
 
     private var crewspaceHeader: some View {
@@ -125,7 +134,6 @@ struct CrewspaceView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 12)
     }
@@ -151,12 +159,14 @@ struct CrewspaceView: View {
         }
         .padding(5)
         .appFloatingOverlay(cornerRadius: 24)
-        .padding(.horizontal, 16)
         .padding(.bottom, 10)
     }
 }
 
 struct CrewspaceCrewView: View {
+    @Binding var section: CrewspaceSection
+    @Binding var headerVisible: Bool
+    let topContentInset: CGFloat
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CrewMemberRecord.createdAt, order: .forward) private var crewMembers: [CrewMemberRecord]
 
@@ -170,6 +180,9 @@ struct CrewspaceCrewView: View {
 
     var body: some View {
         List {
+            CrewspaceScrollingHeader(section: $section)
+                .crewManagementListRow(bottom: 0)
+
             crewOverviewCard
                 .crewManagementListRow()
 
@@ -200,9 +213,10 @@ struct CrewspaceCrewView: View {
                 }
             }
         }
+        .tracksAppHeaderVisibility($headerVisible)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .contentMargins(.top, 6, for: .scrollContent)
+        .contentMargins(.top, topContentInset, for: .scrollContent)
         .contentMargins(.bottom, 28, for: .scrollContent)
         .alert(
             "Löschen fehlgeschlagen",

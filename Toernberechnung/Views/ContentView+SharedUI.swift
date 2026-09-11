@@ -244,14 +244,14 @@ struct AppHeader: View {
 }
 
 struct SettingsSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    var onBoatSettingsChanged: () -> Void = {}
     @AppStorage("boatName") private var boatName = ""
     @AppStorage("boatCallsign") private var boatCallsign = ""
     @AppStorage("boatDraft") private var boatDraft = "1.1"
     @AppStorage("safetyMargin") private var safetyMargin = "0.0"
     @AppStorage("boatLength") private var boatLength = "10.5"
     @AppStorage("appearanceMode") private var appearanceMode = AppAppearanceMode.light.rawValue
-    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var introductionShown = false
 
     var body: some View {
         NavigationStack {
@@ -285,6 +285,24 @@ struct SettingsSheet: View {
         // appearance here makes an already open settings sheet update
         // immediately instead of retaining the scheme it was presented with.
         .preferredColorScheme(activeAppearance.colorScheme)
+        .fullScreenCover(isPresented: $introductionShown) {
+            TideNodeOnboardingView { introductionShown = false }
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        introductionShown = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .appCircularGlass()
+                    .padding(16)
+                    .accessibilityLabel("Einführung schließen")
+                }
+        }
+        .onChange(of: boatDraft) { _, _ in onBoatSettingsChanged() }
+        .onChange(of: safetyMargin) { _, _ in onBoatSettingsChanged() }
     }
 
     private var settingsHero: some View {
@@ -314,13 +332,9 @@ struct SettingsSheet: View {
         settingsSection(title: "Bootsprofil", icon: "sailboat.fill") {
             settingsTextField("Bootsname", text: $boatName, icon: "tag.fill")
             settingsTextField("Rufzeichen", text: $boatCallsign, icon: "antenna.radiowaves.left.and.right")
-            HStack(spacing: 10) {
-                settingsDecimalField("Tiefgang (m)", text: $boatDraft, icon: "arrow.down.to.line")
-                settingsDecimalField("Länge (m)", text: $boatLength, icon: "ruler")
-            }
-            HStack(spacing: 10) {
-                settingsDecimalField("Sicherheitsmarge (m)", text: $safetyMargin, icon: "shield.checkered")
-            }
+            settingsMeasurementMenu("Tiefgang", storage: $boatDraft, tenths: Array(stride(from: 2, through: 20, by: 2)), icon: "arrow.down.to.line", identifier: "BoatDraftMenu")
+            settingsMeasurementMenu("Länge", storage: $boatLength, tenths: Array(stride(from: 20, through: 300, by: 5)), icon: "ruler", identifier: "BoatLengthMenu")
+            settingsMeasurementMenu("Sicherheitsmarge", storage: $safetyMargin, tenths: Array(stride(from: 0, through: 50, by: 2)), icon: "shield.checkered", identifier: "SafetyMarginMenu")
         }
     }
 
@@ -394,11 +408,7 @@ struct SettingsSheet: View {
     private var onboardingSection: some View {
         settingsSection(title: "Einführung", icon: "sparkles.rectangle.stack.fill") {
             Button {
-                dismiss()
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(180))
-                    hasSeenOnboarding = false
-                }
+                introductionShown = true
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "play.circle.fill")
@@ -421,7 +431,9 @@ struct SettingsSheet: View {
                 }
             }
             .buttonStyle(.plain)
+            .contentShape(Rectangle())
             .appFieldSurface(cornerRadius: 16)
+            .accessibilityIdentifier("ReplayIntroductionButton")
         }
     }
 
@@ -455,48 +467,55 @@ struct SettingsSheet: View {
             .appCardSurface(cornerRadius: 24)
     }
 
-    // Decimal field that works on German keyboards. The .decimalPad
-    // keyboard on a German locale shows a comma, not a dot, so the
-    // raw String the user types is "1,5". We persist with a dot so
-    // `Double("1.5")` keeps working everywhere, but the visible value
-    // shows whichever the user typed last. Both notations round-trip
-    // safely.
-    private func settingsDecimalField(
+    private func settingsMeasurementMenu(
         _ title: String,
-        text rawStorage: Binding<String>,
-        icon: String
+        storage: Binding<String>,
+        tenths: [Int],
+        icon: String,
+        identifier: String
     ) -> some View {
-        let displayBinding = Binding<String>(
-            get: {
-                // Show what's stored; users see dots in legacy data
-                // but new edits will appear with whichever separator
-                // the keyboard offers.
-                rawStorage.wrappedValue
-            },
-            set: { newValue in
-                // Strip everything except digits, comma, dot, minus;
-                // then normalize the decimal separator to a dot before
-                // persisting, so the engine's `Double(_:)` parser still
-                // accepts the value on any locale.
-                let filtered = newValue.filter { "0123456789.,-".contains($0) }
-                rawStorage.wrappedValue = filtered.replacingOccurrences(of: ",", with: ".")
-            }
-        )
+        let currentValue = Double(storage.wrappedValue.replacingOccurrences(of: ",", with: "."))
 
-        return HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color(hex: 0x3C82FF))
-                .frame(width: 28, height: 28)
-                .background(Color(hex: 0x3C82FF).opacity(0.12))
-                .clipShape(Circle())
-            TextField(title, text: displayBinding)
-                .keyboardType(.decimalPad)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .font(.system(size: 15, weight: .semibold))
+        return Menu {
+            ForEach(tenths, id: \.self) { tenth in
+                let value = Double(tenth) / 10
+                Button {
+                    // Persist the existing decimal-string contract without locale ambiguity.
+                    storage.wrappedValue = "\(tenth / 10).\(tenth % 10)"
+                } label: {
+                    if currentValue == value {
+                        Label(measurementLabel(value), systemImage: "checkmark")
+                    } else {
+                        Text(measurementLabel(value))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.appPrimary)
+                    .frame(width: 28, height: 28)
+                    .background(Color.appPrimary.opacity(0.12), in: Circle())
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 8)
+                Text(currentValue.map(measurementLabel) ?? "Bitte auswählen")
+                    .font(.body.weight(.semibold))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.appPrimary)
+            }
+            .foregroundStyle(Color.primary)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .appFieldSurface(cornerRadius: 16)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func measurementLabel(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(1))) + " m"
     }
 
     // Inline text-field row. Sits INSIDE a glass card, so it stays as a
@@ -622,5 +641,16 @@ struct CustomCompactDatePicker: View {
         .datePickerStyle(.compact)
         .environment(\.locale, AppDateFormatters.germanLocale)
         .environment(\.timeZone, AppDateFormatters.berlinTimeZone)
+    }
+}
+
+// Observe only the main vertical scroll view, not nested horizontal controls.
+extension View {
+    func tracksAppHeaderVisibility(_ visible: Binding<Bool>) -> some View {
+        onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top <= 2
+        } action: { _, isAtTop in
+            visible.wrappedValue = isAtTop
+        }
     }
 }
