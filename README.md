@@ -11,7 +11,7 @@ Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordin
 [![CI](https://github.com/everybodydaniel/Toernberechnung-iOS/actions/workflows/ci.yml/badge.svg)](https://github.com/everybodydaniel/Toernberechnung-iOS/actions/workflows/ci.yml)
 [![Swift 5.9](https://img.shields.io/badge/Swift-5.9-F05138?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
 [![Platform iOS 18+](https://img.shields.io/badge/Platform-iOS%2018%2B-007AFF?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/ios/)
-[![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071E3?style=flat-square&logo=swift&logoColor=white)](#-architektur)
+[![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071E3?style=flat-square&logo=swift&logoColor=white)](#-systemarchitektur)
 [![MapLibre](https://img.shields.io/badge/Map-MapLibre-396CB2?style=flat-square&logo=maplibre&logoColor=white)](https://maplibre.org/)
 [![Docs](https://img.shields.io/badge/Docs-DocC%20→%20Pages-blue?style=flat-square&logo=readthedocs)](https://everybodydaniel.github.io/Toernberechnung-iOS/documentation/toernberechnung/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
@@ -20,7 +20,7 @@ Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordin
 
 <img src="assets/screenshots/01_map_tab.png" alt="TideNode – Kartenansicht mit Route Borkum → Norderney, nautischer Seekarte und Go/No-Go-Status" width="280">
 
-<sub><i>Kartenansicht: Route Borkum → Norderney mit nautischer Seekarte, Gezeitenfenster und Go/No-Go-Bewertung</i></sub>
+<sub><i>Kartenansicht: Route Borkum → Norderney mit nautischer Seekarte, berechnetem Gezeitenfenster und Go/No-Go-Bewertung</i></sub>
 
 </div>
 
@@ -49,15 +49,14 @@ Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordin
 
 ## 🎯 Überblick
 
-TideNode ist eine native iOS-App für die **Planung von Segeltörns und Wattenpassagen** zwischen den ostfriesischen Inseln. Die App richtet sich an Skipper, die eine zuverlässige, datenbasierte Entscheidungsgrundlage für ihre Fahrt benötigen.
+TideNode ist eine moderne, native iOS-App für die **Planung von Segeltörns und Wattenpassagen** zwischen den ostfriesischen Inseln im deutschen Wattenmeer. Die App richtet sich an Skipper, die eine zuverlässige, datenbasierte Entscheidungsgrundlage für anspruchsvolle Gezeitengewässer benötigen.
 
-Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Hauptbereichen:
+Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit vier harmonisch integrierten Kernbereichen:
 
-- **Karte** – Nautische Seekarte mit Routenplanung, Wegpunkten und Go/No-Go-Bewertung
-- **Wetter** – Apple-WeatherKit-Prognosen mit 48-Stunden-Wind- und Böendarstellung in Knoten
-- **Gezeiten** – BSH-Gezeitenabruf mit astronomischen Hoch-/Niedrigwasserzeiten und Wasserstandsvorhersage
-- **Crewspace** – Crewverwaltung mit Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakten und Bordstatus sowie lokale Terminplanung
-- **Logbuch** – Vollständiges Schiffstagebuch mit PDF-Export und Auditprotokoll via SwiftData
+- **🗺️ Karte** – MapLibre-basierte nautische Seekarte mit interaktiver Mehrstrecken-Routenplanung, Wegpunkten, Schutzzonenmarkierungen, Tiefenprofil und Go / Warning / No-Go Statusanzeige
+- **🌤️ Wetter & Gezeiten** – Apple-WeatherKit-Prognosen mit 48-Stunden-Wind- und Böendiagrammen in Knoten kombiniert mit offiziellen BSH-Gezeitendaten, astronomischen Hoch-/Niedrigwasserzeiten und Wasserstandsvorhersagekurven
+- **👥 Crewspace** – Lokale Crewverwaltung mit Rollen (Skipper, Co-Skipper, Navigation, Deck), Notfallkontakten, Telefonnummern, Bordstatus ("An Bord") sowie integrierter Monats-Terminplanung
+- **📒 Logbuch** – Digitales Schiffstagebuch mit vollständiger Törnhistorie, automatischer Übernahme berechneter Fahrten und PDF-Export via SwiftData
 
 ---
 
@@ -72,7 +71,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Haupt
     <td align="center"><img src="assets/screenshots/03_tides_tab.png" width="200" alt="Gezeiten-Tab"/><br/><sub><b>Gezeiten</b><br/>BSH-Tidenkalender</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/04_crew_tab.png" width="200" alt="Crew-Tab"/><br/><sub><b>Crew</b><br/>Crewverwaltung</sub></td>
+    <td align="center"><img src="assets/screenshots/04_crew_tab.png" width="200" alt="Crewspace-Tab"/><br/><sub><b>Crewspace</b><br/>Crew & Termine</sub></td>
     <td align="center"><img src="assets/screenshots/05_logbook_tab.png" width="200" alt="Logbuch-Tab"/><br/><sub><b>Logbuch</b><br/>Schiffstagebuch</sub></td>
     <td></td>
   </tr>
@@ -86,63 +85,70 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit fünf Haupt
 
 | | Feature | Beschreibung |
 |---|---|---|
-| 🗺️ | **Nautische Seekarte** | MapLibre-basierte Kartenansicht mit Routendarstellung, Wegpunkten, Schutzzonenmarkierung und Vollbildmodus |
-| 🧮 | **Gezeitenbasierte Berechnung** | Automatische Berechnung von Fallhöhe (FmW), Wassertiefe (WT) und Wassersäule über Kiel (WuK) nach der Zwölftelregel |
-| 🔍 | **Passagefenster-Scanner** | Automatische Suche nach dem nächsten sicheren Abfahrtsfenster basierend auf Gezeiten und Wasserstand |
-| 🌊 | **BSH-Gezeitendaten** | Echtzeit-Abruf astronomischer Hoch-/Niedrigwasservorhersagen und Wasserstandskurven vom BSH |
-| 🌤️ | **Apple WeatherKit** | Aktuelles Wetter, 48-Stunden-Windprognose und 7-Tage-Vorhersage für alle ostfriesischen Inseln |
-| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten, ohne Übertragung des Chatverlaufs an einen KI-Server |
-| 🚦 | **Go / Warning / No-Go** | Kombinierte Bewertung aus Gezeiten- und Wetterstatus zu einer klaren Passage-Empfehlung |
-| 🧭 | **Mehrstrecken-Routing** | Routenplanung mit Zwischenstopps und automatischer Streckenberechnung über den Wattenmeer-Katalog |
-| 👥 | **Crewspace** | Rollen (Skipper, Co-Skipper, Navigation), Notfallkontakte, Bordstatus und Terminplanung — vollständig auf dem Gerät |
-| 📒 | **Digitales Logbuch** | Schiffstagebuch mit vollständiger Reisehistorie und PDF-Export via SwiftData |
-| 🗃️ | **Offline-Katalog** | Kuratierter Wattenmeer-Katalog mit 20+ Routen, Wegpunkten und Tiefenwerten |
+| 🗺️ | **Nautische Seekarte** | MapLibre-basierte Kartenansicht mit Kartendarstellung, Routenvektoren, Wegpunkten, Schutzzonen (Nordseebefundverordnung) und Vollbildmodus |
+| 🧮 | **Gezeitenbasierte Berechnung** | Automatische Berechnung von Fallhöhe (FmW), Wassertiefe (WT) und Wassersäule über Kiel (WuK) nach der Zwölftelregel unter Berücksichtigung von Tiefgang und Sicherheitsmarge |
+| 🔍 | **Passagefenster-Solver** | Automatische Suche nach dem optimalen und sicheren Abfahrtsfenster basierend auf Gezeiten und Wasserstandsvorhersage |
+| 🌊 | **BSH-Gezeitendaten** | Direkter Abruf astronomischer Hoch-/Niedrigwasservorhersagen für alle Inselpegel (Borkum, Juist, Norderney, Baltrum, Langeoog, Spiekeroog, Wangerooge, Emden) |
+| 🌤️ | **Apple WeatherKit** | Echtzeit-Wetter, 48-Stunden-Windprognose, Böenanzeige und 7-Tage-Vorhersage in nautischen Einheiten (Knoten, Bft) |
+| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten mit Spracheingabe – vollständig offline ohne Server-Upload |
+| 🚦 | **Go / Warning / No-Go** | Transparente Gesamteinschätzung aus Gezeitentiefe, Seegang und Wetterbedingungen zu einer klaren Passage-Empfehlung |
+| 🧭 | **Mehrstrecken-Routing** | Routenplanung mit flexiblen Zwischenstopps und automatischer Etappenberechnung über den Wattenmeer-Katalog |
+| 📱 | **Responsive iPad-Layout** | Adaptive Oberfläche mit schwebender Tab-Leiste, Mehrspalten-Controls und optimierten Popovers für iPad und iPhone |
+| 👥 | **Crewspace & Termine** | Rollen, Notfallkontakte, Bordstatus und Törnterminplanung mit Kalender – ohne Cloud-Zwang, 100 % auf dem Gerät |
+| 📒 | **Digitales Logbuch** | Schiffstagebuch mit Fahrthistorie, Auditprotokoll und druckfertigem PDF-Export via SwiftData |
+| 🗃️ | **Offline-Katalog** | Kuratierter Wattenmeer-Katalog mit 20+ Routen, Wegpunkten, Tiefenwerten und Ausweichhäfen |
 
 ---
 
 ## 🏗️ Systemarchitektur
 
-Die App folgt einer **MVVM-Architektur** mit strikter Trennung zwischen UI-Schicht, Geschäftslogik und externen Diensten. Der kuratierte Wattenmeer-Katalog ermöglicht die Kernberechnung auch ohne Netzwerkverbindung.
+Die App folgt einer **MVVM-Architektur** mit strikter Entkopplung zwischen UI-Schicht, Geschäftslogik und externen Datenanbietern. Der kuratierte Wattenmeer-Katalog ermöglicht die Kernberechnung auch komplett ohne Internetverbindung.
 
 ```mermaid
 graph TD
     BSH["BSH Gezeiten-API<br/>(Hoch-/Niedrigwasser)"]:::source
-    BSHWL["BSH Wasserstand-API<br/>(Vorhersage & Messung)"]:::source
+    BSHWL["BSH Wasserstand-API<br/>(Vorhersage & Messkurven)"]:::source
     APPLE["Apple WeatherKit<br/>(Wetter, Wind & Böen)"]:::source
+    LOCALAI["Apple Foundation Models<br/>(Lokale Nauti-Inferenz)"]:::source
 
     subgraph App ["TideNode iOS (SwiftUI)"]
-        VM["RoutePlannerViewModel<br/>(Zustand & Steuerung)"]:::core
-        ENGINE["Engine<br/>(Tidenberechnung, Routing, Scanner)"]:::core
+        VM["RoutePlannerViewModel<br/>(Zustand, Routing & Berechnung)"]:::core
+        ENGINE["Engine<br/>(PassageWindowSolver, Twelfths, WaypointDepth)"]:::core
         CATALOG["Wattenmeer-Katalog<br/>(JSON – Offline)"]:::storage
+        SWIFTDATA["SwiftData Storage<br/>(Logbuch, Crew, AuditLog)"]:::storage
     end
 
-    subgraph Services ["Externe Dienste"]
+    subgraph Services ["Dienste & Provider"]
         BSHS["BSHTideService"]:::service
-        BSHWLS["BSHWaterLevelService"]:::service
+        BSHWLS["BSHWaterLevelForecastService"]:::service
         WKS["WeatherKitManager"]:::service
+        NAUTIS["NautiConversationRepository & Speech"]:::service
     end
 
-    subgraph UI ["SwiftUI Views (5 Tabs)"]
-        MAP["🗺️ Karte"]:::client
-        WEATHER["🌤️ Wetter"]:::client
-        TIDES["🌊 Gezeiten"]:::client
-        CREW["👥 Crew"]:::client
-        LOG["📒 Logbuch"]:::client
+    subgraph UI ["SwiftUI Views (4 Tabs & Adaptive UI)"]
+        MAP["🗺️ Karte (Routen & Dashboard)"]:::client
+        WEATHER["🌤️ Wetter & Gezeiten"]:::client
+        CREW["👥 Crewspace (Crew & Kalender)"]:::client
+        LOG["📒 Logbuch (Historie & PDF)"]:::client
+        NAUTIUI["✨ Nauti KI Floating Panel"]:::client
     end
 
     BSH -->|JSON| BSHS
     BSHWL -->|JSON| BSHWLS
     APPLE -->|WeatherKit| WKS
+    LOCALAI -->|On-Device| NAUTIS
     BSHS --> VM
     BSHWLS --> VM
     WKS --> VM
+    NAUTIS --> VM
     CATALOG --> ENGINE
     ENGINE --> VM
+    SWIFTDATA <--> VM
     VM --> MAP
     VM --> WEATHER
-    VM --> TIDES
     VM --> CREW
     VM --> LOG
+    VM --> NAUTIUI
 
     classDef source fill:#e1f5fe,stroke:#0288d1,stroke-width:1px;
     classDef core fill:#efebe9,stroke:#5d4037,stroke-width:1px;
@@ -155,11 +161,11 @@ graph TD
 
 | Schicht | Verantwortung |
 |---|---|
-| **Views** | SwiftUI-Oberfläche mit 5-Tab-Navigation, MapLibre-Kartenansicht und Liquid-Glass-Styling |
-| **ViewModel** | `RoutePlannerViewModel` – zentraler Zustand, Berechnungssteuerung und Datenabruf |
-| **Engine** | Tidenberechnung (Zwölftelregel), Routenplanung, Passagefenster-Scan und Statuskombination |
-| **Services** | Clients für BSH-Gezeiten, BSH-Wasserstand und Apple WeatherKit sowie lokale Nauti-Inferenz |
-| **Resources** | Kuratierter Wattenmeer-Katalog, GeoJSON-Schutzgebietsdaten und nautische Kartenressourcen |
+| **Views** | SwiftUI-Oberfläche mit 4 Tabs (Karte, Wetter/Gezeiten, Crewspace, Logbuch), schwebender TabBar, iPad-Layout und Liquid-Glass-Design |
+| **ViewModel** | `RoutePlannerViewModel`, `NautiChatViewModel` – zentraler Zustand, Berechnungssteuerung und Datenorchestrierung |
+| **Engine** | `PassageWindowSolver`, `RuleOfTwelfths`, `WaypointDepthSolver`, `NauticalRouter` – mathematische Tidenberechnung, Wegpunkttiefen und Routenexpansion |
+| **Services** | Clients für BSH-Gezeiten, BSH-Wasserstandsprognosen, Apple WeatherKit, Wattsegler-Lotungen sowie Sprach- und KI-Inferenz |
+| **Resources** | Kuratierter Wattenmeer-Katalog (`wadden_sea_catalog.json`), Schutzzonen-GeoJSON (`nordsbefv.geojson`) und nautische Kartenressourcen |
 
 ---
 
@@ -167,51 +173,39 @@ graph TD
 
 | Quelle | Bereitgestellte Daten | Verarbeitung |
 |---|---|---|
-| **BSH Gezeiten** | Astronomische Hoch-/Niedrigwasser-Vorhersagen für Inselpegel | JSON-Abruf, Parsing der HW/NW-Zeiten und -Höhen |
-| **BSH Wasserstand** | Wasserstandsvorhersage und -messung (SKN-Bezug) | Zeitreihen-Abruf, Darstellung als Verlaufskurve |
-| **Apple WeatherKit** | Aktuelles Wetter, Wind, Böen, Niederschlag sowie Stunden- und Tagesprognosen | Native async/await-Abfragen, nautische Einheiten und lokaler Cache |
-| **Apple Foundation Models** | Lokales Sprachverständnis für Nauti, Törn-Intents und allgemeine Seefragen | Vollständig auf dem Gerät; strukturierte Swift-Ausgaben ohne KI-Netzwerkaufruf |
-| **Lokaler Katalog** | 20+ Routen, Wegpunkte, Tiefenwerte und Pegel | Offline-JSON mit vorberechneten Katalogdaten |
-
-> Die Kernberechnung und Nauti-Antworten funktionieren auf unterstützten Geräten lokal. Gezeiten- und Wetterdaten erfordern weiterhin eine aktive Internetverbindung; Crew, Termine und Logbuch bleiben vollständig auf dem Gerät.
+| **BSH Gezeiten** | Astronomische Hoch-/Niedrigwasser-Vorhersagen für Inselpegel | JSON-Abruf, Parsing der HW/NW-Zeiten und -Höhen bezogen auf Seekartennull (SKN) |
+| **BSH Wasserstand** | Wasserstandsvorhersage und -messung (SKN-Bezug) | Zeitreihen-Interpolation (`WaterLevelCorrectionSeries`), Darstellung als Verlaufskurve |
+| **Apple WeatherKit** | Aktuelles Wetter, Windgeschwindigkeit, Böen, Windrichtung sowie Stunden- und 7-Tage-Prognosen | Native async/await-Abfragen, nautische Konvertierung (Knoten, Beaufort) und intelligenter In-Memory-/Disk-Cache |
+| **Apple Foundation Models** | Lokales Sprach- und Situationsverständnis für Nauti (Törnabsichten, Gezeitenfragen) | Vollständig auf dem Gerät; typisierte Aktionen (`NautiModels`) ohne Übertragung ins Internet |
+| **Lokaler Katalog** | 20+ Routen, Wegpunkte, Tiefenwerte und Pegel | Offline-JSON mit vorberechneten Distanzen, Solltiefen und Ausweichoptionen |
 
 ---
 
 ## 🧰 Technologie-Stack
 
 ### App-Plattform
-- **Sprache:** Swift 5.9
-- **UI-Framework:** SwiftUI mit Liquid-Glass-Styling
-- **Mindestversion:** iOS 18.0
-- **Persistenz:** SwiftData (Logbuch, Crew, Audit-Log)
+- **Sprache:** Swift 5.9 (Swift 6 ready)
+- **UI-Framework:** SwiftUI mit Liquid-Glassmorphismus und adaptiven iPad-Layouts
+- **Mindestversion:** iOS 18.0 (mit Foundation-Models-Features auf iOS 26+)
+- **Persistenz:** SwiftData (Logbuch, Crew-Roster, Termine, AuditLog)
 
 ### Kartendarstellung
-- **Rendering:** MapLibre GL Native 6.26+
-- **Kartentyp:** Nautische Seekarte mit GeoJSON-Overlays
-- **Schutzgebietsdaten:** Nordseebefundverordnung (GeoJSON)
-
-### Externe Dienste
-- **Gezeiten:** BSH Gezeiten-API + BSH Wasserstand-API
-- **Wetter und Wind:** Apple WeatherKit
-- **Lotungen:** Wattseglervereinigung Lotungsdaten
-
-### Lokale KI
-- **Framework:** Apple Foundation Models auf iOS 26
-- **Datenschutz:** Nauti-Prompts und Antworten verlassen das Gerät nicht
-- **Fallback:** Auf nicht unterstützten Geräten bleiben alle manuellen Funktionen verfügbar; es gibt keinen Remote-KI-Fallback
+- **Rendering:** MapLibre GL Native 6.28+
+- **Kartentyp:** Nautische Seekarte mit benutzerdefinierten Vektor- und Rasterkacheln
+- **Schutzzonen:** Nordseebefundverordnung (GeoJSON-Layer mit Zonen I und II)
 
 ### Berechnungs-Engine
-- **Tidenberechnung:** Zwölftelregel für Wasserstandsinterpolation
-- **Strategien:** MHW-basiert und Lottiefe-basiert
-- **Routing:** Mehrstrecken-Berechnung mit automatischer Routenexpansion
-- **Scanner:** Passagefenster-Suche über konfigurierbare Zeiträume
+- **Tidenberechnung:** Zwölftelregel mit kubischer/linearer Höheninterpolation
+- **Tiefenmodell:** Berücksichtigung von Schiffstiefgang, Sicherheitsmarge und MHW/SKN-Referenz
+- **Passage-Solver:** Automatischer Scan nach befahrbaren Zeitfenstern je Wegpunkt
+- **Routing:** A*-Wegfindung und Nautisches Routing mit Tonnenvalidierung
 
-### Werkzeuge
+### Werkzeuge & Qualitätssicherung
 - **Projektgenerierung:** XcodeGen 2.30+
-- **Code-Analyse:** SwiftLint
-- **Dokumentation:** DocC (automatisch via GitHub Pages)
+- **Code-Analyse:** SwiftLint (automatische Build-Phase)
+- **Dokumentation:** DocC (automatisch auf GitHub Pages bereitgestellt)
+- **Testing:** XCTest (128 Unit-Tests) & XCUITest (automatisierte UI- und Screenshot-Tests)
 - **CI/CD:** GitHub Actions (SwiftLint → Build & Test → SonarCloud → DocC Deploy)
-- **Dependencies:** Swift Package Manager (MapLibre)
 
 ---
 
@@ -220,69 +214,74 @@ graph TD
 ```text
 Toernberechnung-iOS/
 ├── Toernberechnung/
-│   ├── ToernberechnungApp.swift        # App-Einstiegspunkt und SwiftData-Konfiguration
+│   ├── ToernberechnungApp.swift             # App-Einstiegspunkt, Onboarding & SwiftData-Setup
 │   ├── Views/
-│   │   ├── ContentView.swift           # Hauptansicht mit Tab-Navigation
-│   │   ├── ContentView+MapTab.swift    # 🗺️ Karten-Tab: Route, Seekarte, Go/No-Go
-│   │   ├── ContentView+Weather.swift   # 🌤️ Revier-Tab: WeatherKit, Wind und Böen
-│   │   ├── WeatherDetailViews.swift    # Windkarte, Charts und Tagesdetails
-│   │   ├── ContentView+Tides.swift     # 🌊 Gezeiten-Tab: BSH-Tiden, Wasserstandskurve
-│   │   ├── ContentView+Crew.swift      # 👥 Crew-Tab: Rollen, Notfallkontakte, Bordstatus
-│   │   ├── ContentView+Logbook.swift   # 📒 Logbuch-Tab: Reisehistorie, PDF-Export
-│   │   ├── ContentView+RouteDetail.swift   # Routendetails und Berechnungsergebnisse
-│   │   ├── ContentView+SharedUI.swift  # Gemeinsame UI-Komponenten
-│   │   ├── CalculatorResultsSection.swift  # Detaillierte Berechnungsergebnisse
-│   │   ├── MapView.swift               # MapLibre-Kartenintegration
-│   │   ├── FullScreenMapView.swift     # Vollbild-Kartenansicht
-│   │   ├── FullScreenNavigationView.swift  # Vollbild-Navigation
-│   │   ├── LiquidGlassStyle.swift      # Glasmorphismus-UI-Styles
-│   │   └── WebView.swift               # Eingebettete Webansicht
+│   │   ├── ContentView.swift                # Hauptnavigation (4 Tabs), iPad-Erkennung & Scroll-Header
+│   │   ├── ContentView+MapTab.swift         # 🗺️ Karten-Tab: Seekarte, Routenplanung & Live-Dashboard
+│   │   ├── ContentView+Weather.swift        # 🌤️ Wetter & Gezeiten: WeatherKit, Windrose, 48h-Vorhersage
+│   │   ├── ContentView+Tides.swift          # 🌊 Gezeitenansicht: BSH-Pegel, HW/NW-Karten, Wasserstand
+│   │   ├── ContentView+Crew.swift           # 👥 Crewspace: Roster, Notfallkontakte & Bordstatus
+│   │   ├── ContentView+Logbook.swift        # 📒 Logbuch: Fahrtenbuch, Reisetagebuch & PDF-Export
+│   │   ├── ContentView+Nauti.swift          # ✨ Nauti KI: Floating Launcher & Anbindung
+│   │   ├── ContentView+NautiDrawer.swift    # Nauti KI Side-Drawer und Chat-Panel
+│   │   ├── ContentView+FloatingTabBar.swift # Schwebende Glas-Tab-Leiste mit Label-Unterstützung
+│   │   ├── ContentView+SharedUI.swift       # Gemeinsame UI-Elemente, Menüs & Bootseinstellungen
+│   │   ├── ContentView+RouteDetail.swift    # Routeninspektor & Wegpunktliste
+│   │   ├── CrewEventEditor.swift            # Termineditor für Crewspace-Planung
+│   │   ├── CrewPlanningView.swift           # Monatskalender & Terminübersicht
+│   │   ├── NautiChatView.swift              # KI-Chatoberfläche mit Sprachausgabe
+│   │   ├── NautiPremiumChatView.swift       # Vollbild-Chat mit Kontextaktionen
+│   │   ├── MapView.swift                    # MapLibre-Kartenintegration
+│   │   ├── FullScreenMapView.swift          # Vollbild-Kartenansicht mit Navigationsmodus
+│   │   ├── LiquidGlassStyle.swift           # Glasmorphismus-Designsystem
+│   │   └── WeatherDetailViews.swift         # Detailkarten für Wind, Böen und Luftdruck
 │   ├── Engine/
-│   │   ├── RoutePlannerViewModel.swift  # MVVM-ViewModel: Zustand und Berechnungssteuerung
-│   │   ├── RouteCalculationService.swift    # Kernberechnung: Zeiten, Tiefen, Status
-│   │   ├── RoutePlanModels.swift        # Datenmodelle für Routen und Ergebnisse
-│   │   ├── TidalHeightStrategy.swift    # MHW- und Lottiefe-Strategien
-│   │   ├── RuleOfTwelfths.swift         # Zwölftelregel-Implementation
-│   │   ├── PassageWindowScanner.swift   # Automatische Abfahrtsfenster-Suche
-│   │   ├── SeaRoutePlanner.swift        # Seekarten-Routenplanung
-│   │   ├── NauticalRouter.swift         # Nautisches Routing mit Wegpunkten
-│   │   ├── RouteExpander.swift          # Automatische Routenexpansion
-│   │   ├── RouteSummary.swift           # Zusammenfassung der Routenberechnung
-│   │   ├── WaddenSeaCatalog.swift       # Wattenmeer-Katalog-Parser
-│   │   ├── ProtectedZoneCatalog.swift   # Schutzzonen-Verwaltung
-│   │   ├── NavigationTracker.swift      # GPS-Positionsverfolgung
-│   │   ├── ActiveVoyageManager.swift    # Aktive Reiseverwaltung
-│   │   ├── AppDateFormatters.swift      # Zentrale Datumsformatierung
-│   │   ├── HarbourCatalog.swift         # Neutraler Hafen- und Koordinatenkatalog
-│   │   ├── MarineWeatherModels.swift    # Nautische Wetter-Domänenmodelle
-│   │   ├── NautiModels.swift            # Typisierte lokale KI-Aktionen und Verfügbarkeit
-│   │   ├── NautiChatViewModel.swift     # Chat-Zustand ohne Netzwerkabhängigkeit
-│   │   └── Routing/                     # Routing-Algorithmen und Graphen
+│   │   ├── RoutePlannerViewModel.swift       # MVVM-ViewModel für Törnplanung und Berechnungen
+│   │   ├── RoutePlannerViewModel+Support.swift # Hilfsfunktionen für Wegpunkte und Häfen
+│   │   ├── PassageWindowSolver.swift        # Solver für sichere Abfahrtszeitfenster
+│   │   ├── RouteCalculationService.swift    # Kernberechnung: Tiefen, Zeiten, Go/No-Go
+│   │   ├── RoutePlanModels.swift            # Datenmodelle für Routen, Segmente und Resultate
+│   │   ├── WaypointDepthSolver.swift        # Dynamische Tiefenauflösung pro Wegpunkt
+│   │   ├── WaypointTideContext.swift        # Gezeitenkontext für Wegpunkte
+│   │   ├── RuleOfTwelfths.swift             # Zwölftelregel-Berechnung
+│   │   ├── TidalHeightStrategy.swift        # MHW- und Lottiefe-Berechnungsstrategien
+│   │   ├── HarbourCatalog.swift             # Insel- und Festlandshäfen mit Pegelzuordnung
+│   │   ├── NauticalRouter.swift             # Nautisches Routing und Tonnenabgleich
+│   │   ├── RouteExpander.swift              # Automatische Routenexpansion
+│   │   ├── WaddenSeaCatalog.swift           # Parser für den Wattenmeer-Katalog
+│   │   ├── NautiChatViewModel.swift         # Zustandsverwaltung für Nauti On-Device
+│   │   ├── NautiModels.swift                # Typisierte Intentionen und Aktionen
+│   │   ├── NautiDeterministicIntentRouter.swift # Deterministische Aktionsauflösung
+│   │   └── Routing/                         # A*-Pathfinder, Seemasken & Wegglättung
 │   ├── Services/
-│   │   ├── BSHTideService.swift         # BSH-Gezeiten-API-Client
-│   │   ├── BSHWaterLevelService.swift   # BSH-Wasserstand-Messdaten
-│   │   ├── BSHWaterLevelForecastService.swift  # BSH-Wasserstandsvorhersage
-│   │   ├── WeatherKitManager.swift      # Apple-WeatherKit-Client und Cache
-│   │   ├── LocalAIInferenceManager.swift # Apple-Foundation-Models-Inferenz
-│   │   ├── WattseglerLotungenService.swift  # Wattseglervereinigung-Lotungen
-│   │   ├── EmdenPlantabelleService.swift    # Emden-Plantabelle
-│   │   ├── TideDataProvider.swift       # Abstrahierter Gezeitendaten-Provider
-│   │   └── LocationService.swift        # GPS-Ortungsdienst
+│   │   ├── BSHTideService.swift             # Client für BSH-Gezeitendaten
+│   │   ├── BSHWaterLevelForecastService.swift # BSH-Wasserstandsvorhersage
+│   │   ├── WeatherKitManager.swift          # Apple WeatherKit Manager mit Caching
+│   │   ├── LocalAIInferenceManager.swift    # On-Device Foundation Models Inferenz
+│   │   ├── NautiConversationRepository.swift # Lokale Speicherung von Chatverläufen
+│   │   ├── NautiSpeechInputManager.swift    # Lokale Spracheingabe (Speech Recognition)
+│   │   ├── SpeechAudioFormatConverter.swift # Audio-Konvertierung für On-Device-Modelle
+│   │   ├── WaterLevelCorrectionSeries.swift # Zeitreihen-Interpolation für Wasserstände
+│   │   ├── WattseglerLotungenService.swift  # Lotungsdaten der Soltwaters-Wattsegler
+│   │   └── LocationService.swift            # CoreLocation-Dienst für GPS-Tracking
 │   └── Resources/
-│       ├── wadden_sea_catalog.json      # Kuratierter Wattenmeer-Katalog
-│       ├── east_frisia.geojson          # Ostfriesland-Regionsdaten
-│       ├── east_frisia_osm.geojson      # OSM-basierte Kartendetails
-│       ├── nordsbefv.geojson            # Nordseebefundverordnung-Schutzzonen
-│       └── nordsbefv_eastfrisia.geojson # Schutzgebiete Ostfriesland
-├── ToernberechnungTests/
-│   └── RouteCalculationTests.swift      # Unit-Tests für Kern-Engine
-├── .github/workflows/
-│   └── ci.yml                           # CI: SwiftLint → Build & Test → SonarCloud → DocC
-├── .swiftlint.yml                       # SwiftLint-Konfiguration
-├── project.yml                          # XcodeGen-Projektdefinition
-├── Gemfile                              # Ruby-Abhängigkeiten (Fastlane)
-├── fastlane/                            # Fastlane-Konfiguration
-└── LICENSE                              # MIT-Lizenz
+│       ├── wadden_sea_catalog.json          # Kuratierter Wattenmeer-Routenkatalog
+│       ├── nordsbefv.geojson                # Schutzzonen der Nordseebefundverordnung
+│       ├── east_frisia.geojson              # Ostfriesische Küstenlinie und Inseln
+│       └── PrivacyInfo.xcprivacy            # Apple Privacy Manifest
+├── ToernberechnungTests/                    # 15 Testsuiten mit 128 Unit-Tests
+│   ├── ExcelParityDepthChainTests.swift     # Paritätstests zur Excel-Berechnungskette
+│   ├── ExcelParityRouteTests.swift          # Routenabgleich und Referenztests
+│   ├── PassageWindowSolverTests.swift       # Validierung des Passagefenster-Solvers
+│   ├── WeatherKitMigrationTests.swift       # Caching, Grid und nautische Einheiten
+│   ├── BSHTideMigrationTests.swift          # BSH-Datenparser und Pegelzuordnung
+│   └── ...
+├── ToernberechnungUITests/                  # Automatisierte XCUITest-Oberflächentests
+│   └── WeatherRevierUITests.swift           # UI-Tests, Onboarding & Screenshot-Generator
+├── assets/screenshots/                     # Hochauflösende Screenshots der App
+├── .github/workflows/ci.yml                 # CI-Pipeline (SwiftLint → Tests → SonarCloud → DocC)
+├── project.yml                              # XcodeGen-Spezifikation
+└── LICENSE                                  # MIT-Lizenz
 ```
 
 ---
@@ -293,11 +292,11 @@ Toernberechnung-iOS/
 
 | Tool | Version |
 |---|---|
+| macOS | 14.5+ (Sonoma) oder 15.0+ (Sequoia) |
 | Xcode | 16.0+ |
 | iOS Target | 18.0+ |
-| Swift | 5.9 |
+| Swift | 5.9+ |
 | XcodeGen | 2.30+ *(optional)* |
-| SwiftLint | Latest *(empfohlen)* |
 
 ### 1 · Repository klonen
 
@@ -306,100 +305,64 @@ git clone https://github.com/everybodydaniel/Toernberechnung-iOS.git
 cd Toernberechnung-iOS
 ```
 
-### 2 · Xcode-Projekt generieren (optional)
+### 2 · Xcode-Projekt öffnen & bauen
 
-Das `.xcodeproj` ist im Repository enthalten. Bei Änderungen an `project.yml` neu generieren:
-
-```bash
-# XcodeGen installieren (falls nötig)
-brew install xcodegen
-
-# Projekt generieren
-xcodegen generate
-```
-
-### 3 · Projekt öffnen & bauen
+Das vorkonfigurierte Projekt `Toernberechnung.xcodeproj` ist direkt im Repository enthalten:
 
 ```bash
 open Toernberechnung.xcodeproj
 ```
 
-Die Dependency (MapLibre) wird automatisch über **Swift Package Manager** aufgelöst.
+Alle externen Abhängigkeiten (wie MapLibre GL Native) werden beim ersten Öffnen automatisch über den **Swift Package Manager** bezogen.
 
-### 4 · WeatherKit aktivieren
-
-Aktiviere **WeatherKit** unter *Signing & Capabilities* für das App-Target sowie für die zugehörige App ID im Apple Developer Portal. Erzeuge danach bei Bedarf das Provisioning Profile neu.
-
-### 5 · SwiftLint installieren (empfohlen)
+*(Optional)* Falls Änderungen an `project.yml` vorgenommen wurden, kann das Projekt mit XcodeGen neu generiert werden:
 
 ```bash
-brew install swiftlint
+brew install xcodegen
+xcodegen generate
 ```
 
-> SwiftLint wird als Build-Phase automatisch ausgeführt, sofern installiert. Ohne SwiftLint läuft der Build trotzdem durch – es erscheint nur eine Warnung.
+### 3 · WeatherKit-Berechtigung
+
+Unter *Signing & Capabilities* im Xcode-Target **Toernberechnung** sicherstellen, dass die *WeatherKit*-Capability aktiv ist und ein gültiges Developer-Team ausgewählt ist.
 
 ---
 
-## 🧹 Code Quality
+## 🧪 Tests & Qualitätssicherung
+
+### Unit-Tests
+
+Die Testsuite umfasst **128 automatisierte Tests**, die mathematische Berechnungen, Gezeiteninterpolation, Caching und Datenparität absichern:
+
+```bash
+xcodebuild test \
+  -scheme ToernberechnungTests \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
+```
+
+### UI-Tests & Screenshot-Generierung
+
+Die XCUITest-Suite prüft die Navigation aller Tabs, Onboarding, iPad-Layouts und Dark-Mode-Rendering. Mit dem Test `testGenerateReadmeScreenshots` können die Dokumentations-Screenshots jederzeit reproduzierbar im Simulator erzeugt werden:
+
+```bash
+xcodebuild test \
+  -scheme ToernberechnungUITests \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:ToernberechnungUITests/WeatherRevierUITests/testGenerateReadmeScreenshots
+```
 
 ### SwiftLint
 
-Das Projekt nutzt [SwiftLint](https://github.com/realm/SwiftLint) für statische Code-Analyse. Die Konfiguration liegt in `.swiftlint.yml`.
-
 ```bash
-# Lokal ausführen
+# Linting ausführen
 swiftlint lint --config .swiftlint.yml
-
-# Automatische Korrektur (wo möglich)
-swiftlint --fix --config .swiftlint.yml
-```
-
-### DocC-Dokumentation
-
-Swift-Quellcode ist mit `///`-DocC-Kommentaren dokumentiert. Dokumentation kompilieren:
-
-```bash
-# Via Xcode: Product → Build Documentation (⌃⇧⌘D)
-
-# Via Terminal
-xcodebuild docbuild \
-  -project Toernberechnung.xcodeproj \
-  -scheme Toernberechnung \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
-```
-
----
-
-## 🧪 Tests
-
-Unit-Tests liegen unter `ToernberechnungTests/` und decken ab:
-
-- Zwölftelregel und Hochwasserabweichungen
-- Reisezeiten, SOG und Etappenberechnung
-- Kombination von Gezeiten- und Wetterstatus
-- Regression für Emden → Norderney
-- Laden und Konsistenz des Wattenmeer-Katalogs
-
-```bash
-# Tests über CLI ausführen
-xcodebuild test \
-  -project Toernberechnung.xcodeproj \
-  -scheme Toernberechnung \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
 ---
 
 ## ⚙️ CI/CD Pipeline
 
-Die GitHub Actions Pipeline (`.github/workflows/ci.yml`) führt bei jedem Push/PR auf `main` aus:
-
-| Job | Beschreibung |
-|---|---|
-| 🧹 **SwiftLint** | Statische Code-Analyse mit GitHub Actions Logging |
-| 🏗️ **Build & Test** | Kompilierung, SPM-Auflösung und Unit Tests auf iOS Simulator |
-| 📊 **SonarCloud** | Automatisierte Code-Qualitätsanalyse mit Test-Reports |
-| 📚 **DocC Deploy** | Dokumentations-Build und Deployment auf GitHub Pages |
+Die GitHub Actions Pipeline (`.github/workflows/ci.yml`) sichert jeden Commit und Pull Request auf `main` vollautomatisch ab:
 
 ```mermaid
 graph LR
@@ -415,38 +378,20 @@ graph LR
     style E fill:#e1f5fe,stroke:#0288d1
 ```
 
-> Alle Actions sind auf volle Commit-SHAs gepinnt (Supply-Chain-Sicherheit).
+1. **SwiftLint** – Prüfung auf Code-Style und saubere Konventionen
+2. **Build & Test** – Bauen des iOS-Ziels und Ausführen der Testsuite im iOS Simulator
+3. **SonarCloud** – Statische Analyse und Qualitäts-Gateways
+4. **DocC Deployment** – Automatisches Veröffentlichen der interaktiven Swift-Dokumentation auf GitHub Pages
 
 ---
 
 ## 📚 Dokumentation
 
-Die gesamte Codebasis ist nach DocC-Standard dokumentiert. Die statische Dokumentationswebsite wird bei jedem Push automatisch auf GitHub Pages veröffentlicht:
+Die vollständige Entwicklerdokumentation steht als DocC-Katalog zur Verfügung:
 
-👉 **[DocC-Dokumentation](https://everybodydaniel.github.io/Toernberechnung-iOS/documentation/toernberechnung/)**
-
-Lokale Generierung:
-
-```bash
-xcodebuild docbuild \
-  -project Toernberechnung.xcodeproj \
-  -scheme Toernberechnung \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
-```
+👉 **[DocC Dokumentation ansehen](https://everybodydaniel.github.io/Toernberechnung-iOS/documentation/toernberechnung/)**
 
 ---
-
-## 🔢 Versionierung
-
-Das Projekt nutzt [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
-
-| Xcode-Feld | Bedeutung | Beispiel |
-|---|---|---|
-| `MARKETING_VERSION` | Öffentliche Version (SemVer) | `1.0` |
-| `CURRENT_PROJECT_VERSION` | Build-Nummer (inkrementell) | `1` |
-
-
-
 
 ## 📄 Lizenz
 

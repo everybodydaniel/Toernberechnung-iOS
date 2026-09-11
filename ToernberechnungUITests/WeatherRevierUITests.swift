@@ -250,4 +250,92 @@ final class WeatherRevierUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
+
+    func testGenerateReadmeScreenshots() throws {
+        let app = makeApp()
+        app.launch()
+
+        let fileManager = FileManager.default
+        let targetDir = "/tmp/tagnode_screenshots"
+        try? fileManager.createDirectory(atPath: targetDir, withIntermediateDirectories: true)
+
+        func saveScreenshot(name: String) {
+            let screenshot = XCUIScreen.main.screenshot()
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+
+            let data = screenshot.pngRepresentation
+            let path = "\(targetDir)/\(name).png"
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
+
+        // 1. Map Tab with calculated route
+        let planPill = app.buttons["MapPlanningPill"]
+        if planPill.waitForExistence(timeout: 8) {
+            planPill.tap()
+
+            let startPicker = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "START")).firstMatch
+            if startPicker.waitForExistence(timeout: 3) {
+                startPicker.tap()
+                let borkumOption = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Borkum")).firstMatch
+                if borkumOption.waitForExistence(timeout: 3) {
+                    borkumOption.tap()
+                }
+            }
+
+            let destPicker = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "ZIEL")).firstMatch
+            if destPicker.waitForExistence(timeout: 3) {
+                destPicker.tap()
+                let norderneyOption = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Norderney")).firstMatch
+                if norderneyOption.waitForExistence(timeout: 3) {
+                    norderneyOption.tap()
+                }
+            }
+
+            let calcBtn = app.buttons["CalculateVoyageButton"]
+            if calcBtn.waitForExistence(timeout: 3) && calcBtn.isEnabled {
+                calcBtn.tap()
+            } else {
+                let closeBtn = app.buttons["Törnplanung schließen"]
+                if closeBtn.exists { closeBtn.tap() }
+            }
+        }
+
+        Thread.sleep(forTimeInterval: 2.5)
+        saveScreenshot(name: "01_map_tab")
+
+        // 2. Weather Tab
+        let weatherTab = app.tabBars.buttons["Wetter"]
+        if weatherTab.waitForExistence(timeout: 5) {
+            weatherTab.tap()
+            Thread.sleep(forTimeInterval: 2.0)
+            saveScreenshot(name: "02_weather_tab")
+
+            // 3. Tides Sub-section
+            let tidesButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Gezeiten")).firstMatch
+            if tidesButton.waitForExistence(timeout: 5) {
+                tidesButton.tap()
+                Thread.sleep(forTimeInterval: 2.0)
+                saveScreenshot(name: "03_tides_tab")
+            }
+        }
+
+        // 4. Crew Tab
+        let crewTab = app.tabBars.buttons["Crewspace"]
+        if crewTab.waitForExistence(timeout: 5) {
+            crewTab.tap()
+            Thread.sleep(forTimeInterval: 2.0)
+            saveScreenshot(name: "04_crew_tab")
+        }
+
+        // 5. Logbook Tab
+        let logbookTab = app.tabBars.buttons["Logbuch"]
+        if logbookTab.waitForExistence(timeout: 5) {
+            logbookTab.tap()
+            Thread.sleep(forTimeInterval: 2.0)
+            saveScreenshot(name: "05_logbook_tab")
+        }
+    }
 }
