@@ -333,8 +333,8 @@ struct SettingsSheet: View {
             settingsTextField("Bootsname", text: $boatName, icon: "tag.fill")
             settingsTextField("Rufzeichen", text: $boatCallsign, icon: "antenna.radiowaves.left.and.right")
             settingsMeasurementMenu("Tiefgang", storage: $boatDraft, tenths: Array(stride(from: 2, through: 20, by: 2)), icon: "arrow.down.to.line", identifier: "BoatDraftMenu")
-            settingsMeasurementMenu("Länge", storage: $boatLength, tenths: Array(stride(from: 20, through: 300, by: 5)), icon: "ruler", identifier: "BoatLengthMenu")
-            settingsMeasurementMenu("Sicherheitsmarge", storage: $safetyMargin, tenths: Array(stride(from: 0, through: 50, by: 2)), icon: "shield.checkered", identifier: "SafetyMarginMenu")
+            settingsMeasurementField("Länge", storage: $boatLength, icon: "ruler", identifier: "BoatLengthField")
+            settingsMeasurementField("Sicherheitsmarge", storage: $safetyMargin, icon: "shield.checkered", identifier: "SafetyMarginField")
         }
     }
 
@@ -516,6 +516,30 @@ struct SettingsSheet: View {
 
     private func measurementLabel(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(1))) + " m"
+    }
+
+    // MARK: - Manual numeric input field (replaces dropdown for Länge & Sicherheitsmarge)
+
+    /// A text-field row that only accepts decimal numbers.
+    /// – Keyboard is `.decimalPad` (digits + separator, no emoji).
+    /// – Non-numeric characters are stripped on every keystroke.
+    /// – On commit the value is normalised to German locale with exactly two
+    ///   fraction digits (e.g. "0.1" → "0,10", "12" → "12,00").
+    /// – The underlying `@AppStorage` string keeps the dot-decimal contract
+    ///   used elsewhere ("12.00").
+    private func settingsMeasurementField(
+        _ title: String,
+        storage: Binding<String>,
+        icon: String,
+        identifier: String
+    ) -> some View {
+        MeasurementTextField(
+            title: title,
+            storage: storage,
+            icon: icon,
+            identifier: identifier
+        )
+        .appFieldSurface(cornerRadius: 16)
     }
 
     // Inline text-field row. Sits INSIDE a glass card, so it stays as a

@@ -251,6 +251,64 @@ final class WeatherRevierUITests: XCTestCase {
         add(screenshot)
     }
 
+    func testCrewCalendarSharingShowsInvitationAndCalendarAttachment() {
+        let app = makeApp()
+        app.launch()
+        let crewspaceTab = app.tabBars.buttons["Crewspace"]
+        XCTAssertTrue(crewspaceTab.waitForExistence(timeout: 10))
+        crewspaceTab.tap()
+        app.buttons["CrewspaceSectionPlanung"].tap()
+        let addEvent = app.buttons["Termin"]
+        for _ in 0..<4 where !addEvent.isHittable { app.swipeUp() }
+        XCTAssertTrue(addEvent.isHittable)
+        addEvent.tap()
+
+        let titleField = app.textFields["z. B. Ablegen Norderney"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5))
+        app.buttons["Törnstart"].tap()
+        titleField.tap()
+        titleField.typeText(" Norderney")
+        let editorScroll = app.scrollViews["CrewEventEditorScroll"]
+        editorScroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            .press(forDuration: 0.1, thenDragTo: editorScroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)))
+        let saveEvent = app.buttons["Termin hinzufügen"]
+        for _ in 0..<6 where !saveEvent.isHittable { editorScroll.swipeUp() }
+        XCTAssertTrue(saveEvent.isHittable)
+        saveEvent.tap()
+        XCTAssertTrue(app.navigationBars["Neuer Termin"].waitForNonExistence(timeout: 5))
+
+        let share = app.buttons["Termin teilen"].firstMatch
+        for _ in 0..<4 where !share.isHittable { app.swipeUp() }
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        share.tap()
+        XCTAssertTrue(app.buttons["Kalendereintrag teilen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["CREWSPACE · TERMIN"].exists)
+        let invitation = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        invitation.name = "Crew-Kalendereinladung"
+        invitation.lifetime = .keepAlways
+        add(invitation)
+
+        app.buttons["Zum Kalender hinzufügen"].tap()
+        let nativeTitle = app.textFields.matching(NSPredicate(format: "value == %@", "Törnstart Norderney")).firstMatch
+        XCTAssertTrue(nativeTitle.waitForExistence(timeout: 10))
+        let calendarEditor = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        calendarEditor.name = "Crew-Apple-Kalenderdialog"
+        calendarEditor.lifetime = .keepAlways
+        add(calendarEditor)
+        let cancel = app.buttons.matching(NSPredicate(format: "label == 'Abbrechen' OR label == 'Cancel'")).firstMatch
+        XCTAssertTrue(cancel.exists)
+        cancel.tap()
+        XCTAssertTrue(app.buttons["Zum Kalender hinzufügen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Zum Kalender hinzufügen"].isEnabled)
+
+        app.buttons["Kalendereintrag teilen"].tap()
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 10))
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "Crew-iCalendar-Teilen"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testGenerateReadmeScreenshots() throws {
         let app = makeApp()
         app.launch()

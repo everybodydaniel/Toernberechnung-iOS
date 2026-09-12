@@ -28,7 +28,7 @@ enum AppTab: Hashable, CaseIterable {
         switch self {
         case .map: return "map.fill"
         case .conditions: return "cloud.sun.rain.fill"
-        case .crew: return "person.3.fill"
+        case .crew: return "person.2.badge.gearshape.fill"
         case .logbook: return "book.closed.fill"
         }
     }

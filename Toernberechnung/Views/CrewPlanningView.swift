@@ -47,19 +47,6 @@ extension CrewEventRecord {
     var resolvedCategory: CrewEventCategory {
         CrewEventCategory.resolved(category)
     }
-
-    /// Plain-text representation used by the share sheet. Deliberately readable
-    /// in any target app — mail, messages or a notes app all get the same text.
-    var shareText: String {
-        var lines = [title]
-        lines.append(CrewEventFormat.timeRange(self))
-        if !location.isEmpty { lines.append("Ort: \(location)") }
-        if !attendees.isEmpty { lines.append("Crew: \(attendees.joined(separator: ", "))") }
-        if !notes.isEmpty { lines.append("") ; lines.append(notes) }
-        lines.append("")
-        lines.append("Geplant mit TideNode")
-        return lines.joined(separator: "\n")
-    }
 }
 
 enum CrewEventFormat {
@@ -96,6 +83,8 @@ struct CrewPlanningView: View {
     @State private var selectedDate = Date()
     @State private var newEventShown = false
     @State private var eventToEdit: CrewEventRecord?
+    @State private var eventToShare: CrewCalendarExport?
+    @State private var shareError: String?
 
     var body: some View {
         List {
@@ -129,7 +118,7 @@ struct CrewPlanningView: View {
                             Button { eventToEdit = event } label: {
                                 Label("Bearbeiten", systemImage: "pencil")
                             }
-                            ShareLink(item: event.shareText) {
+                            Button { prepareShare(event) } label: {
                                 Label("Termin teilen", systemImage: "square.and.arrow.up")
                             }
                             Button(role: .destructive) {
@@ -148,7 +137,7 @@ struct CrewPlanningView: View {
                             }
                         }
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            ShareLink(item: event.shareText) {
+                            Button { prepareShare(event) } label: {
                                 Label("Teilen", systemImage: "square.and.arrow.up")
                             }
                             .tint(Color.appPrimary)
@@ -172,7 +161,7 @@ struct CrewPlanningView: View {
                 insert(draft)
                 newEventShown = false
             }
-            .presentationDetents([.fraction(0.68), .large])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(30)
             .appSheetGlassBackground()
@@ -182,10 +171,35 @@ struct CrewPlanningView: View {
                 apply(draft, to: event)
                 eventToEdit = nil
             }
-            .presentationDetents([.fraction(0.68), .large])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(30)
             .appSheetGlassBackground()
+        }
+        .sheet(item: $eventToShare) { event in
+            CrewEventShareView(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(30)
+        }
+        .alert("Teilen fehlgeschlagen", isPresented: Binding(
+            get: { shareError != nil },
+            set: { if !$0 { shareError = nil } }
+        )) {
+            Button("OK", role: .cancel) { shareError = nil }
+        } message: {
+            Text(shareError ?? "Der Kalendereintrag konnte nicht erstellt werden.")
+        }
+    }
+
+    @MainActor
+    private func prepareShare(_ event: CrewEventRecord) {
+        do {
+            // Persist first so the exported UID uses the permanent store identity.
+            try modelContext.save()
+            eventToShare = try CrewCalendarExport(event: event)
+        } catch {
+            shareError = "Der Kalendereintrag konnte nicht erstellt werden: \(error.localizedDescription)"
         }
     }
 
@@ -291,7 +305,7 @@ struct CrewPlanningView: View {
                 }
                 .accessibilityLabel("Termin bearbeiten")
 
-                ShareLink(item: event.shareText) {
+                Button { prepareShare(event) } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 36, height: 36)
@@ -409,7 +423,7 @@ struct CrewMonthCalendar: View {
                 .contentTransition(.numericText())
             Spacer()
 
-            if !calendar.isDate(selectedDate, inSameDayAs: .now) {
+            if !calendar.isDate(visibleMonth, equalTo: .now, toGranularity: .month) {
                 Button("Heute") { select(.now) }
                     .font(.system(size: 12, weight: .heavy))
                     .buttonStyle(.plain)
@@ -532,7 +546,7 @@ struct CrewMonthCalendar: View {
         return symbols
     }
 
-    /// One entry per grid slot; `nil` pads the days before the 1st.
+    /// Always six weeks so the calendar keeps its height when changing months.
     private var gridDays: [Date?] {
         guard let interval = calendar.dateInterval(of: .month, for: visibleMonth),
               let dayCount = calendar.range(of: .day, in: .month, for: visibleMonth)?.count else {
@@ -543,6 +557,7 @@ struct CrewMonthCalendar: View {
         let days: [Date?] = (0..<dayCount).map {
             calendar.date(byAdding: .day, value: $0, to: interval.start)
         }
-        return Array(repeating: nil, count: leading) + days
+        let trailing = 42 - leading - days.count
+        return Array(repeating: nil, count: leading) + days + Array(repeating: nil, count: trailing)
     }
 }

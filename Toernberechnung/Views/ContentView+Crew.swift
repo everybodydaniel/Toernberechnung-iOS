@@ -251,7 +251,7 @@ struct CrewspaceCrewView: View {
                         .font(.system(size: 28, weight: .heavy))
                         .foregroundStyle(Color.appPrimary)
                         .contentTransition(.numericText())
-                    Text("\(crewMembers.count) Crewmitglieder")
+                    Text("\(crewMembers.count) \(crewMembers.count == 1 ? "Crewmitglied" : "Crewmitglieder")")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.secondary)
                 }
@@ -262,7 +262,7 @@ struct CrewspaceCrewView: View {
             }
 
             if onboardMembers.isEmpty {
-                Text("Aktuell ist niemand als an Bord markiert.")
+                Text("Aktuell ist niemand an Bord.")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.secondary)
             } else {
@@ -401,16 +401,33 @@ struct CrewspaceCrewView: View {
 
             Spacer()
 
-            Toggle("An Bord", isOn: Binding(
-                get: { member.isOnBoard },
-                set: {
-                    member.isOnBoard = $0
-                    try? modelContext.save()
-                }
-            ))
-            .labelsHidden()
-            .tint(role.tint)
+            onboardIndicator(for: member)
         }
+    }
+
+    private func onboardIndicator(for member: CrewMemberRecord) -> some View {
+        let tint: Color = member.isOnBoard ? .green : .red
+
+        return Button {
+            member.isOnBoard.toggle()
+            try? modelContext.save()
+        } label: {
+            Circle()
+                .fill(tint.gradient)
+                .frame(width: 26, height: 26)
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.65), lineWidth: 2)
+                }
+                .shadow(color: tint.opacity(0.45), radius: 6)
+                .frame(width: 44, height: 44)
+                .background(tint.opacity(0.10), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Bordstatus von \(member.name)")
+        .accessibilityValue(member.isOnBoard ? "An Bord" : "Nicht an Bord")
+        .accessibilityHint(member.isOnBoard ? "Als nicht an Bord markieren" : "Als an Bord markieren")
     }
 
     private func roleSelector(selection: Binding<CrewRoleOption>) -> some View {
@@ -464,13 +481,13 @@ struct CrewspaceCrewView: View {
             emergencyContact: emergencyContact.trimmingCharacters(in: .whitespacesAndNewlines),
             emergencyPhone: emergencyPhone.trimmingCharacters(in: .whitespacesAndNewlines),
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
-            isOnBoard: false
+            isOnBoard: true
         )
         modelContext.insert(record)
         modelContext.insert(AuditLog(
             action: "INSERT",
             source: "crew",
-            statement: "INSERT INTO crew(name, role, is_on_board) VALUES ('\(name)', '\(selectedRole.rawValue)', false)",
+            statement: "INSERT INTO crew(name, role, is_on_board) VALUES ('\(name)', '\(selectedRole.rawValue)', true)",
             status: "ok"
         ))
         try? modelContext.save()

@@ -97,46 +97,99 @@ final class CrewPlanningTests: XCTestCase {
     }
 
     @MainActor
-    func testShareTextContainsEveryFilledFieldAndSkipsEmptyOnes() throws {
+    func testCalendarExportContainsFieldsAndUTCInstants() throws {
         let start = try date("2026-07-16T14:00:00+02:00")
-        let full = CrewEventRecord(
-            title: "Ablegen Norderney",
-            startsAt: start,
-            endsAt: start.addingTimeInterval(3600),
-            location: "Norderney Hafen",
-            notes: "Schwimmwesten prüfen",
-            category: CrewEventCategory.departure.rawValue,
-            attendees: ["Daniel", "Lea"]
+        let event = CrewEventRecord(
+            title: "Ablegen Norderney", startsAt: start, endsAt: start.addingTimeInterval(3600),
+            location: "Norderney Hafen", notes: "Schwimmwesten prüfen",
+            category: CrewEventCategory.departure.rawValue, attendees: ["Daniel", "Lea"]
         )
-
-        let text = full.shareText
-        XCTAssertTrue(text.hasPrefix("Ablegen Norderney"))
-        XCTAssertTrue(text.contains("14:00–15:00 Uhr"))
-        XCTAssertTrue(text.contains("Ort: Norderney Hafen"))
-        XCTAssertTrue(text.contains("Crew: Daniel, Lea"))
+        let text = try CrewCalendarExport(event: event).calendarText(generatedAt: start)
+            .replacingOccurrences(of: "\r\n ", with: "")
+        XCTAssertTrue(text.hasPrefix("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"))
+        XCTAssertTrue(text.hasSuffix("END:VEVENT\r\nEND:VCALENDAR\r\n"))
+        XCTAssertTrue(text.contains("DTSTAMP:20260716T120000Z"))
+        XCTAssertTrue(text.contains("DTSTART:20260716T120000Z"))
+        XCTAssertTrue(text.contains("DTEND:20260716T130000Z"))
+        XCTAssertTrue(text.contains("SUMMARY:Ablegen Norderney"))
+        XCTAssertTrue(text.contains("LOCATION:Norderney Hafen"))
+        XCTAssertTrue(text.contains("CATEGORIES:Törnstart"))
         XCTAssertTrue(text.contains("Schwimmwesten prüfen"))
-        XCTAssertTrue(text.hasSuffix("Geplant mit TideNode"))
-
-        let bare = CrewEventRecord(
-            title: "Crewtreffen",
-            startsAt: start,
-            endsAt: start.addingTimeInterval(1800)
-        )
-        XCTAssertFalse(bare.shareText.contains("Ort:"))
-        XCTAssertFalse(bare.shareText.contains("Crew:"))
+        XCTAssertTrue(text.contains("Crew: Daniel\\, Lea"))
+        XCTAssertFalse(text.contains("ATTENDEE:"))
     }
 
     @MainActor
-    func testAllDayEventReportsTheDayInsteadOfATimeRange() throws {
-        let start = try date("2026-07-16T00:00:00+02:00")
+    func testAllDayExportUsesExclusiveEndAcrossDaylightSavingChange() throws {
         let event = CrewEventRecord(
-            title: "Überführung",
-            startsAt: start,
-            endsAt: try date("2026-07-16T23:59:00+02:00"),
-            isAllDay: true
+            title: "Überführung", startsAt: try date("2026-10-25T00:00:00+02:00"),
+            endsAt: try date("2026-10-25T23:59:00+01:00"), isAllDay: true
         )
-        XCTAssertTrue(event.shareText.contains("ganztägig"))
-        XCTAssertFalse(event.shareText.contains("–"))
+        let text = try CrewCalendarExport(event: event).calendarText()
+        XCTAssertTrue(text.contains("DTSTART;VALUE=DATE:20261025\r\n"))
+        XCTAssertTrue(text.contains("DTEND;VALUE=DATE:20261026\r\n"))
+        XCTAssertFalse(text.contains("DTSTART:"))
+        XCTAssertTrue(CrewEventFormat.timeRange(event).contains("ganztägig"))
+    }
+
+    @MainActor
+    func testCalendarExportEscapesTextAndFoldsWithoutBreakingUnicode() throws {
+        let start = try date("2026-09-18T15:00:00+02:00")
+        let title = "Törn, Crew; \\ Hafen\r\nBEGIN:VEVENT"
+        let notes = String(repeating: "Grüße ⚓️ 🌊 ", count: 40)
+        let event = CrewEventRecord(title: title, startsAt: start, endsAt: start, notes: notes)
+        let export = try CrewCalendarExport(event: event)
+        let text = export.calendarText()
+        let lines = text.components(separatedBy: "\r\n")
+        XCTAssertTrue(lines.allSatisfy { $0.utf8.count <= 75 })
+        XCTAssertTrue(lines.contains { $0.hasPrefix(" ") })
+        XCTAssertEqual(lines.filter { $0 == "BEGIN:VEVENT" }.count, 1)
+        let unfolded = text.replacingOccurrences(of: "\r\n ", with: "")
+        XCTAssertTrue(unfolded.contains("SUMMARY:Törn\\, Crew\\; \\\\ Hafen\\nBEGIN:VEVENT"))
+        XCTAssertTrue(unfolded.contains(notes))
+        XCTAssertTrue(unfolded.contains("DTEND:20260918T130100Z"))
+        XCTAssertFalse(export.fileName.contains("/"))
+        XCTAssertFalse(export.fileName.contains("\n"))
+    }
+
+    @MainActor
+    func testCalendarIdentityIsStableAfterEditingAndRefetching() throws {
+        let context = try makeContext()
+        let start = try date("2026-09-18T15:00:00+02:00")
+        let event = CrewEventRecord(title: "Törn", startsAt: start, endsAt: start.addingTimeInterval(3600))
+        context.insert(event)
+        try context.save()
+        let original = try CrewCalendarExport(event: event)
+        event.title = "Neuer Titel"
+        event.startsAt = start.addingTimeInterval(1800)
+        try context.save()
+        let freshContext = ModelContext(context.container)
+        let fetched = try XCTUnwrap(try freshContext.fetch(FetchDescriptor<CrewEventRecord>()).first)
+        XCTAssertEqual(try CrewCalendarExport(event: fetched).id, original.id)
+        let other = CrewEventRecord(title: fetched.title, startsAt: fetched.startsAt, endsAt: fetched.endsAt)
+        context.insert(other)
+        try context.save()
+        XCTAssertNotEqual(try CrewCalendarExport(event: other).id, original.id)
+    }
+
+    @MainActor
+    func testSharedFileIsICalendarAndKeepsIndependentExports() throws {
+        let start = try date("2026-09-18T15:00:00+02:00")
+        let event = CrewEventRecord(title: "Ablegen / Norderney", startsAt: start, endsAt: start.addingTimeInterval(3600))
+        let export = try CrewCalendarExport(event: event)
+        let first = try export.writeFile()
+        let second = try export.writeFile()
+        defer {
+            try? FileManager.default.removeItem(at: first.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: second.deletingLastPathComponent())
+        }
+        XCTAssertEqual(first.pathExtension, "ics")
+        XCTAssertNotEqual(first, second)
+        let text = try String(contentsOf: first, encoding: .utf8)
+        XCTAssertTrue(text.hasPrefix("BEGIN:VCALENDAR\r\n"))
+        XCTAssertTrue(text.contains("SUMMARY:Ablegen / Norderney"))
+        XCTAssertFalse(text.contains("LOCATION:"))
+        XCTAssertFalse(text.contains("Crew:"))
     }
 
     @MainActor

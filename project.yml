@@ -29,6 +29,8 @@ targets:
       - path: Toernberechnung/Views/ContentView+Crew.swift
       - path: Toernberechnung/Views/CrewPlanningView.swift
       - path: Toernberechnung/Views/CrewEventEditor.swift
+      - path: Toernberechnung/Views/CrewEventShareView.swift
+      - path: Toernberechnung/Engine/CrewCalendarExport.swift
       - path: Toernberechnung/Views/ContentView+Logbook.swift
       - path: Toernberechnung/Views/ContentView+InitialData.swift
       - path: Toernberechnung/Views/ContentView+RouteDetail.swift
@@ -38,6 +40,7 @@ targets:
       - path: Toernberechnung/Views/WebView.swift
       - path: Toernberechnung/Views/LiquidGlassStyle.swift
       - path: Toernberechnung/Views/KeyboardDismissal.swift
+      - path: Toernberechnung/Views/MeasurementTextField.swift
       - path: Toernberechnung/Views/NautiChatView.swift
       - path: Toernberechnung/Views/NautiPremiumChatView.swift
       - path: Toernberechnung/Engine/AppDateFormatters.swift

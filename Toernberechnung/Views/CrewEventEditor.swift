@@ -52,30 +52,35 @@ struct CrewEventEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    summaryBanner
-                    categoryPicker
-                    titleCard
+                    VStack(alignment: .leading, spacing: 18) {
+                        editorHeading
+                        titleCard
+                        categoryPicker
+                    }
+                    .appCardSurface(cornerRadius: 22)
                     timeCard
                     detailsCard
                     if !crewMembers.isEmpty { crewCard }
+                    saveBar
                 }
                 .padding(16)
                 .padding(.bottom, 28)
             }
+            .accessibilityIdentifier("CrewEventEditorScroll")
+            .scrollDismissesKeyboard(.interactively)
+            .appSheetBackground {
+                Color.appBackground.ignoresSafeArea()
+            }
             .navigationTitle(event == nil ? "Neuer Termin" : "Termin bearbeiten")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Sichern") {
-                        save()
-                    }
-                    .fontWeight(.bold)
-                    .disabled(trimmedTitle.isEmpty)
+                    .accessibilityLabel("Termineditor schließen")
                 }
             }
         }
@@ -84,30 +89,44 @@ struct CrewEventEditor: View {
         .onAppear(perform: prepare)
     }
 
-    /// Live preview of the appointment as it will appear in the day list.
-    private var summaryBanner: some View {
+    private var editorHeading: some View {
         HStack(spacing: 12) {
-            Image(systemName: category.icon)
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
-                .background(category.tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trimmedTitle.isEmpty ? category.rawValue : trimmedTitle)
-                    .font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(trimmedTitle.isEmpty ? Color.secondary : Color.primary)
-                    .lineLimit(1)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event == nil ? "Termin planen" : "Termin bearbeiten")
+                    .font(.system(size: 28, weight: .heavy))
+                    .foregroundStyle(Color.appPrimary)
+                Text("Zeit, Ort und Crew abstimmen")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.secondary)
                 Text(summaryTimeText)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color.secondary)
-                    .lineLimit(1)
             }
             Spacer(minLength: 0)
+            Image(systemName: category.icon)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(category.tint)
+                .frame(width: 44, height: 44)
+                .appGlassIconBackground()
         }
-        .padding(12)
-        .background(category.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: category)
+    }
+
+    private var saveBar: some View {
+        VStack(spacing: 8) {
+            if trimmedTitle.isEmpty {
+                Text("Bitte einen Titel eingeben.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Button(action: save) {
+                Label(event == nil ? "Termin hinzufügen" : "Änderungen sichern", systemImage: "checkmark.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .appProminentButton(tint: Color.appPrimary)
+            .disabled(trimmedTitle.isEmpty)
+        }
+        .padding(.vertical, 12)
     }
 
     private var summaryTimeText: String {
@@ -161,7 +180,7 @@ struct CrewEventEditor: View {
 
     private var timeCard: some View {
         VStack(alignment: .leading, spacing: 11) {
-            sectionLabel("ZEIT")
+            cardHeading("Zeit", icon: "calendar.badge.clock")
 
             VStack(spacing: 12) {
                 Toggle(isOn: $isAllDay.animation(.spring(response: 0.28, dampingFraction: 0.86))) {
@@ -226,14 +245,13 @@ struct CrewEventEditor: View {
                     }
                 }
             }
-            .padding(15)
-            .appCardSurface(cornerRadius: 20)
         }
+        .appCardSurface(cornerRadius: 22)
     }
 
     private var detailsCard: some View {
         VStack(alignment: .leading, spacing: 9) {
-            sectionLabel("DETAILS")
+            cardHeading("Details", icon: "text.bubble.fill")
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
                     Image(systemName: "mappin.and.ellipse")
@@ -259,15 +277,14 @@ struct CrewEventEditor: View {
                 }
                 .font(.system(size: 15, weight: .medium))
             }
-            .padding(15)
-            .appCardSurface(cornerRadius: 20)
         }
+        .appCardSurface(cornerRadius: 22)
     }
 
     private var crewCard: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
-                sectionLabel("WER IST DABEI")
+                cardHeading("Wer ist dabei?", icon: "person.2.fill")
                 Spacer()
                 if !attendees.isEmpty {
                     Text("\(attendees.count) ausgewählt")
@@ -305,9 +322,15 @@ struct CrewEventEditor: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(15)
-            .appCardSurface(cornerRadius: 20)
         }
+        .appCardSurface(cornerRadius: 22)
+    }
+
+    private func cardHeading(_ text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 17, weight: .heavy))
+            .foregroundStyle(Color.appPrimary)
+            .padding(.bottom, 4)
     }
 
     private func sectionLabel(_ text: String) -> some View {
