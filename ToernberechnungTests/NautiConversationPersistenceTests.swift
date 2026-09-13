@@ -239,6 +239,27 @@ final class NautiConversationPersistenceTests: XCTestCase {
     }
 
     @MainActor
+    func testCrewspaceRequestsOpenFormInOriginatingConversation() async {
+        let model = makeViewModel()
+        let conversationID = model.activeConversationID
+        model.draft = "Ich möchte ein Crewmitglied hinzufügen"
+        let dispatch = await model.sendCurrentDraft()
+        XCTAssertNil(dispatch)
+        XCTAssertEqual(model.crewspaceEditor?.kind, .crewMember)
+        XCTAssertEqual(model.crewspaceEditor?.conversationID, conversationID)
+        XCTAssertTrue(model.draft.isEmpty)
+        XCTAssertFalse(model.isSending)
+        XCTAssertTrue(model.messages.last?.text.contains("Formular") == true)
+        XCTAssertFalse(model.messages.contains { $0.text == "Verstanden." })
+
+        model.crewspaceEditor = nil
+        model.draft = "Ich möchte ein Termin planen"
+        _ = await model.sendCurrentDraft()
+        XCTAssertEqual(model.crewspaceEditor?.kind, .event)
+        XCTAssertEqual(model.crewspaceEditor?.conversationID, conversationID)
+    }
+
+    @MainActor
     private func makeViewModel() -> NautiChatViewModel {
         NautiChatViewModel(
             inferenceClient: ConversationTestInferenceClient(),

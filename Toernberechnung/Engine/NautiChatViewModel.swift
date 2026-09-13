@@ -12,6 +12,8 @@ final class NautiChatViewModel {
     private(set) var generatingConversationID: UUID?
     private(set) var didLoadHistory = false
 
+    var crewspaceEditor: NautiCrewspaceEditorRequest?
+
     var isSending = false
     var errorMessage: String?
     var persistenceWarning: String?
@@ -172,6 +174,17 @@ final class NautiChatViewModel {
             NautiChatMessage(role: .user, text: userText),
             conversationID: conversationID
         )
+        if let kind = NautiDeterministicIntentRouter.crewspaceEditor(in: userText) {
+            crewspaceEditor = NautiCrewspaceEditorRequest(conversationID: conversationID, kind: kind)
+            appendAssistantMessage(
+                kind == .crewMember
+                    ? "Trage die Daten des Crewmitglieds im Formular ein. Mit Hinzufügen kommt es an Bord."
+                    : "Trage deinen Termin im Formular ein und bestätige mit Termin hinzufügen.",
+                conversationID: conversationID
+            )
+            return nil
+        }
+
         isSending = true
         generatingConversationID = conversationID
         defer {

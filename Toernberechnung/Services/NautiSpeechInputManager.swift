@@ -2,6 +2,7 @@ import AVFAudio
 import CoreMedia
 import Foundation
 import Observation
+import OSLog
 import Speech
 
 struct NautiSpeechTranscript: Equatable, Sendable {
@@ -35,7 +36,11 @@ enum NautiSpeechInputError: LocalizedError, Equatable, Sendable {
         case .unsupportedGerman:
             return "Für Deutsch ist auf diesem Gerät kein lokales Sprachmodell verfügbar."
         case .assetsUnavailable:
-            return "Die lokalen Sprachressourcen konnten nicht vorbereitet werden."
+            #if targetEnvironment(simulator)
+            return "Die lokalen Sprachressourcen sind im Simulator nicht verfügbar. Bitte teste die Spracheingabe auf einem echten iPhone oder iPad."
+            #else
+            return "Die lokalen Sprachressourcen sind noch nicht verfügbar. Verbinde das Gerät mit dem Internet, prüfe unter Einstellungen › Allgemein › Tastatur, ob Diktierfunktion und Deutsch aktiviert sind, und versuche es erneut."
+            #endif
         case .audioSessionUnavailable:
             return "Das Mikrofon konnte gerade nicht gestartet werden."
         case .recognitionFailed:
@@ -69,6 +74,9 @@ final class NautiSpeechInputController {
     private let client: any NautiSpeechInputClient
     @ObservationIgnored
     private var transcriptionTask: Task<Void, Never>?
+    private var startGeneration = 0
+    @ObservationIgnored
+    private var cleanupTask: Task<Void, Never>?
 
     init(client: (any NautiSpeechInputClient)? = nil) {
         self.client = client ?? AppleNautiSpeechInputClient()
@@ -84,11 +92,19 @@ final class NautiSpeechInputController {
 
     func start() async {
         guard state == .idle else { return }
+        startGeneration += 1
+        let attempt = startGeneration
         errorMessage = nil
         transcript = ""
         state = .preparing
 
-        switch await client.requestPermission() {
+        await cleanupTask?.value
+        guard startGeneration == attempt else { return }
+        guard !Task.isCancelled else { state = .idle; return }
+        let permission = await client.requestPermission()
+        guard startGeneration == attempt else { return }
+        guard !Task.isCancelled else { state = .idle; return }
+        switch permission {
         case .denied:
             state = .idle
             errorMessage = NautiSpeechInputError.permissionDenied.localizedDescription
@@ -103,27 +119,40 @@ final class NautiSpeechInputController {
 
         do {
             let stream = try await client.startTranscription()
+            guard startGeneration == attempt else { return }
+            if Task.isCancelled {
+                await client.cancelTranscription()
+                state = .idle
+                return
+            }
             state = .recording
             transcriptionTask = Task { [weak self] in
                 do {
                     for try await result in stream {
-                        guard !Task.isCancelled else { return }
+                        guard !Task.isCancelled, self?.startGeneration == attempt else { return }
                         self?.transcript = result.text
                         if result.isFinal {
                             self?.state = .idle
                         }
                     }
+                    guard self?.startGeneration == attempt else { return }
                     if self?.state == .recording {
                         self?.state = .idle
                     }
                 } catch is CancellationError {
+                    guard self?.startGeneration == attempt else { return }
                     self?.state = .idle
                 } catch {
+                    guard self?.startGeneration == attempt else { return }
                     self?.state = .idle
                     self?.errorMessage = Self.message(for: error)
                 }
             }
+        } catch is CancellationError {
+            guard startGeneration == attempt else { return }
+            state = .idle
         } catch {
+            guard startGeneration == attempt else { return }
             state = .idle
             errorMessage = Self.message(for: error)
         }
@@ -131,6 +160,10 @@ final class NautiSpeechInputController {
 
     func stop() async {
         guard state != .idle else { return }
+        if state == .preparing {
+            cancel()
+            return
+        }
         await client.stopTranscription()
         transcriptionTask?.cancel()
         transcriptionTask = nil
@@ -138,10 +171,15 @@ final class NautiSpeechInputController {
     }
 
     func cancel() {
+        startGeneration += 1
         transcriptionTask?.cancel()
         transcriptionTask = nil
         state = .idle
-        Task { await client.cancelTranscription() }
+        let pendingCleanup = cleanupTask
+        cleanupTask = Task {
+            await pendingCleanup?.value
+            await client.cancelTranscription()
+        }
     }
 
     func clearError() {
@@ -158,7 +196,7 @@ final class NautiSpeechInputController {
 }
 
 @MainActor
-private protocol NautiSpeechBackend: AnyObject {
+protocol NautiSpeechBackend: AnyObject {
     func start() async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error>
     func stop() async
     func cancel() async
@@ -167,6 +205,26 @@ private protocol NautiSpeechBackend: AnyObject {
 @MainActor
 final class AppleNautiSpeechInputClient: NautiSpeechInputClient {
     private var activeBackend: (any NautiSpeechBackend)?
+    private var generation = 0
+    private let makePrimary: @MainActor () -> any NautiSpeechBackend
+    private let makeFallback: (@MainActor () -> any NautiSpeechBackend)?
+    private static let logger = Logger(subsystem: "Toernberechnung", category: "NautiSpeech")
+
+    init(
+        primary: (@MainActor () -> any NautiSpeechBackend)? = nil,
+        fallback: (@MainActor () -> any NautiSpeechBackend)? = nil
+    ) {
+        if let primary {
+            makePrimary = primary
+            makeFallback = fallback
+        } else if #available(iOS 26.0, *) {
+            makePrimary = { SpeechAnalyzerNautiBackend() }
+            makeFallback = { LegacyNautiSpeechBackend() }
+        } else {
+            makePrimary = { LegacyNautiSpeechBackend() }
+            makeFallback = nil
+        }
+    }
 
     func requestPermission() async -> NautiSpeechPermission {
         let microphoneAllowed = await withCheckedContinuation { continuation in
@@ -190,34 +248,82 @@ final class AppleNautiSpeechInputClient: NautiSpeechInputClient {
     }
 
     func startTranscription() async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error> {
-        await activeBackend?.cancel()
+        generation += 1
+        let attempt = generation
+        let previous = activeBackend
+        activeBackend = nil
+        await previous?.cancel()
+        try checkAttempt(attempt)
 
-        let backend: any NautiSpeechBackend
-        if #available(iOS 26.0, *) {
-            backend = SpeechAnalyzerNautiBackend()
-        } else {
-            backend = LegacyNautiSpeechBackend()
+        do {
+            return try await start(makePrimary(), attempt: attempt)
+        } catch {
+            try checkAttempt(attempt)
+            guard !(error is CancellationError),
+                  let makeFallback,
+                  Self.canFallback(after: error) else { throw error }
+            let failure = error as NSError
+            Self.logger.error("SpeechAnalyzer preparation failed: \(failure.domain, privacy: .public) / \(failure.code). Trying on-device dictation.")
+            do {
+                return try await start(makeFallback(), attempt: attempt)
+            } catch {
+                try checkAttempt(attempt)
+                guard !(error is CancellationError) else { throw error }
+                if Self.canFallback(after: error) {
+                    throw NautiSpeechInputError.assetsUnavailable
+                }
+                throw error
+            }
         }
+    }
+
+    private func start(
+        _ backend: any NautiSpeechBackend,
+        attempt: Int
+    ) async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error> {
         activeBackend = backend
         do {
-            return try await backend.start()
+            let stream = try await backend.start()
+            try checkAttempt(attempt)
+            return stream
         } catch {
-            // Without this the failed backend stays installed and its audio
-            // session is never torn down, so the next attempt starts dirty.
-            activeBackend = nil
+            // A failure can happen after the audio session has been activated.
+            // Fully release it before trying another recognizer.
+            await backend.cancel()
+            if generation == attempt { activeBackend = nil }
             throw error
         }
     }
 
+    private func checkAttempt(_ attempt: Int) throws {
+        try Task.checkCancellation()
+        guard generation == attempt else { throw CancellationError() }
+    }
+
+    private static func canFallback(after error: Error) -> Bool {
+        guard let error = error as? NautiSpeechInputError else { return true }
+        switch error {
+        case .assetsUnavailable, .unsupportedGerman, .onDeviceRecognitionUnavailable, .recognitionFailed:
+            return true
+        case .permissionDenied, .permissionRestricted, .audioSessionUnavailable:
+            return false
+        }
+    }
+
     func stopTranscription() async {
-        await activeBackend?.stop()
+        generation += 1
+        let backend = activeBackend
         activeBackend = nil
+        await backend?.stop()
     }
 
     func cancelTranscription() async {
-        await activeBackend?.cancel()
+        generation += 1
+        let backend = activeBackend
         activeBackend = nil
+        await backend?.cancel()
     }
+
 }
 
 @available(iOS 26.0, *)
@@ -270,14 +376,18 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
             locale: locale,
             preset: .progressiveShortDictation
         )
-        if let installation = try await AssetInventory.assetInstallationRequest(
-            supporting: [transcriber]
-        ) {
-            do {
+        do {
+            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                 try await installation.downloadAndInstall()
-            } catch {
-                throw NautiSpeechInputError.assetsUnavailable
             }
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let failure = error as NSError
+            Logger(subsystem: "Toernberechnung", category: "NautiSpeech")
+                .error("Speech asset installation failed: \(failure.domain, privacy: .public) / \(failure.code)")
+            throw NautiSpeechInputError.assetsUnavailable
         }
         return transcriber
     }

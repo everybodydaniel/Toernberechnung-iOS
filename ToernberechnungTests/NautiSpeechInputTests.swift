@@ -57,6 +57,85 @@ final class NautiSpeechInputTests: XCTestCase {
     }
 
     @MainActor
+    func testUnavailableAssetsStartFallbackAfterPrimaryCleanup() async throws {
+        let primary = FakeNautiSpeechBackend(error: NautiSpeechInputError.assetsUnavailable)
+        let fallback = FakeNautiSpeechBackend()
+        let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: {
+            XCTAssertEqual(primary.cancelCount, 1)
+            return fallback
+        })
+        let stream = try await client.startTranscription()
+        fallback.continuation?.yield(.init(text: "Einen Termin planen", isFinal: true))
+        var iterator = stream.makeAsyncIterator()
+        let result = try await iterator.next()
+        XCTAssertEqual(result?.text, "Einen Termin planen")
+        XCTAssertEqual(fallback.startCount, 1)
+        await client.cancelTranscription()
+        XCTAssertEqual(fallback.cancelCount, 1)
+    }
+
+    @MainActor
+    func testSuccessfulPrimaryDoesNotStartFallback() async throws {
+        let primary = FakeNautiSpeechBackend()
+        let fallback = FakeNautiSpeechBackend()
+        let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: { fallback })
+        _ = try await client.startTranscription()
+        XCTAssertEqual(fallback.startCount, 0)
+        await client.cancelTranscription()
+        XCTAssertEqual(primary.cancelCount, 1)
+    }
+
+    @MainActor
+    func testCancellationAndMicrophoneErrorsDoNotStartFallback() async {
+        for error: Error in [CancellationError(), NautiSpeechInputError.audioSessionUnavailable] {
+            let primary = FakeNautiSpeechBackend(error: error)
+            let fallback = FakeNautiSpeechBackend()
+            let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: { fallback })
+            do {
+                _ = try await client.startTranscription()
+                XCTFail("Expected startup failure")
+            } catch { }
+            XCTAssertEqual(primary.cancelCount, 1)
+            XCTAssertEqual(fallback.startCount, 0)
+        }
+    }
+
+    @MainActor
+    func testBothRecognizersUnavailableReleaseResourcesAndReportRecovery() async {
+        let primary = FakeNautiSpeechBackend(error: NautiSpeechInputError.assetsUnavailable)
+        let fallback = FakeNautiSpeechBackend(error: NautiSpeechInputError.onDeviceRecognitionUnavailable)
+        let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: { fallback })
+        do {
+            _ = try await client.startTranscription()
+            XCTFail("Expected unavailable resources")
+        } catch {
+            XCTAssertEqual(error as? NautiSpeechInputError, .assetsUnavailable)
+        }
+        XCTAssertEqual(primary.cancelCount, 1)
+        XCTAssertEqual(fallback.cancelCount, 1)
+    }
+
+    @MainActor
+    func testCancelDuringPreparationDoesNotRestartMicrophone() async {
+        let primary = FakeNautiSpeechBackend()
+        primary.suspendStart = true
+        let fallback = FakeNautiSpeechBackend()
+        let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: { fallback })
+        let start = Task { try await client.startTranscription() }
+        await waitUntil { primary.pendingStart != nil }
+        await client.cancelTranscription()
+        primary.pendingStart?.resume()
+        primary.pendingStart = nil
+        do {
+            _ = try await start.value
+            XCTFail("Cancelled startup must not succeed")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertEqual(fallback.startCount, 0)
+    }
+
+    @MainActor
     private func waitUntil(
         _ condition: @escaping @MainActor () -> Bool
     ) async {
@@ -110,5 +189,32 @@ private final class FakeNautiSpeechInputClient: NautiSpeechInputClient {
     func finish(throwing error: Error) {
         continuation?.finish(throwing: error)
         continuation = nil
+    }
+}
+
+@MainActor
+private final class FakeNautiSpeechBackend: NautiSpeechBackend {
+    let error: Error?
+    var startCount = 0
+    var cancelCount = 0
+    var suspendStart = false
+    var pendingStart: CheckedContinuation<Void, Never>?
+    var continuation: AsyncThrowingStream<NautiSpeechTranscript, Error>.Continuation?
+
+    init(error: Error? = nil) { self.error = error }
+
+    func start() async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error> {
+        startCount += 1
+        if suspendStart {
+            await withCheckedContinuation { pendingStart = $0 }
+        }
+        if let error { throw error }
+        return AsyncThrowingStream { continuation = $0 }
+    }
+
+    func stop() async { continuation?.finish() }
+    func cancel() async {
+        cancelCount += 1
+        continuation?.finish()
     }
 }

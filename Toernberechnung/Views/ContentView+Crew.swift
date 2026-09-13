@@ -170,12 +170,6 @@ struct CrewspaceCrewView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CrewMemberRecord.createdAt, order: .forward) private var crewMembers: [CrewMemberRecord]
 
-    @State private var name = ""
-    @State private var selectedRole = CrewRoleOption.deck
-    @State private var emergencyContact = ""
-    @State private var emergencyPhone = ""
-    @State private var notes = ""
-    @State private var errorMessage: String?
     @State private var deleteErrorMessage: String?
 
     var body: some View {
@@ -186,7 +180,7 @@ struct CrewspaceCrewView: View {
             crewOverviewCard
                 .crewManagementListRow()
 
-            addCrewMemberCard
+            CrewMemberForm()
                 .crewManagementListRow()
 
             memberListHeader
@@ -240,10 +234,6 @@ struct CrewspaceCrewView: View {
         crewMembers.filter(\.isOnBoard)
     }
 
-    private var trimmedName: String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private var crewOverviewCard: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .firstTextBaseline) {
@@ -287,67 +277,6 @@ struct CrewspaceCrewView: View {
         .padding(18)
         .appFloatingOverlay(cornerRadius: 26)
         .animation(.spring(response: 0.32, dampingFraction: 0.84), value: onboardMembers.count)
-    }
-
-    private var addCrewMemberCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Image(systemName: "person.crop.circle.badge.plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.appPrimary)
-                    .frame(width: 38, height: 38)
-                    .background(Color.appPrimary.opacity(0.12), in: Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Crewmitglied hinzufügen")
-                        .font(.system(size: 18, weight: .heavy))
-                    Text("Name, Rolle und Hinweise")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-                }
-                Spacer()
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("NAME")
-                    .font(.system(size: 10, weight: .heavy))
-                    .foregroundStyle(Color.secondary)
-                crewTextField("Name", text: $name, capitalization: .words)
-            }
-
-            Text("ROLLE")
-                .font(.system(size: 10, weight: .heavy))
-                .foregroundStyle(Color.secondary)
-            roleSelector(selection: $selectedRole)
-
-            crewTextField("Notfallkontakt", text: $emergencyContact, capitalization: .words)
-            crewTextField("Telefon", text: $emergencyPhone, keyboard: .phonePad)
-            crewTextField("Medizinische Hinweise / Notizen", text: $notes, capitalization: .sentences)
-
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.orange)
-            }
-
-            Button {
-                addCrewMember()
-            } label: {
-                Label("Hinzufügen", systemImage: "plus")
-                    .font(.system(size: 16, weight: .bold))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .padding(.vertical, 14)
-            .background(
-                Color.appPrimary.opacity(trimmedName.isEmpty ? 0.45 : 1),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .disabled(trimmedName.isEmpty)
-        }
-        .padding(18)
-        .appFloatingOverlay(cornerRadius: 26)
     }
 
     private var memberListHeader: some View {
@@ -431,6 +360,102 @@ struct CrewspaceCrewView: View {
         .accessibilityHint(member.isOnBoard ? "Als nicht an Bord markieren" : "Als an Bord markieren")
     }
 
+    @MainActor
+    private func deleteCrewMember(_ member: CrewMemberRecord) -> Bool {
+        let name = member.name
+        do {
+            modelContext.delete(member)
+            modelContext.insert(AuditLog(
+                action: "DELETE",
+                source: "crew",
+                statement: "DELETE FROM crew WHERE name = '\(name)'",
+                status: "ok"
+            ))
+            try modelContext.save()
+            deleteErrorMessage = nil
+            return true
+        } catch {
+            modelContext.rollback()
+            deleteErrorMessage = "Crewmitglied konnte nicht gelöscht werden: \(error.localizedDescription)"
+            return false
+        }
+    }
+}
+
+/// Shared by Crewspace and Nauti so fields, defaults and validation stay identical.
+struct CrewMemberForm: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \CrewMemberRecord.createdAt) private var crewMembers: [CrewMemberRecord]
+    var onSave: (String) -> Void = { _ in }
+    @State private var name = ""
+    @State private var selectedRole = CrewRoleOption.deck
+    @State private var emergencyContact = ""
+    @State private var emergencyPhone = ""
+    @State private var notes = ""
+    @State private var errorMessage: String?
+
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.appPrimary)
+                    .frame(width: 38, height: 38)
+                    .background(Color.appPrimary.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Crewmitglied hinzufügen")
+                        .font(.system(size: 18, weight: .heavy))
+                    Text("Name, Rolle und Hinweise")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.secondary)
+                }
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("NAME")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(Color.secondary)
+                crewTextField("Name", text: $name, capitalization: .words)
+            }
+
+            Text("ROLLE")
+                .font(.system(size: 10, weight: .heavy))
+                .foregroundStyle(Color.secondary)
+            roleSelector(selection: $selectedRole)
+
+            crewTextField("Notfallkontakt", text: $emergencyContact, capitalization: .words)
+            crewTextField("Telefon", text: $emergencyPhone, keyboard: .phonePad)
+            crewTextField("Medizinische Hinweise / Notizen", text: $notes, capitalization: .sentences)
+
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.orange)
+            }
+
+            Button {
+                addCrewMember()
+            } label: {
+                Label("Hinzufügen", systemImage: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .padding(.vertical, 14)
+            .background(
+                Color.appPrimary.opacity(trimmedName.isEmpty ? 0.45 : 1),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .disabled(trimmedName.isEmpty)
+        }
+        .padding(18)
+        .appFloatingOverlay(cornerRadius: 26)
+    }
+
     private func roleSelector(selection: Binding<CrewRoleOption>) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -485,13 +510,22 @@ struct CrewspaceCrewView: View {
             isOnBoard: true
         )
         modelContext.insert(record)
-        modelContext.insert(AuditLog(
+        let audit = AuditLog(
             action: "INSERT",
             source: "crew",
             statement: "INSERT INTO crew(name, role, is_on_board) VALUES ('\(name)', '\(selectedRole.rawValue)', true)",
             status: "ok"
-        ))
-        try? modelContext.save()
+        )
+        modelContext.insert(audit)
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.delete(record)
+            modelContext.delete(audit)
+            errorMessage = "Das Crewmitglied konnte nicht gespeichert werden. Bitte versuche es erneut."
+            return
+        }
+        onSave(name)
 
         self.name = ""
         selectedRole = .deck
@@ -501,24 +535,4 @@ struct CrewspaceCrewView: View {
         errorMessage = nil
     }
 
-    @MainActor
-    private func deleteCrewMember(_ member: CrewMemberRecord) -> Bool {
-        let name = member.name
-        do {
-            modelContext.delete(member)
-            modelContext.insert(AuditLog(
-                action: "DELETE",
-                source: "crew",
-                statement: "DELETE FROM crew WHERE name = '\(name)'",
-                status: "ok"
-            ))
-            try modelContext.save()
-            deleteErrorMessage = nil
-            return true
-        } catch {
-            modelContext.rollback()
-            deleteErrorMessage = "Crewmitglied konnte nicht gelöscht werden: \(error.localizedDescription)"
-            return false
-        }
-    }
 }

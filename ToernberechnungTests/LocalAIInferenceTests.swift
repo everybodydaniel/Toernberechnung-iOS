@@ -2,6 +2,18 @@ import XCTest
 @testable import Toernberechnung
 
 final class LocalAIInferenceTests: XCTestCase {
+    func testCrewspaceEditorRequestsRecognizeGermanCommands() {
+        for text in ["Ich möchte ein Crewmitglied hinzufügen", "Füge ein Crewmitglied an Bord hinzu", "Crewmitglied anlegen"] {
+            XCTAssertEqual(NautiDeterministicIntentRouter.crewspaceEditor(in: text), .crewMember, text)
+        }
+        for text in ["Ich möchte einen Termin hinzufügen", "Trage einen Termin ein", "Neuer Termin", "Erstelle ein Event", "Ich möchte ein Termin planen", "Ich möchte einen Termin planen", "Plane einen Termin für morgen", "Termin vereinbaren", "Ein Event organisieren"] {
+            XCTAssertEqual(NautiDeterministicIntentRouter.crewspaceEditor(in: text), .event, text)
+        }
+        for text in ["Kein Crewmitglied hinzufügen", "Termin nicht anlegen", "Ich möchte keinen Termin planen", "Termin löschen", "Welche Termine habe ich?", "Wie wird das Wetter?"] {
+            XCTAssertNil(NautiDeterministicIntentRouter.crewspaceEditor(in: text), text)
+        }
+    }
+
     func testLocalContextKeepsCurrentQuestionAndOnlyCompleteRecentMessages() throws {
         let question = "Was muss ich beim Trockenfallen mit 1,5 m Tiefgang beachten?"
         let request = NautiInferenceRequest(messages: [

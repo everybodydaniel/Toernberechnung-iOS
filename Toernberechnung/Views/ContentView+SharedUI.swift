@@ -385,7 +385,8 @@ struct SettingsSheet: View {
 
     private var sourcesSection: some View {
         settingsSection(title: "Datenquellen", icon: "network") {
-            sourceRow(name: "BSH", detail: "Gezeiten, Hoch- und Niedrigwasser", icon: "water.waves")
+            sourceRow(name: "BSH", detail: "Gezeiten, Hoch- und Niedrigwasser sowie nautische Warnnachrichten", icon: "water.waves")
+            sourceRow(name: "WSV / ELWIS", detail: "Bekanntmachungen für Seefahrer", icon: "antenna.radiowaves.left.and.right")
             sourceRow(name: "Apple Weather", detail: "WeatherKit-Prognosen, Wind und Böen", icon: "cloud.sun.rain.fill")
         }
     }

@@ -365,6 +365,7 @@ struct ToernberechnungApp: App {
 private enum OnboardingPage: Int, CaseIterable, Identifiable {
     case route
     case weather
+    case warnings
     case crew
 
     var id: Int { rawValue }
@@ -373,6 +374,7 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .route: return "TÖRN UND NAVIGATION"
         case .weather: return "WETTER AUF DER ROUTE"
+        case .warnings: return "SEEFAHRER-MELDUNGEN"
         case .crew: return "GEMEINSAM AN BORD"
         }
     }
@@ -381,6 +383,7 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .route: return "Sicher planen.\nKlar navigieren."
         case .weather: return "Wind und Wetter vorausdenken."
+        case .warnings: return "Meldungen lesen.\nInformiert ablegen."
         case .crew: return "Crew und Termine\nim Blick behalten."
         }
     }
@@ -395,6 +398,8 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
             return "Plane Törns durchs Wattenmeer, prüfe Passagefenster und zeichne deine Fahrt per GPS auf."
         case .weather:
             return "Behalte Wind, Böen und Vorhersagen für dein Revier und deine Route kompakt im Blick."
+        case .warnings:
+            return "Informiere dich über Sperrungen, Gefahren und veränderte Seezeichen in der Nordsee. Lies die Meldungen und öffne verortete Hinweise direkt auf der Karte."
         case .crew:
             return "Erfasse Rollen, Notfallkontakte, Termine und die Anwesenheit an Bord."
         }
@@ -404,6 +409,7 @@ private enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .route: return Color(hex: 0x0EA5E9)
         case .weather: return Color(hex: 0xF59E0B)
+        case .warnings: return Color(hex: 0xEA580C)
         case .crew: return Color(hex: 0x0D9488)
         }
     }
@@ -642,6 +648,7 @@ private struct OnboardingIllustration: View {
             switch page {
             case .route: routeIllustration
             case .weather: weatherIllustration
+            case .warnings: warningsIllustration
             case .crew: crewIllustration
             }
         }
@@ -661,6 +668,46 @@ private struct OnboardingIllustration: View {
                 routeAnimationStartedAt = Date()
             }
         }
+    }
+
+    private var warningsIllustration: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(page.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Nordsee Warnmeldungen")
+                        .font(.system(size: 16, weight: .heavy))
+                    Text("Hinweise für dein Revier")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            warningPreviewRow("Gefahren und Sperrungen", icon: "exclamationmark.triangle.fill", tint: .orange)
+            warningPreviewRow("Tonnen und Seezeichen", icon: "mappin.and.ellipse", tint: .blue)
+            warningPreviewRow("Hinweise auf der Karte", icon: "map.fill", tint: .teal)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func warningPreviewRow(_ title: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28)
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private var routeIllustration: some View {

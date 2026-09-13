@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -14,6 +15,9 @@ struct NautiPremiumChatOverlay: View {
     let onRetryAvailability: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var editorError: String?
 
     @State private var searchText = ""
     @State private var renamingConversation: NautiConversation?
@@ -32,6 +36,11 @@ struct NautiPremiumChatOverlay: View {
                 historyArea
                     .transition(panelTransition)
             }
+        }
+        .sheet(item: $viewModel.crewspaceEditor) { request in
+            crewspaceEditor(request)
+                .presentationDetents([.large])
+                .environment(\.locale, Locale(identifier: "de_DE"))
         }
         .animation(NautiDashboardGeometry.animation(reduceMotion: reduceMotion), value: mode)
         .onChange(of: viewModel.activeConversationID) { _, _ in
@@ -328,6 +337,59 @@ struct NautiPremiumChatOverlay: View {
     private func beginRename(_ conversation: NautiConversation) {
         renameDraft = conversation.title
         renamingConversation = conversation
+    }
+
+    @ViewBuilder
+    private func crewspaceEditor(_ request: NautiCrewspaceEditorRequest) -> some View {
+        switch request.kind {
+        case .crewMember:
+            NavigationStack {
+                ScrollView {
+                    CrewMemberForm { name in
+                        viewModel.appendAssistantMessage("\(name) wurde zur Crew hinzugefügt und ist an Bord.", conversationID: request.conversationID)
+                        viewModel.crewspaceEditor = nil
+                    }
+                    .padding(16)
+                }
+                .background(Color.appBackground)
+                .navigationTitle("Crewmitglied hinzufügen")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Abbrechen") { viewModel.crewspaceEditor = nil }
+                    }
+                }
+            }
+        case .event:
+            eventEditor(request)
+        }
+    }
+
+    private func eventEditor(_ request: NautiCrewspaceEditorRequest) -> some View {
+        var editor = CrewEventEditor(initialDate: .now) { draft in
+            let record = CrewEventRecord(
+                title: draft.title, startsAt: draft.startsAt, endsAt: draft.endsAt,
+                location: draft.location, notes: draft.notes, category: draft.category.rawValue,
+                isAllDay: draft.isAllDay, attendees: draft.attendees
+            )
+            modelContext.insert(record)
+            do {
+                try modelContext.save()
+                viewModel.appendAssistantMessage("Der Termin „\(draft.title)“ wurde im Crewspace gespeichert.", conversationID: request.conversationID)
+                viewModel.crewspaceEditor = nil
+            } catch {
+                modelContext.delete(record)
+                editorError = "Der Termin konnte nicht gespeichert werden. Bitte versuche es erneut."
+            }
+        }
+        editor.dismissAfterSave = false
+        return editor.alert("Speichern fehlgeschlagen", isPresented: Binding(
+            get: { editorError != nil }, set: { if !$0 { editorError = nil } }
+        )) {
+            Button("OK") { editorError = nil }
+        } message: {
+            Text(editorError ?? "")
+        }
     }
 
     private func send() {

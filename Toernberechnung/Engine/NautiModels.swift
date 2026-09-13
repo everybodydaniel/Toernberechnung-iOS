@@ -630,3 +630,11 @@ enum NautiPendingAction: Identifiable {
         return harbour.name.components(separatedBy: ",").first ?? harbour.name
     }
 }
+
+/// A transient editor request; personal form data is never sent to inference.
+struct NautiCrewspaceEditorRequest: Identifiable {
+    enum Kind { case crewMember, event }
+    let id = UUID()
+    let conversationID: UUID
+    let kind: Kind
+}

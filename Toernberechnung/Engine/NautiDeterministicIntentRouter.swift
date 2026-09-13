@@ -10,6 +10,16 @@ enum NautiDeterministicIntentRouter {
         case waterLevel
     }
 
+    static func crewspaceEditor(in text: String) -> NautiCrewspaceEditorRequest.Kind? {
+        let text = folded(text)
+        guard text.range(of: #"\b(nicht|kein\w*|abbrechen|loschen|entfernen)\b"#, options: .regularExpression) == nil else { return nil }
+        let creates = containsAny(text, ["hinzufug", "hinzu", "anlegen", "erstell", "eintrag", "trage", "aufnehmen", "nehme", "neues crewmitglied", "neuen termin", "neuer termin"])
+        if creates && containsAny(text, ["crewmitglied", "crew-mitglied", "mitglied der crew"]) { return .crewMember }
+        let plansEvent = text.range(of: #"\b(plan\w*|vereinbar\w*|ansetz\w*|organisier\w*)\b"#, options: .regularExpression) != nil
+        if (creates || plansEvent) && containsAny(text, ["termin", "ereignis", "event"]) { return .event }
+        return nil
+    }
+
     static func route(_ request: NautiInferenceRequest) -> NautiInferenceResult? {
         // Explanatory questions belong to the model even when they contain
         // data keywords such as "Gezeiten" or "Wetter". Mixed requests also

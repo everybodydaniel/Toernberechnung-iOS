@@ -21,6 +21,7 @@ struct CrewEventEditor: View {
     let initialDate: Date
     var event: CrewEventRecord?
     let onSave: (CrewEventDraft) -> Void
+    var dismissAfterSave = true
 
     @State private var title = ""
     @State private var startsAt = Date()
@@ -408,6 +409,6 @@ struct CrewEventEditor: View {
             isAllDay: isAllDay,
             attendees: attendees
         ))
-        dismiss()
+        if dismissAfterSave { dismiss() }
     }
 }
