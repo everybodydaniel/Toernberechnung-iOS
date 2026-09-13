@@ -373,6 +373,7 @@ extension ContentView {
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     selectedMapWarning = nil
+                    mapFocusCoordinate = nil
                 }
             } label: {
                 Image(systemName: "xmark.circle.fill")

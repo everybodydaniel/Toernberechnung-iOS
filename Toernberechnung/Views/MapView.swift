@@ -298,7 +298,7 @@ struct CompactMapView: UIViewRepresentable {
             )
 
             // Center on warning coordinate if provided
-            if let focus = focusCoordinate {
+            if let focus = focusCoordinate, focusWarning != nil {
                 let isNew = lastFocusCoordinate == nil ||
                     abs(lastFocusCoordinate!.latitude - focus.latitude) > 0.0001 ||
                     abs(lastFocusCoordinate!.longitude - focus.longitude) > 0.0001
@@ -320,6 +320,12 @@ struct CompactMapView: UIViewRepresentable {
                         warning: focusWarning
                     )
                     map.addAnnotation(pin)
+                }
+            } else {
+                lastFocusCoordinate = nil
+                let oldPins = map.annotations.compactMap { $0 as? WarningPinAnnotation }
+                if !oldPins.isEmpty {
+                    map.removeAnnotations(oldPins)
                 }
             }
 
@@ -352,9 +358,13 @@ struct CompactMapView: UIViewRepresentable {
             let tileOverlays = map.overlays.compactMap { $0 as? MKTileOverlay }
             let polylines    = map.overlays.compactMap { $0 as? MKPolyline }
             map.removeOverlays(polylines)
-            let preservedWarningPins = map.annotations.compactMap { $0 as? WarningPinAnnotation }
+            let preservedWarningPins = focusWarning != nil
+                ? map.annotations.compactMap { $0 as? WarningPinAnnotation }
+                : []
             map.removeAnnotations(map.annotations)
-            map.addAnnotations(preservedWarningPins)
+            if !preservedWarningPins.isEmpty {
+                map.addAnnotations(preservedWarningPins)
+            }
 
             // Re-add tile overlays only if MapKit dropped them (rare).
             if tileOverlays.count < 2 {

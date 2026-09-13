@@ -468,7 +468,12 @@ final class WeatherRevierUITests: XCTestCase {
 
         // Also test closing the callout card via close button
         closeButton.tap()
-        Thread.sleep(forTimeInterval: 1.0)
+        Thread.sleep(forTimeInterval: 1.5)
         XCTAssertFalse(closeButton.exists)
+
+        let afterCloseScreenshot = XCUIScreen.main.screenshot()
+        let afterCloseData = afterCloseScreenshot.pngRepresentation
+        let afterClosePath = "\(targetDir)/warning_map_after_close.png"
+        try? afterCloseData.write(to: URL(fileURLWithPath: afterClosePath))
     }
 }
