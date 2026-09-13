@@ -164,18 +164,18 @@ final class MockTideDataProvider: TideDataProvider {
     /// Lock-protected: `PassageWindowSolver` resolves its waypoints
     /// concurrently, so an unsynchronised dictionary would race.
     var highWatersCallCount: [String: Int] {
-        callCountLock.lock()
-        defer { callCountLock.unlock() }
-        return storedHighWatersCallCount
+        callCountLock.withLock {
+            storedHighWatersCallCount
+        }
     }
 
     private let callCountLock = NSLock()
     private var storedHighWatersCallCount: [String: Int] = [:]
 
     func highWaters(for stationID: String, around date: Date) async throws -> [TideEvent] {
-        callCountLock.lock()
-        storedHighWatersCallCount[stationID, default: 0] += 1
-        callCountLock.unlock()
+        callCountLock.withLock {
+            storedHighWatersCallCount[stationID, default: 0] += 1
+        }
         if shouldThrow {
             throw BSHTideError.badResponse
         }

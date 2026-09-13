@@ -32,7 +32,7 @@ enum SeaMaskBuilder {
         let n = GridConfig.rows * GridConfig.cols
         var cells = [UInt8](repeating: CellType.openSea.rawValue, count: n)
         let depthScaled = Int16(defaultSeaDepthMeters * Double(SeaMask.depthScale))
-        var depth = [Int16](repeating: depthScaled, count: n)
+        let depth = [Int16](repeating: depthScaled, count: n)
 
         var fairwayPolys: [SeamarkPolygon] = []
         var harbourPolys: [SeamarkPolygon] = []

@@ -37,17 +37,6 @@ struct HarbourOption: Identifiable, Hashable, Sendable {
     var coordinate: (latitude: Double, longitude: Double) {
         (latitude, longitude)
     }
-
-    func distanceNM(to other: HarbourOption) -> Double {
-        let earthRadiusNM = 3_440.065
-        let lat1 = latitude * .pi / 180
-        let lat2 = other.latitude * .pi / 180
-        let dLat = (other.latitude - latitude) * .pi / 180
-        let dLon = (other.longitude - longitude) * .pi / 180
-        let a = sin(dLat / 2) * sin(dLat / 2)
-            + cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2)
-        return earthRadiusNM * 2 * atan2(sqrt(a), sqrt(1 - a))
-    }
 }
 
 enum BSHTideStationKind: String, Codable, Sendable {
@@ -91,10 +80,6 @@ struct BSHTideStation: Identifiable, Hashable, Codable, Sendable {
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-    }
-
-    var tidePageURL: URL? {
-        URL(string: "https://gezeiten.bsh.de/\(seoID)")
     }
 
     func distanceKilometers(to other: BSHTideStation) -> Double {

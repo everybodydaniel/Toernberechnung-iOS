@@ -226,13 +226,11 @@ Toernberechnung-iOS/
 │   │   ├── ContentView+NautiDrawer.swift    # Nauti AI side-drawer and chat panel
 │   │   ├── ContentView+FloatingTabBar.swift # Floating glass tab bar with label support
 │   │   ├── ContentView+SharedUI.swift       # Shared UI components, menus & boat settings
-│   │   ├── ContentView+RouteDetail.swift    # Route inspector & waypoint list
 │   │   ├── CrewEventEditor.swift            # Appointment editor for Crewspace scheduling
 │   │   ├── CrewPlanningView.swift           # Monthly calendar & schedule overview
 │   │   ├── NautiChatView.swift              # AI chat interface with speech output
 │   │   ├── NautiPremiumChatView.swift       # Full-screen chat with context actions
 │   │   ├── MapView.swift                    # MapLibre chart integration
-│   │   ├── FullScreenMapView.swift          # Fullscreen chart view with navigation mode
 │   │   ├── LiquidGlassStyle.swift           # Glassmorphism design system
 │   │   └── WeatherDetailViews.swift         # Detail cards for wind, gusts, and pressure
 │   ├── Engine/
@@ -262,7 +260,6 @@ Toernberechnung-iOS/
 │   │   ├── NautiSpeechInputManager.swift    # Local speech recognition
 │   │   ├── SpeechAudioFormatConverter.swift # Audio format conversion for on-device models
 │   │   ├── WaterLevelCorrectionSeries.swift # Time series interpolation for water levels
-│   │   ├── WattseglerLotungenService.swift  # Depth soundings by Soltwaters Wadden Sea sailors
 │   │   └── LocationService.swift            # CoreLocation service for GPS tracking
 │   └── Resources/
 │       ├── wadden_sea_catalog.json          # Curated Wadden Sea route catalog

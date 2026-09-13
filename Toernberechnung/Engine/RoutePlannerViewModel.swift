@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Observation
 
 // MARK: - Intermediate Stop Model
 //
@@ -74,12 +74,6 @@ final class RoutePlannerViewModel {
     }
     private(set) var confirmedComparisonGaugeIDs: [String: String] = [:]
 
-    // MARK: - Route Template Selection
-
-    var availableTemplates: [RouteTemplate] = []
-    var selectedTemplateID: UUID?
-    var showTemplateSelector: Bool = false
-
     // MARK: - Calculation State
 
     var routePlan: RoutePlan?
@@ -125,10 +119,6 @@ final class RoutePlannerViewModel {
             return "Törn noch nicht geplant"
         }
         return "\(start.name) → \(destination.name)"
-    }
-
-    var isMultiWaypoint: Bool {
-        (routePlan?.waypoints.count ?? 0) > 2
     }
 
     var combinedStatus: CombinedRouteStatus? {
@@ -209,29 +199,12 @@ final class RoutePlannerViewModel {
     func onRouteChanged() {
         confirmedComparisonGaugeIDs.removeAll()
 
-        availableTemplates = []
-        selectedTemplateID = nil
-        showTemplateSelector = false
-
         guard hasCompleteRouteInput else {
             clearCalculatedRoute()
             return
         }
 
         buildHarbourChainAndCalculate()
-    }
-
-    func clearRouteDraft() {
-        startHarbourID = ""
-        destinationHarbourID = ""
-        intermediateStops = []
-        clearCalculatedRoute()
-    }
-
-    /// Legacy template selector hook (no longer auto-suggests templates —
-    /// kept so the existing UI button compiles).
-    func selectTemplate(_ templateID: UUID) {
-        // No-op: we now always build from the user's start / stops / destination.
     }
 
     /// Add several explicitly selected intermediate harbours in one mutation.
@@ -488,11 +461,6 @@ final class RoutePlannerViewModel {
         }
     }
 
-    /// Search for safe passage windows for the current route.
-    func searchPassageWindow() {
-        refreshPassageWindow()
-    }
-
     /// Refresh the safe passage window for the current route.
     func refreshPassageWindow() {
         guard let plan = routePlan else {
@@ -554,13 +522,6 @@ final class RoutePlannerViewModel {
             }
             self.isSearchingWindow = false
         }
-    }
-
-    /// Update weather status from the weather service assessment.
-    func updateWeatherStatus(_ status: WeatherStatus) {
-        weatherStatus = status
-        // Recalculate combined status display — no recalculation needed,
-        // just update the combined status in the existing result.
     }
 
     @discardableResult

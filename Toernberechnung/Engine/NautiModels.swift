@@ -213,6 +213,28 @@ struct NautiInferenceRequest: Equatable, Sendable {
         self.requestedAt = requestedAt
     }
 
+    /// Character limits are conservative heuristics, not token counts. Leave
+    /// room for system instructions, the generated intent schema and output.
+    /// Keep the newest question whole: truncation could remove crucial details.
+    func preparedForLocalModel(historyCharacterLimit: Int = 1_200) throws -> NautiInferenceRequest {
+        guard let latestIndex = messages.lastIndex(where: { $0.role == .user }) else {
+            throw LocalAIInferenceError.generationFailed
+        }
+        let latest = messages[latestIndex]
+        guard latest.text.count <= 2_000 else {
+            throw LocalAIInferenceError.contextTooLarge
+        }
+        var remaining = max(0, historyCharacterLimit)
+        var history: [NautiConversationMessage] = []
+        for message in messages[..<latestIndex].suffix(4).reversed() {
+            // Retain a contiguous tail of complete messages, never fragments.
+            guard message.text.count <= remaining else { break }
+            history.append(message)
+            remaining -= message.text.count
+        }
+        return NautiInferenceRequest(messages: history.reversed() + [latest], requestedAt: requestedAt)
+    }
+
     func limited(maxMessages: Int = 12, maxCharacters: Int = 8_000) -> NautiInferenceRequest {
         guard maxMessages > 0, maxCharacters > 0 else {
             return NautiInferenceRequest(messages: [], requestedAt: requestedAt)
@@ -337,7 +359,7 @@ enum LocalAIInferenceError: LocalizedError, Equatable, Sendable {
         case .unavailable(let reason): return reason.message
         case .busy: return "Nauti verarbeitet bereits eine Anfrage."
         case .cancelled: return "Die lokale Antwort wurde abgebrochen."
-        case .contextTooLarge: return "Der Chatverlauf ist für eine lokale Antwort zu lang. Beginne bitte eine neue Frage."
+        case .contextTooLarge: return "Die Anfrage passt nicht in den lokalen Modellkontext. Bitte formuliere sie kürzer und nenne die wichtigen Angaben direkt oder teile sie in einzelne Fragen auf."
         case .guardrailViolation: return "Nauti kann diese Anfrage aus Sicherheitsgründen nicht beantworten."
         case .assetsUnavailable: return "Das lokale Sprachmodell ist momentan nicht einsatzbereit."
         case .unsupportedLanguage: return "Das lokale Sprachmodell unterstützt diese Sprache nicht."

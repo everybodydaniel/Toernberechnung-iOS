@@ -103,8 +103,8 @@ struct NautiMessageBubble: View {
             .padding(.leading, 46)
         } else {
             HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "sailboat.fill")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "sparkles")
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.cyan)
                     .frame(width: 24, height: 24)
 
@@ -144,7 +144,8 @@ struct NautiMessageBubble: View {
         } else if case let .tide(card)? = message.payload {
             NautiTideCardView(card: card)
         } else {
-            Text(message.text)
+            Text(NautiAnswerFormatting.attributed(message.text))
+                .lineSpacing(4)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color.primary)
                 .textSelection(.enabled)
@@ -401,9 +402,10 @@ struct NautiTypingBubble: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 9) {
-            Image(systemName: "sailboat.fill")
-                .font(.system(size: 12, weight: .bold))
+            Image(systemName: "sparkles")
+                .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Color.cyan)
+                .symbolEffect(.pulse, options: .repeating)
                 .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: 5) {
@@ -437,8 +439,8 @@ struct NautiTypingBubble: View {
 
 struct NautiSymbolAvatar: View {
     var body: some View {
-        Image(systemName: "sailboat.fill")
-            .font(.system(size: 24, weight: .heavy))
+        Image(systemName: "sparkles")
+            .font(.system(size: 20, weight: .heavy))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
@@ -449,5 +451,22 @@ struct NautiSymbolAvatar: View {
                 ),
                 in: Circle()
             )
+    }
+}
+
+/// Render emphasis and preserve paragraph spacing, including older chat replies.
+enum NautiAnswerFormatting {
+    static func attributed(_ text: String) -> AttributedString {
+        // Repair inline numbered headings emitted by earlier prompts. Require
+        // bold heading syntax so decimals, times and ordinary numbers stay intact.
+        let spaced = text.replacingOccurrences(
+            of: #"[ \t]+(?=\d{1,2}\.[ \t]+\*\*)"#,
+            with: "\n\n",
+            options: .regularExpression
+        )
+        return (try? AttributedString(
+            markdown: spaced,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(spaced)
     }
 }

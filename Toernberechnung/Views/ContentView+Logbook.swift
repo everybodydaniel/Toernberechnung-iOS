@@ -44,6 +44,7 @@ extension ContentView {
                         } label: {
                             Label("Löschen", systemImage: "trash.fill")
                         }
+                        .tint(.red)
                     }
                 }
             }
@@ -340,44 +341,6 @@ extension ContentView {
     }
 
     @MainActor
-    private func saveLogbookDraft(_ draft: LogbookEntryDraft, into record: CalculationRecord?) {
-        let target = record ?? CalculationRecord(
-            routeTitle: draft.routeTitle,
-            startName: draft.startName,
-            destinationName: draft.destinationName,
-            departureAt: draft.departureAt,
-            arrivalAt: draft.arrivalAt,
-            distanceNM: draft.distanceNM,
-            status: draft.status,
-            fmw: draft.fmw,
-            wt: draft.wt,
-            wuk: draft.wuk
-        )
-        target.routeTitle = draft.routeTitle
-        target.startName = draft.startName
-        target.destinationName = draft.destinationName
-        target.departureAt = draft.departureAt
-        target.arrivalAt = draft.arrivalAt
-        target.distanceNM = draft.distanceNM
-        target.status = draft.status
-        target.fmw = draft.fmw
-        target.wt = draft.wt
-        target.wuk = draft.wuk
-        target.weatherSummary = draft.weatherSummary
-        target.tideSummary = draft.tideSummary
-        target.crewSummary = draft.crewSummary
-        target.notes = draft.notes
-        if record == nil { modelContext.insert(target) }
-        try? modelContext.save()
-        writeAudit(
-            action: record == nil ? "INSERT" : "UPDATE",
-            source: "logbook",
-            statement: "\(record == nil ? "INSERT INTO" : "UPDATE") calculations route='\(draft.routeTitle)'",
-            status: "ok"
-        )
-    }
-
-    @MainActor
     func deleteCalculation(_ record: CalculationRecord) -> Bool {
         let routeTitle = record.routeTitle
         let statement = "DELETE FROM calculations WHERE persistent_model_id = '\(record.persistentModelID)'"
@@ -445,180 +408,8 @@ extension ContentView {
             }
         }
     }
-
-    private static let displayDateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = AppDateFormatters.germanLocale
-        formatter.timeZone = AppDateFormatters.berlinTimeZone
-        formatter.dateFormat = "dd.MM.yyyy · HH:mm"
-        return formatter
-    }()
 }
 
-struct LogbookEntryDraft {
-    var routeTitle: String
-    var startName: String
-    var destinationName: String
-    var departureAt: Date
-    var arrivalAt: Date
-    var distanceNM: Double
-    var status: String
-    var fmw: Double
-    var wt: Double
-    var wuk: Double
-    var weatherSummary: String
-    var tideSummary: String
-    var crewSummary: String
-    var notes: String
-
-    init(record: CalculationRecord? = nil) {
-        let now = Date()
-        routeTitle = record?.routeTitle ?? "Manueller Törn"
-        startName = record?.startName ?? ""
-        destinationName = record?.destinationName ?? ""
-        departureAt = record?.departureAt ?? now
-        arrivalAt = record?.arrivalAt ?? now.addingTimeInterval(3600)
-        distanceNM = record?.distanceNM ?? 0
-        status = record?.status ?? "Entwurf"
-        fmw = record?.fmw ?? 0
-        wt = record?.wt ?? 0
-        wuk = record?.wuk ?? 0
-        weatherSummary = record?.weatherSummary ?? ""
-        tideSummary = record?.tideSummary ?? ""
-        crewSummary = record?.crewSummary ?? ""
-        notes = record?.notes ?? ""
-    }
-
-    var isValid: Bool {
-        !startName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !destinationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && arrivalAt >= departureAt
-            && distanceNM >= 0 && fmw >= 0 && wt >= 0 && wuk >= 0
-    }
-}
-
-private struct LogbookEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let record: CalculationRecord?
-    let onSave: (LogbookEntryDraft) -> Void
-    @State private var draft: LogbookEntryDraft
-
-    init(record: CalculationRecord?, onSave: @escaping (LogbookEntryDraft) -> Void) {
-        self.record = record
-        self.onSave = onSave
-        _draft = State(initialValue: LogbookEntryDraft(record: record))
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    editorSection("Route", icon: "point.topleft.down.to.point.bottomright.curvepath") {
-                        editorField("Start", text: $draft.startName, icon: "mappin.and.ellipse")
-                        editorField("Ziel", text: $draft.destinationName, icon: "flag.checkered")
-                        editorField("Bezeichnung", text: $draft.routeTitle, icon: "tag")
-                    }
-                    editorSection("Zeiten", icon: "clock") {
-                        DatePicker("Abfahrt", selection: $draft.departureAt)
-                        Divider()
-                        DatePicker("Ankunft", selection: $draft.arrivalAt)
-                        if draft.arrivalAt < draft.departureAt {
-                            Label("Die Ankunft muss nach der Abfahrt liegen.", systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color.orange)
-                        }
-                    }
-                    editorSection("Messwerte", icon: "gauge.with.dots.needle.67percent") {
-                        numericField("Distanz", suffix: "nm", value: $draft.distanceNM)
-                        numericField("Wassertiefe", suffix: "m", value: $draft.wt)
-                        numericField("UKC", suffix: "m", value: $draft.wuk)
-                        numericField("Fehlendes Wasser", suffix: "m", value: $draft.fmw)
-                        Picker("Status", selection: $draft.status) {
-                            ForEach(statusOptions, id: \.self) { Text($0).tag($0) }
-                        }
-                    }
-                    editorSection("Bordbuch", icon: "book.pages") {
-                        editorField("Wetter", text: $draft.weatherSummary, icon: "cloud.sun", axis: .vertical)
-                        editorField("Gezeiten", text: $draft.tideSummary, icon: "water.waves", axis: .vertical)
-                        editorField("Crew", text: $draft.crewSummary, icon: "person.3", axis: .vertical)
-                        editorField("Notizen und Ereignisse", text: $draft.notes, icon: "square.and.pencil", axis: .vertical)
-                    }
-                    if record?.isActualVoyage == true {
-                        Label("GPS-Spur und tatsächlich gemessene Fahrtdaten bleiben unverändert.", systemImage: "lock.shield.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.secondary)
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .appFloatingOverlay(cornerRadius: 18)
-                    }
-                }
-                .padding(16)
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(record == nil ? "Törn eintragen" : "Törn bearbeiten")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Speichern") {
-                        onSave(normalizedDraft)
-                        dismiss()
-                    }
-                    .fontWeight(.bold)
-                    .disabled(!draft.isValid)
-                }
-            }
-        }
-    }
-
-    private var normalizedDraft: LogbookEntryDraft {
-        var result = draft
-        result.startName = result.startName.trimmingCharacters(in: .whitespacesAndNewlines)
-        result.destinationName = result.destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
-        result.routeTitle = result.routeTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        if result.routeTitle.isEmpty { result.routeTitle = "\(result.startName) – \(result.destinationName)" }
-        return result
-    }
-
-    private var statusOptions: [String] {
-        Array(Set(["Entwurf", "Geplant", "Fahrt abgeschlossen", "Abgebrochen", draft.status])).sorted()
-    }
-
-    private func editorSection<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(title.uppercased(), systemImage: icon)
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(Color.appPrimary)
-            content()
-        }
-        .appCardSurface(cornerRadius: 24)
-    }
-
-    private func editorField(_ title: String, text: Binding<String>, icon: String, axis: Axis = .horizontal) -> some View {
-        HStack(alignment: axis == .vertical ? .top : .center, spacing: 10) {
-            Image(systemName: icon)
-                .foregroundStyle(Color.appPrimary)
-                .frame(width: 22)
-            TextField(title, text: text, axis: axis)
-                .lineLimit(axis == .vertical ? 2...5 : 1...1)
-        }
-        .appFieldSurface(cornerRadius: 15)
-    }
-
-    private func numericField(_ title: String, suffix: String, value: Binding<Double>) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField(title, value: value, format: .number.precision(.fractionLength(0...2)))
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 86)
-            Text(suffix).foregroundStyle(Color.secondary)
-        }
-        .font(.system(size: 14, weight: .semibold))
-        .appFieldSurface(cornerRadius: 15)
-    }
-}
 
 private enum LogbookDetailSection: String, CaseIterable, Identifiable {
     case overview = "Übersicht"

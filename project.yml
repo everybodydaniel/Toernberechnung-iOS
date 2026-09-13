@@ -18,7 +18,6 @@ targets:
       - path: Toernberechnung/ToernberechnungApp.swift
       - path: Toernberechnung/Views/ContentView.swift
       - path: Toernberechnung/Views/ContentView+MapTab.swift
-      - path: Toernberechnung/Views/CalculatorResultsSection.swift
       - path: Toernberechnung/Views/ContentView+SharedUI.swift
       - path: Toernberechnung/Views/ContentView+FloatingTabBar.swift
       - path: Toernberechnung/Views/ContentView+Weather.swift
@@ -33,10 +32,8 @@ targets:
       - path: Toernberechnung/Engine/CrewCalendarExport.swift
       - path: Toernberechnung/Views/ContentView+Logbook.swift
       - path: Toernberechnung/Views/ContentView+InitialData.swift
-      - path: Toernberechnung/Views/ContentView+RouteDetail.swift
       - path: Toernberechnung/Views/MapView.swift
       - path: Toernberechnung/Views/FullScreenNavigationView.swift
-      - path: Toernberechnung/Views/FullScreenMapView.swift
       - path: Toernberechnung/Views/WebView.swift
       - path: Toernberechnung/Views/LiquidGlassStyle.swift
       - path: Toernberechnung/Views/KeyboardDismissal.swift
@@ -44,7 +41,6 @@ targets:
       - path: Toernberechnung/Views/NautiChatView.swift
       - path: Toernberechnung/Views/NautiPremiumChatView.swift
       - path: Toernberechnung/Engine/AppDateFormatters.swift
-      - path: Toernberechnung/Engine/StringHelpers.swift
       - path: Toernberechnung/Engine/HarbourCatalog.swift
       - path: Toernberechnung/Engine/MarineWeatherModels.swift
       - path: Toernberechnung/Engine/NautiModels.swift
@@ -53,7 +49,6 @@ targets:
       - path: Toernberechnung/Engine/RoutePlanModels.swift
       - path: Toernberechnung/Engine/TidalHeightStrategy.swift
       - path: Toernberechnung/Engine/WaypointDepthSolver.swift
-      - path: Toernberechnung/Engine/RuleOfTwelfths.swift
       - path: Toernberechnung/Engine/RouteCalculationService.swift
       - path: Toernberechnung/Engine/RouteSummary.swift
       - path: Toernberechnung/Engine/PassageWindowScanner.swift
@@ -62,7 +57,6 @@ targets:
       - path: Toernberechnung/Engine/WaddenSeaCatalog.swift
       - path: Toernberechnung/Engine/RoutePlannerViewModel.swift
       - path: Toernberechnung/Engine/RoutePlannerViewModel+Support.swift
-      - path: Toernberechnung/Engine/SeaRoutePlanner.swift
       - path: Toernberechnung/Engine/NauticalRouter.swift
       - path: Toernberechnung/Engine/ProtectedZoneCatalog.swift
       - path: Toernberechnung/Engine/RouteExpander.swift
@@ -78,8 +72,6 @@ targets:
       - path: Toernberechnung/Services/BSHTideService.swift
       - path: Toernberechnung/Services/BSHWaterLevelForecastService.swift
       - path: Toernberechnung/Services/WaterLevelCorrectionSeries.swift
-      - path: Toernberechnung/Services/WattseglerLotungenService.swift
-      - path: Toernberechnung/Services/EmdenPlantabelleService.swift
       - path: Toernberechnung/Services/TideDataProvider.swift
       - path: Toernberechnung/Resources/wadden_sea_catalog.json
         type: file

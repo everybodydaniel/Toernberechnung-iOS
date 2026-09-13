@@ -67,19 +67,6 @@ struct PassageWindowScanner {
 
     // MARK: - Entry point
 
-    func findSafeWindow(
-        route: RoutePlan,
-        boatSettings: BoatSettings,
-        tideDataProvider: TideDataProvider,
-        confirmedComparisonGaugeIDs: [String: String] = [:]
-    ) async -> Window? {
-        await solve(
-            route: route,
-            boatSettings: boatSettings,
-            tideDataProvider: tideDataProvider,
-            confirmedComparisonGaugeIDs: confirmedComparisonGaugeIDs
-        ).routeWindow
-    }
 
     /// Full solution including the per-bottleneck windows.
     func solve(

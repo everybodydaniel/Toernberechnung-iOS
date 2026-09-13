@@ -226,13 +226,11 @@ Toernberechnung-iOS/
 │   │   ├── ContentView+NautiDrawer.swift    # Nauti KI Side-Drawer und Chat-Panel
 │   │   ├── ContentView+FloatingTabBar.swift # Schwebende Glas-Tab-Leiste mit Label-Unterstützung
 │   │   ├── ContentView+SharedUI.swift       # Gemeinsame UI-Elemente, Menüs & Bootseinstellungen
-│   │   ├── ContentView+RouteDetail.swift    # Routeninspektor & Wegpunktliste
 │   │   ├── CrewEventEditor.swift            # Termineditor für Crewspace-Planung
 │   │   ├── CrewPlanningView.swift           # Monatskalender & Terminübersicht
 │   │   ├── NautiChatView.swift              # KI-Chatoberfläche mit Sprachausgabe
 │   │   ├── NautiPremiumChatView.swift       # Vollbild-Chat mit Kontextaktionen
 │   │   ├── MapView.swift                    # MapLibre-Kartenintegration
-│   │   ├── FullScreenMapView.swift          # Vollbild-Kartenansicht mit Navigationsmodus
 │   │   ├── LiquidGlassStyle.swift           # Glasmorphismus-Designsystem
 │   │   └── WeatherDetailViews.swift         # Detailkarten für Wind, Böen und Luftdruck
 │   ├── Engine/
@@ -262,7 +260,6 @@ Toernberechnung-iOS/
 │   │   ├── NautiSpeechInputManager.swift    # Lokale Spracheingabe (Speech Recognition)
 │   │   ├── SpeechAudioFormatConverter.swift # Audio-Konvertierung für On-Device-Modelle
 │   │   ├── WaterLevelCorrectionSeries.swift # Zeitreihen-Interpolation für Wasserstände
-│   │   ├── WattseglerLotungenService.swift  # Lotungsdaten der Soltwaters-Wattsegler
 │   │   └── LocationService.swift            # CoreLocation-Dienst für GPS-Tracking
 │   └── Resources/
 │       ├── wadden_sea_catalog.json          # Kuratierter Wattenmeer-Routenkatalog

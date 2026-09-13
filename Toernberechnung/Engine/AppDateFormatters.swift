@@ -24,8 +24,6 @@ enum AppDateFormatters {
     static let hourMinute: DateFormatter = make("HH:mm")
     /// `dd.MM.yyyy` (e.g. "14.05.2026").
     static let dayMonthYear: DateFormatter = make("dd.MM.yyyy")
-    /// `dd.MM. HH:mm` (e.g. "14.05. 14:30").
-    static let shortDateTime: DateFormatter = make("dd.MM. HH:mm")
     /// `EEEE, dd.MM.yyyy` (e.g. "Donnerstag, 14.05.2026").
     static let weekdayLong: DateFormatter = make("EEEE, dd.MM.yyyy")
     /// `EE dd.MM. HH:mm` (e.g. "Do 14.05. 14:30").

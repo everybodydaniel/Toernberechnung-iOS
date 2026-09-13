@@ -391,27 +391,6 @@ extension ContentView {
         return formatter
     }()
 
-    func tideEventsRow(_ events: [TideEvent]) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
-            ForEach(events) { event in
-                VStack(alignment: .leading, spacing: 6) {
-                    Image(systemName: event.symbol)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(event.type == "HW" ? Color.blue : Color.teal)
-                    Text(AppDateFormatters.hourMinute.string(from: event.time))
-                        .font(.system(size: 16, weight: .bold))
-                    Text(event.heightText)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                .padding(10)
-                .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-        }
-    }
-
     @MainActor
     func loadTides(force: Bool) async {
         let stationID = tideStationID
@@ -534,7 +513,6 @@ struct TideStationPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Binding var selection: String
-    let readings: [String: TideReading]
     @State private var searchText = ""
 
     private var matchingStations: [BSHTideStation] {

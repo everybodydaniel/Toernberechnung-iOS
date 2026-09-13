@@ -70,34 +70,4 @@ final class SeaMask {
     func isThroughWater(row: Int, col: Int) -> Bool {
         cellAt(row: row, col: col).isThroughWater
     }
-
-    func setCell(row: Int, col: Int, type: CellType) {
-        guard !cells.isEmpty, GridConfig.inBounds(row: row, col: col) else { return }
-        cells[GridConfig.index(row: row, col: col)] = type.rawValue
-    }
-
-    func setDepth(row: Int, col: Int, depthMeters: Double) {
-        guard !chartDepth.isEmpty, GridConfig.inBounds(row: row, col: col) else { return }
-        let scaled = Int(depthMeters * Double(Self.depthScale))
-        let clamped = Int16(clamping: scaled)
-        chartDepth[GridConfig.index(row: row, col: col)] = clamped
-    }
-
-    func nearestBuoyDistance(lat: Double, lon: Double) -> Double {
-        guard !buoyPositions.isEmpty else { return .greatestFiniteMagnitude }
-        var best = Double.greatestFiniteMagnitude
-        var i = 0
-        while i < buoyPositions.count {
-            let bLat = Double(buoyPositions[i])
-            let bLon = Double(buoyPositions[i + 1])
-            let d = GridConfig.approxMeters(lat1: lat, lon1: lon, lat2: bLat, lon2: bLon)
-            if d < best { best = d }
-            i += 2
-        }
-        return best
-    }
-
-    var buoyCount: Int {
-        buoyPositions.count / 2
-    }
 }

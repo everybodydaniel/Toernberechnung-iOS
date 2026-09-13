@@ -79,9 +79,8 @@ extension WaterLevelCurvePoint {
     /// Model forecast minus astronomical prediction, in metres.
     ///
     /// Both values are already referenced to chart datum, so the datum cancels
-    /// in the difference — this is the same quantity that
-    /// `WaterLevelEvent.centralCorrectionMeters` derives from the raw
-    /// centimetre values above gauge zero.
+    /// in the difference, just as it does for a tidal event's raw forecast
+    /// and astronomical centimetre values above gauge zero.
     var centralCorrectionMeters: Double? {
         guard let forecastMetersSkn, let astroMetersSkn else { return nil }
         return forecastMetersSkn - astroMetersSkn

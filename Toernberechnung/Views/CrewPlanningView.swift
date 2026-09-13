@@ -49,17 +49,6 @@ extension CrewEventRecord {
     }
 }
 
-enum CrewEventFormat {
-    static func timeRange(_ event: CrewEventRecord) -> String {
-        let day = event.startsAt.formatted(
-            .dateTime.locale(Locale(identifier: "de_DE")).weekday(.wide).day().month(.wide).year()
-        )
-        guard !event.isAllDay else { return "\(day) · ganztägig" }
-        let start = AppDateFormatters.hourMinute.string(from: event.startsAt)
-        let end = AppDateFormatters.hourMinute.string(from: event.endsAt)
-        return "\(day) · \(start)–\(end) Uhr"
-    }
-}
 
 private extension View {
     func crewPlanningListRow() -> some View {
@@ -87,6 +76,44 @@ struct CrewPlanningView: View {
     @State private var shareError: String?
 
     var body: some View {
+        planningList
+        .sheet(isPresented: $newEventShown) {
+            CrewEventEditor(initialDate: selectedDate) { draft in
+                insert(draft)
+                newEventShown = false
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(30)
+            .appSheetGlassBackground()
+        }
+        .sheet(item: $eventToEdit) { event in
+            CrewEventEditor(initialDate: event.startsAt, event: event) { draft in
+                apply(draft, to: event)
+                eventToEdit = nil
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(30)
+            .appSheetGlassBackground()
+        }
+        .sheet(item: $eventToShare) { event in
+            CrewEventShareView(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(30)
+        }
+        .alert("Teilen fehlgeschlagen", isPresented: Binding(
+            get: { shareError != nil },
+            set: { if !$0 { shareError = nil } }
+        )) {
+            Button("OK", role: .cancel) { shareError = nil }
+        } message: {
+            Text(shareError ?? "Der Kalendereintrag konnte nicht erstellt werden.")
+        }
+    }
+
+    private var planningList: some View {
         List {
             CrewspaceScrollingHeader(section: $section)
                 .crewPlanningListRow()
@@ -128,13 +155,14 @@ struct CrewPlanningView: View {
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
-                                    delete(event)
-                                }
+                            // Avoid List's optimistic destructive-row animation;
+                            // SwiftData updates the row and summary together below.
+                            Button {
+                                delete(event)
                             } label: {
                                 Label("Löschen", systemImage: "trash")
                             }
+                            .tint(.red)
                         }
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
                             Button { prepareShare(event) } label: {
@@ -148,48 +176,16 @@ struct CrewPlanningView: View {
             if let next = upcomingEvent {
                 upcomingEventBanner(next)
                     .crewPlanningListRow()
+                    .id("crew-upcoming-event")
             }
         }
+        .animation(nil, value: events.map(\.persistentModelID))
         .tracksAppHeaderVisibility($headerVisible)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.horizontal, 16, for: .scrollContent)
         .contentMargins(.top, topContentInset, for: .scrollContent)
         .contentMargins(.bottom, 28, for: .scrollContent)
-        .sheet(isPresented: $newEventShown) {
-            CrewEventEditor(initialDate: selectedDate) { draft in
-                insert(draft)
-                newEventShown = false
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(30)
-            .appSheetGlassBackground()
-        }
-        .sheet(item: $eventToEdit) { event in
-            CrewEventEditor(initialDate: event.startsAt, event: event) { draft in
-                apply(draft, to: event)
-                eventToEdit = nil
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(30)
-            .appSheetGlassBackground()
-        }
-        .sheet(item: $eventToShare) { event in
-            CrewEventShareView(event: event)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(30)
-        }
-        .alert("Teilen fehlgeschlagen", isPresented: Binding(
-            get: { shareError != nil },
-            set: { if !$0 { shareError = nil } }
-        )) {
-            Button("OK", role: .cancel) { shareError = nil }
-        } message: {
-            Text(shareError ?? "Der Kalendereintrag konnte nicht erstellt werden.")
-        }
     }
 
     @MainActor
@@ -381,8 +377,12 @@ struct CrewPlanningView: View {
 
     @MainActor
     private func delete(_ event: CrewEventRecord) {
-        modelContext.delete(event)
-        try? modelContext.save()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            modelContext.delete(event)
+            try? modelContext.save()
+        }
     }
 }
 

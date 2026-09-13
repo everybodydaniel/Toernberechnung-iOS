@@ -12,9 +12,9 @@ import UIKit
 //   2. OpenSeaMap seamark tiles (transparent PNG) painted on top so the
 //      buoys, depth contours and harbour symbols sit above the OSM base.
 //
-// The planned-route polyline is built from the FULL list of
-// `routePlan.waypoints` — every Dijkstra node, in order. No node is
-// skipped. The chain is smoothed once with Chaikin (`NauticalRouter.smooth`).
+// The planned-route polyline follows the user-selected stops through
+// `NauticalRouteService`. Its `PathSmoother` validates the smoothed route
+// against the sea mask before the map draws the resulting coordinates.
 //
 // Protected zones from the Befahrensverordnung Nationalpark are drawn
 // as red semi-transparent polygons so the skipper can see why the route
@@ -26,7 +26,6 @@ import UIKit
 
 struct CompactMapView: UIViewRepresentable {
 
-    let zoomLevel: Double
     let start: HarbourOption?
     let destination: HarbourOption?
     var routePlan: RoutePlan?

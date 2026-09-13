@@ -446,24 +446,16 @@ private struct WeatherCacheEnvelope: Codable, Sendable {
 
 struct WeatherCacheLookup: Sendable {
     let snapshot: MaritimeWeatherSnapshot
-    let freshDatasets: Set<MarineWeatherDataset>
     let staleDatasets: Set<MarineWeatherDataset>
     let missingDatasets: Set<MarineWeatherDataset>
-    let source: WeatherCacheHitSource
 
     var datasetsNeedingRefresh: Set<MarineWeatherDataset> { staleDatasets.union(missingDatasets) }
-}
-
-enum WeatherCacheHitSource: Sendable {
-    case memory
-    case disk
 }
 
 actor WeatherCacheManager {
     private let configuration: WeatherCacheConfiguration
     private let fileURL: URL?
     private var records: [WeatherAreaKey: WeatherAreaCacheRecord] = [:]
-    private var diskBackedAreas: Set<WeatherAreaKey> = []
     private var accessCounter: UInt64 = 0
     private var didLoad = false
 
@@ -509,7 +501,6 @@ actor WeatherCacheManager {
         var hourly: [MarineHourlyForecast] = []
         var daily: [MarineDailyForecast] = []
         var states: [MarineWeatherProductKind: MarineWeatherProductState] = [:]
-        var fresh: Set<MarineWeatherDataset> = []
         var stale: Set<MarineWeatherDataset> = []
         var missing: Set<MarineWeatherDataset> = []
 
@@ -530,8 +521,6 @@ actor WeatherCacheManager {
                 states[.current] = state
                 if state.isStale {
                     stale.insert(dataset)
-                } else {
-                    fresh.insert(dataset)
                 }
 
             case .hourly(let requestedInterval):
@@ -558,8 +547,6 @@ actor WeatherCacheManager {
                 states[.hourly] = state
                 if state.isStale {
                     stale.insert(dataset)
-                } else {
-                    fresh.insert(dataset)
                 }
 
             case .daily:
@@ -581,8 +568,6 @@ actor WeatherCacheManager {
                 states[.daily] = state
                 if state.isStale {
                     stale.insert(dataset)
-                } else {
-                    fresh.insert(dataset)
                 }
             }
         }
@@ -600,10 +585,8 @@ actor WeatherCacheManager {
                 productStates: states,
                 refreshOutcome: .cacheHit(validUntil: validUntil)
             ),
-            freshDatasets: fresh,
             staleDatasets: stale,
-            missingDatasets: missing,
-            source: diskBackedAreas.remove(areaKey) != nil ? .disk : .memory
+            missingDatasets: missing
         )
     }
 
@@ -646,7 +629,6 @@ actor WeatherCacheManager {
         record.lastAccessedAt = now
         record.accessSequence = nextAccessSequence()
         records[areaKey] = record
-        diskBackedAreas.remove(areaKey)
         prune(now: now)
         try persist()
     }
@@ -684,7 +666,6 @@ actor WeatherCacheManager {
             let envelope = try JSONDecoder().decode(WeatherCacheEnvelope.self, from: data)
             guard envelope.schemaVersion == 1 else { return }
             records = Dictionary(uniqueKeysWithValues: envelope.records.map { ($0.areaKey, $0) })
-            diskBackedAreas = Set(records.keys)
             accessCounter = records.values.compactMap(\.accessSequence).max() ?? 0
             prune(now: now)
         } catch {
@@ -692,7 +673,6 @@ actor WeatherCacheManager {
                 .appendingPathExtension("corrupt-\(Int(now.timeIntervalSince1970)).json")
             try? FileManager.default.moveItem(at: fileURL, to: backupURL)
             records.removeAll()
-            diskBackedAreas.removeAll()
         }
     }
 
@@ -863,14 +843,6 @@ final class NWPathMonitorAdapter: NetworkPathMonitoring, @unchecked Sendable {
     }
 }
 
-struct WeatherServiceDiagnostics: Equatable, Sendable {
-    var memoryHits = 0
-    var diskHits = 0
-    var coalescedRequests = 0
-    var cooldownBlocks = 0
-    var apiCalls = 0
-}
-
 protocol MaritimeWeatherProviding: Sendable {
     func weather(
         at coordinate: CLLocationCoordinate2D,
@@ -902,7 +874,6 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
     private var pendingFetchDatasets: [WeatherAreaKey: Set<MarineWeatherDataset>] = [:]
     private var retries: [WeatherAreaKey: RetryState] = [:]
     private var attributionCache: MarineWeatherAttribution?
-    private var metrics = WeatherServiceDiagnostics()
 
     init(
         client: any MarineWeatherClient = AppleWeatherClient(),
@@ -1082,8 +1053,6 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
         }
     }
 
-    func diagnostics() -> WeatherServiceDiagnostics { metrics }
-
     private func resolve(
         areaKey: WeatherAreaKey,
         datasets: Set<MarineWeatherDataset>,
@@ -1100,10 +1069,6 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
         }
 
         if due.isEmpty {
-            switch lookup.source {
-            case .memory: metrics.memoryHits += 1
-            case .disk: metrics.diskHits += 1
-            }
             return replacingOutcome(
                 lookup.snapshot,
                 with: .cacheHit(validUntil: earliestValidUntil(in: lookup.snapshot, fallback: requestDate))
@@ -1114,7 +1079,6 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
         if let retry = retries[areaKey], requestDate < retry.blockedUntil {
             let mayOverride = policy == .manualRetry && path.isImprovement(over: retry.failedPath)
             if !mayOverride {
-                metrics.cooldownBlocks += 1
                 if lookup.missingDatasets.isEmpty {
                     return replacingOutcome(lookup.snapshot, with: .retryBlocked(until: retry.blockedUntil))
                 }
@@ -1133,7 +1097,6 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
         }
 
         if let task = inFlight[areaKey] {
-            metrics.coalescedRequests += 1
             pendingFetchDatasets[areaKey, default: []].formUnion(expandedDatasetsForFetch(due))
             let payload = try await task.value
             try await cache.merge(areaKey: areaKey, payload: payload, now: requestDate)
@@ -1156,7 +1119,6 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
             return try await client.fetch(at: location, datasets: combinedDatasets, now: requestDate)
         }
         inFlight[areaKey] = task
-        metrics.apiCalls += 1
 
         do {
             let payload = try await task.value

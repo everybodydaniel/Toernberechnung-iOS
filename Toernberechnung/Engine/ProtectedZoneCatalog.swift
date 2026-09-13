@@ -52,11 +52,6 @@ enum ProtectedZoneCatalog {
         return false
     }
 
-    /// Returns the first zone containing `point`, if any. Used for diagnostics.
-    static func zoneContaining(_ point: CLLocationCoordinate2D) -> Zone? {
-        zones.first { pointInRing(point, ring: $0.outerRing) }
-    }
-
     // MARK: - Geometry primitives
 
     private static func bboxOverlaps(

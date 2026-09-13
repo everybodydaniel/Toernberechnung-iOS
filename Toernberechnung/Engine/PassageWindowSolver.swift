@@ -47,7 +47,7 @@ struct PassageWindowSolver {
         let shortfallMeters: Double
         let quality: WaterLevelCorrectionQuality
 
-        var isPassableAtPlannedTime: Bool { shortfallMeters <= 0 }
+
     }
 
     struct Solution: Equatable {

@@ -271,8 +271,8 @@ struct ToernberechnungApp: App {
 
     /// Live GPS service.  Shared across every tab so the background
     /// recording survives navigation away from the Map tab.
-    @State private var locationService = LocationService()
-    @State private var navigationTracker = NavigationTracker()
+    @State private var locationService: LocationService
+    @State private var navigationTracker: NavigationTracker
     @State private var voyageManager: ActiveVoyageManager
     @AppStorage("appearanceMode") private var appearanceMode = AppAppearanceMode.light.rawValue
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false

@@ -24,12 +24,7 @@ enum WaypointCalculationMode: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var displayName: String {
-        switch self {
-        case .meanHighWater: return "MHW"
-        case .lottiefe: return "Lottiefe"
-        }
-    }
+
 }
 
 // MARK: - Source Metadata
@@ -44,16 +39,7 @@ enum ValueSource: String, Codable {
     case weatherService = "weather"
     case unknown = "unknown"
 
-    var displayName: String {
-        switch self {
-        case .bsh: return "BSH"
-        case .catalog: return "Vorgabe"
-        case .cache: return "Cache"
-        case .manual: return "Manuell"
-        case .weatherService: return "Apple Weather"
-        case .unknown: return "Unbekannt"
-        }
-    }
+
 }
 
 /// A numeric value paired with its source and optional notes.

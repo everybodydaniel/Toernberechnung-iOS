@@ -57,24 +57,6 @@ extension View {
         }
     }
 
-    /// Same as `appCardSurface` but without the leading-aligned frame.
-    /// Use for metric-style grid cards where the parent already controls
-    /// dimensions.
-    @ViewBuilder
-    func appMetricSurface(cornerRadius: CGFloat = 20) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        if #available(iOS 26.0, *) {
-            self
-                .padding(14)
-                .glassEffect(.regular, in: shape)
-        } else {
-            self
-                .padding(14)
-                .background(Color.cardBackground)
-                .clipShape(shape)
-                .shadow(color: .black.opacity(0.05), radius: 12, y: 8)
-        }
-    }
 }
 
 // MARK: - Field Surface
@@ -281,26 +263,9 @@ extension View {
     }
 }
 
-// MARK: - Chip surface
-//
-// Capsule pill used for tiny status indicators (e.g. "Bezug: SKN").
+// MARK: - Icon Background
 
 extension View {
-
-    @ViewBuilder
-    func appChipSurface(tint: Color = Color(hex: 0x3C82FF)) -> some View {
-        if #available(iOS 26.0, *) {
-            self
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .glassEffect(Glass.regular.tint(tint.opacity(0.55)), in: Capsule())
-        } else {
-            self
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(tint.opacity(0.12), in: Capsule())
-        }
-    }
 
     /// Transparent Liquid Glass background for small circular icons.
     @ViewBuilder
@@ -415,23 +380,6 @@ extension View {
             }
         } else {
             self.presentationBackground(.ultraThinMaterial)
-        }
-    }
-}
-
-// MARK: - TabView minimize behavior
-//
-// One-call modifier so the TabView code stays readable. iOS 26 enables
-// the new auto-minimize tab bar; older OSes are a no-op.
-
-extension View {
-
-    @ViewBuilder
-    func appTabBarMinimize() -> some View {
-        if #available(iOS 26.0, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            self
         }
     }
 }

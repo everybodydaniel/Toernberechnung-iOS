@@ -41,18 +41,7 @@ struct RouteSummary: Equatable {
     let legs: [Leg]
     let overallStatus: RouteStatus
 
-    /// Localized German one-liner that names the first failing leg, or nil
-    /// if the whole route is .go / .warning.
-    var failureMessage: String? {
-        if let bad = legs.first(where: { $0.status == .noGo || $0.status == .invalid }) {
-            return "Passage von \(bad.fromName) nach \(bad.toName) ist nicht möglich" +
-                (bad.bottleneckName.map { " (Engstelle: \($0))" } ?? "")
-        }
-        if let incomplete = legs.first(where: { $0.status == .incomplete }) {
-            return "Daten unvollständig zwischen \(incomplete.fromName) und \(incomplete.toName)"
-        }
-        return nil
-    }
+
 
     // MARK: - Build
 

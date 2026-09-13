@@ -2,6 +2,29 @@ import XCTest
 @testable import Toernberechnung
 
 final class LocalAIInferenceTests: XCTestCase {
+    func testLocalContextKeepsCurrentQuestionAndOnlyCompleteRecentMessages() throws {
+        let question = "Was muss ich beim Trockenfallen mit 1,5 m Tiefgang beachten?"
+        let request = NautiInferenceRequest(messages: [
+            .init(role: .user, text: String(repeating: "a", count: 1_000)),
+            .init(role: .assistant, text: String(repeating: "b", count: 800)),
+            .init(role: .user, text: question)
+        ])
+        let result = try request.preparedForLocalModel()
+        XCTAssertEqual(result.messages.map(\.text), [String(repeating: "b", count: 800), question])
+        XCTAssertEqual(result.requestedAt, request.requestedAt)
+        let retry = try request.preparedForLocalModel(historyCharacterLimit: 0)
+        XCTAssertEqual(retry.messages.map(\.text), [question])
+    }
+
+    func testLocalContextRejectsOversizedQuestionRatherThanTruncatingIt() {
+        let request = NautiInferenceRequest(messages: [
+            .init(role: .user, text: String(repeating: "x", count: 2_001))
+        ])
+        XCTAssertThrowsError(try request.preparedForLocalModel()) { error in
+            XCTAssertEqual(error as? LocalAIInferenceError, .contextTooLarge)
+        }
+    }
+
     func testContextKeepsLatestTwelveMessagesWithinEightThousandCharacters() {
         let messages = (0..<20).map { index in
             NautiConversationMessage(
@@ -46,6 +69,44 @@ final class LocalAIInferenceTests: XCTestCase {
         XCTAssertEqual(result.action?.kind, .planTrip)
         XCTAssertEqual(result.action?.intermediateStopIDs, ["juist_harbor"])
         XCTAssertEqual(result.action?.saveTrip, true)
+    }
+
+    func testAnswerFormattingRendersEmphasisAndSeparatesInlineHeadings() {
+        let answer = NautiAnswerFormatting.attributed("Vorbereitung: 1. **Schiff**: prüfen. 2. **Crew**: einweisen.")
+        XCTAssertEqual(String(answer.characters), "Vorbereitung:\n\n1. Schiff: prüfen.\n\n2. Crew: einweisen.")
+        let values = "Tiefgang 1.5 m, Abfahrt 10.30 Uhr.\n\nReserve einplanen."
+        XCTAssertEqual(String(NautiAnswerFormatting.attributed(values).characters), values)
+    }
+
+    func testKnowledgeQuestionsReachLanguageModel() {
+        let questions = [
+            "Erkläre mir die Gezeiten im Wattenmeer.",
+            "Was ist der Tidenhub?",
+            "Wie plane ich einen Törn im Wattenmeer?",
+            "Wie bereite ich ein Törn vor?",
+            "Wie bereite ich einen Törn im Wattenmeer vor?",
+            "Welche Wetterzeichen muss ich beachten?",
+            "Warum kentert der Strom nicht immer bei Hochwasser?",
+            "Erläutere den Einfluss von Wind auf den Wasserstand.",
+            "Was bedeutet Niedrigwasser für das Trockenfallen bei Juist?"
+        ]
+        for question in questions {
+            let request = NautiInferenceRequest(messages: [.init(role: .user, text: question)])
+            XCTAssertNil(NautiDeterministicIntentRouter.route(request), question)
+        }
+    }
+
+    func testConcreteDataRequestsStillRouteDirectly() {
+        let cases: [(String, NautiActionKind)] = [
+            ("Wie ist das Wetter morgen auf Juist?", .getWeatherSummary),
+            ("Gezeiten für Norderney heute", .getTideSummary),
+            ("Wasserstand in Emden", .getWaterLevelSummary),
+            ("Öffne den Wetterbereich für Juist", .showWeather)
+        ]
+        for (text, kind) in cases {
+            let request = NautiInferenceRequest(messages: [.init(role: .user, text: text)])
+            XCTAssertEqual(NautiDeterministicIntentRouter.route(request)?.action?.kind, kind, text)
+        }
     }
 
     func testDeterministicRouterPlansSimpleTripWithoutAskingAgain() {

@@ -32,7 +32,6 @@ struct FullScreenNavigationView: View {
     var body: some View {
         ZStack(alignment: .top) {
             CompactMapView(
-                zoomLevel: 14,
                 start: start,
                 destination: destination,
                 routePlan: routePlan,

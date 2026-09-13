@@ -11,6 +11,14 @@ enum NautiDeterministicIntentRouter {
     }
 
     static func route(_ request: NautiInferenceRequest) -> NautiInferenceResult? {
+        // Explanatory questions belong to the model even when they contain
+        // data keywords such as "Gezeiten" or "Wetter". Mixed requests also
+        // reach the model so it can choose the appropriate structured intent.
+        if let latest = request.messages.last(where: { $0.role == .user })?.text,
+           asksForAdvice(latest) {
+            return nil
+        }
+
         if let latest = request.messages.last(where: { $0.role == .user })?.text,
            looksLikeTripPlanning(latest) {
             return routeTrip(latest, requestedAt: request.requestedAt)
@@ -85,6 +93,16 @@ enum NautiDeterministicIntentRouter {
 
         let reply = tripReply(for: action)
         return NautiActionValidator.validate(action, reply: reply)
+    }
+
+    private static func asksForAdvice(_ text: String) -> Bool {
+        let text = folded(text)
+        let patterns = [
+            #"\b(erkl[aä]r\w*|erlaut\w*|warum|weshalb|wieso|bedeut\w*|versteh\w*)\b"#,
+            #"\b(was (ist|sind)|wie (entsteh\w*|funktionier\w*|bereit\w*|plan\w*|erkenne|verhalt\w*))\b"#,
+            #"\b(beacht\w*|berat\w*|rat(?:schlag|schlage)|tipps?|zusammenhang|unterschied\w*)\b"#
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
     }
 
     private static func dataIntent(in text: String) -> DataIntent? {

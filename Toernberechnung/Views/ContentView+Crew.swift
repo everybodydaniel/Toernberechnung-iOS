@@ -209,6 +209,7 @@ struct CrewspaceCrewView: View {
                             } label: {
                                 Label("Löschen", systemImage: "trash.fill")
                             }
+                            .tint(.red)
                         }
                 }
             }

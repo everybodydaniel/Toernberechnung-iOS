@@ -433,30 +433,6 @@ enum NauticalRouter {
         }
     }
 
-    static func multiStopRoute(stops: [CLLocationCoordinate2D]) -> [Waypoint] {
-        guard stops.count >= 2 else { return [] }
-        let isTesting = NSClassFromString("XCTestCase") != nil
-        guard SeaMask.shared.isReady && !isTesting else {
-            var result: [Waypoint] = []
-            for i in 0 ..< stops.count - 1 {
-                let segment = route(from: stops[i], to: stops[i + 1])
-                if result.isEmpty {
-                    result.append(contentsOf: segment)
-                } else {
-                    result.append(contentsOf: segment.dropFirst())
-                }
-            }
-            return result
-        }
-
-        let routeResult = NauticalRouteService.shared.calculateMultiStopRoute(stops: stops)
-        let simplifiedCoords = PathSmoother.simplify(routeResult.coordinates, epsilon: 100.0)
-        return simplifiedCoords.enumerated().map { index, coord in
-            let depth = SeaMask.shared.depthAtLatLng(lat: coord.latitude, lon: coord.longitude)
-            return Waypoint("AStar_multi_\(index)", coord.latitude, coord.longitude, depth)
-        }
-    }
-
     static func nearest(to coordinate: CLLocationCoordinate2D) -> Waypoint {
         // If the coordinate is very close to one of our precise harbor locations,
         // we explicitly return that precise harbor waypoint.
@@ -516,8 +492,6 @@ enum NauticalRouter {
             distanceSquared(lhs.coordinate, coordinate) < distanceSquared(rhs.coordinate, coordinate)
         } ?? waypoints[0]
     }
-
-    static func waypoint(id: String) -> Waypoint? { waypointMap[id] }
 
     // MARK: - Dijkstra
 
@@ -590,44 +564,5 @@ enum NauticalRouter {
         let dLat = a.latitude - b.latitude
         let dLon = (a.longitude - b.longitude) * cos(a.latitude * .pi / 180)
         return dLat * dLat + dLon * dLon
-    }
-
-    // MARK: - Chaikin smoothing (verbatim from original implementation)
-    //
-    // Q = 0.75·P1 + 0.25·P2 ;  R = 0.25·P1 + 0.75·P2
-    //
-    // Two iterations matches the original `repeat(2) { chaikinStep(...) }`.
-    // Because every consecutive Chaikin point is a CONVEX combination of
-    // the original endpoints, the smoothed curve stays inside the convex
-    // hull of the input waypoints — and the input waypoints come straight
-    // from the verified reference graph, which sits in navigable water by
-    // construction. There is therefore no land-overshoot risk.
-
-    static func smooth(_ path: [CLLocationCoordinate2D], iterations: Int = 1) -> [CLLocationCoordinate2D] {
-        guard path.count >= 3 else { return path }
-        var current = path
-        for _ in 0 ..< iterations {
-            current = chaikinStep(current)
-        }
-        return current
-    }
-
-    private static func chaikinStep(_ path: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
-        guard let first = path.first, let last = path.last else { return path }
-        var result: [CLLocationCoordinate2D] = [first]
-        for i in 0 ..< path.count - 1 {
-            let p1 = path[i]
-            let p2 = path[i + 1]
-            result.append(CLLocationCoordinate2D(
-                latitude: 0.75 * p1.latitude + 0.25 * p2.latitude,
-                longitude: 0.75 * p1.longitude + 0.25 * p2.longitude
-            ))
-            result.append(CLLocationCoordinate2D(
-                latitude: 0.25 * p1.latitude + 0.75 * p2.latitude,
-                longitude: 0.25 * p1.longitude + 0.75 * p2.longitude
-            ))
-        }
-        result.append(last)
-        return result
     }
 }

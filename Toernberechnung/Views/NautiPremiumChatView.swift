@@ -112,9 +112,6 @@ struct NautiPremiumChatOverlay: View {
                 mode = .history
             }
 
-            NautiSymbolAvatar()
-                .frame(width: 34, height: 34)
-
             VStack(alignment: .leading, spacing: 1) {
                 Text(viewModel.activeConversation.title)
                     .font(.system(size: 15, weight: .bold))
@@ -420,20 +417,7 @@ private struct NautiHistoryList: View {
                                 }
                                 .tint(.blue)
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    onDelete(conversation)
-                                } label: {
-                                    Label("Löschen", systemImage: "trash")
-                                }
 
-                                Button {
-                                    onRename(conversation)
-                                } label: {
-                                    Label("Umbenennen", systemImage: "pencil")
-                                }
-                                .tint(.indigo)
-                            }
                             .contextMenu {
                                 Button {
                                     onTogglePin(conversation)

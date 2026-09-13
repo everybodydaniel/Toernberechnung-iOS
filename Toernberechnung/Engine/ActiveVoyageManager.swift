@@ -177,11 +177,6 @@ final class ActiveVoyageManager {
         return record
     }
 
-    /// Abandon the voyage without persisting anything (e.g. user cancels).
-    func cancelVoyage() {
-        cleanup()
-    }
-
     // MARK: - Per-fix processing
 
     private var lastLocation: CLLocation?

@@ -228,21 +228,6 @@ struct MarineWeatherReport: Codable, Equatable, Sendable {
     let sourceUpdatedAt: Date
     let isStale: Bool
 
-    func markedStale() -> MarineWeatherReport {
-        MarineWeatherReport(
-            regionID: regionID,
-            regionName: regionName,
-            latitude: latitude,
-            longitude: longitude,
-            current: current,
-            hourly: hourly,
-            daily: daily,
-            fetchedAt: fetchedAt,
-            sourceUpdatedAt: sourceUpdatedAt,
-            isStale: true
-        )
-    }
-
     func hourlyForecast(nearest date: Date, tolerance: TimeInterval = 90 * 60) -> MarineHourlyForecast? {
         guard let closest = hourly.min(by: {
             abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
@@ -339,10 +324,6 @@ struct MaritimeWeatherSnapshot: Equatable, Sendable {
 
     var isStale: Bool {
         productStates.values.contains(where: \.isStale)
-    }
-
-    var oldestSourceDate: Date? {
-        productStates.values.map(\.fetchedAt).min()
     }
 
     func report(for harbour: HarbourOption, startingAt start: Date = Date()) throws -> MarineWeatherReport {

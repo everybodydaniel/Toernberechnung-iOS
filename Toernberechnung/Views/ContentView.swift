@@ -57,7 +57,6 @@ enum ConditionsSection: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @Environment(\.modelContext) var modelContext
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(LocationService.self) var locationService
     @Environment(NavigationTracker.self) var navigationTracker
     @Environment(ActiveVoyageManager.self) var voyageManager
@@ -102,8 +101,6 @@ struct ContentView: View {
     @State var selectedLogbookRecord: CalculationRecord?
     @State var logbookExportInProgress = false
     @State var logbookDeleteError: String?
-    @State var editingLogbookRecord: CalculationRecord?
-    @State var logbookEditorShown = false
     @State var weatherLoading = false
     @State var weatherReport: MarineWeatherReport?
     @State var islandWeatherReports: [String: MarineWeatherReport] = [:]
@@ -137,10 +134,6 @@ struct ContentView: View {
         HarbourOption.options.first(where: { $0.tideStationID == tideStationID })
             ?? HarbourOption.options[2]
     }
-    var compactColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 10), count: horizontalSizeClass == .regular ? 3 : 1)
-    }
-
     var body: some View {
         mainContent
     }
@@ -176,8 +169,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $tideStationPickerShown) {
             TideStationPickerSheet(
-                selection: $tideStationID,
-                readings: islandTides
+                selection: $tideStationID
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -382,6 +374,7 @@ struct ContentView: View {
             }
             .tint(Color(hex: 0x0077B6))
             .tabBarMinimizeBehavior(.onScrollDown)
+            .toolbarBackgroundVisibility(.hidden, for: .tabBar)
         } else {
             currentScreen
                 .overlay(alignment: .bottom) {

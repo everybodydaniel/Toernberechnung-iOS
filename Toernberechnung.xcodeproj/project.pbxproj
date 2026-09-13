@@ -19,27 +19,21 @@
 		163EE3299E5F965B0DBDBF93 /* RouteSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 854BD2E3D8ECB6A2F6829B1D /* RouteSummary.swift */; };
 		19574E5BF8BEAE0ED83964D2 /* WeatherRevierUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE38047FFF900E189080C7D4 /* WeatherRevierUITests.swift */; };
 		1A0BEF78EAEE470A2C851AB0 /* PassageWindowScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF51E2BE9460F831E95F3631 /* PassageWindowScanner.swift */; };
-		2003540FEF954C3BBA859B0C /* BuoyValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB571B02B695D39AE30977AC /* BuoyValidator.swift */; };
 		290A8A8D0C9A8B5EC1FB62ED /* ActiveVoyageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274236500C1B928A068F3783 /* ActiveVoyageManager.swift */; };
 		2CA0578F0E47A86ED0677954 /* GridConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAE27DA1F418F346EAC503F /* GridConfig.swift */; };
 		2E5D6CF2857614B287146E8D /* TidalHeightStrategy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */; };
 		2F17F8E1AE1CC501F580EC41 /* ContentView+Tides.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */; };
 		306BEF3DDCA492F13D5DF406 /* MeasurementTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446C16D2630809C1DD0D7B24 /* MeasurementTextField.swift */; };
 		33E0F847AA931080722046B2 /* BSHTideMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC8EA575915AE2FB0948A07 /* BSHTideMigrationTests.swift */; };
-		341D4D819FF47AEA79150034 /* ContentView+RouteDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */; };
 		3613AEEB458B2095CA8A7CF5 /* HarbourCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F436A6D4344A8FBC41A70F2D /* HarbourCatalog.swift */; };
 		381183DB7B7D8D019DA48ADA /* WeatherKitMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83A33A91CDA768763868520B /* WeatherKitMigrationTests.swift */; };
 		39A2F76306859B35D71FF5BE /* RouteExpander.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB983A46EA4BC5DBA65F12DA /* RouteExpander.swift */; };
 		3A2619E5325541DB32A27858 /* WeatherKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2EE863A1B996B4F4D70A72 /* WeatherKitManager.swift */; };
 		3EA202BC107BCD881933A35A /* NauticalRouteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7A360C93882D2D4BCD9FCA /* NauticalRouteService.swift */; };
-		3EED05627FF4619CAF4C0088 /* RuleOfTwelfths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640393A55B27F29286BA7281 /* RuleOfTwelfths.swift */; };
 		4016C38D4688B7BB0A45EDD7 /* ContentView+SharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */; };
 		40247830EDCFA32E62504A12 /* nordsbefv.geojson in Resources */ = {isa = PBXBuildFile; fileRef = 832A4D0EF23DA499958BE153 /* nordsbefv.geojson */; };
-		40DEEC6A3524EA510BB3799F /* EmdenPlantabelleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169593BB0CD5790CBECE6649 /* EmdenPlantabelleService.swift */; };
 		461698973EC983552F171EE5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4653D4F082EF987F05C20FDA /* ContentView.swift */; };
 		4A66344FA10440B2F4FE1062 /* CrewEventEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D761D8EA2DD50E216BB78B2 /* CrewEventEditor.swift */; };
-		4C0AE1CE7C8713E2C0F274AC /* FullScreenMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645CA1CC6BEB3E7B371C68E6 /* FullScreenMapView.swift */; };
-		5177240AA629369FD41F60D4 /* StringHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D433292A9FE8CD89D07B3E /* StringHelpers.swift */; };
 		5358D53E0C82493B269FD378 /* WaypointDepthSolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C147B3C44BBEE29AF5B07473 /* WaypointDepthSolver.swift */; };
 		543ABD2837D73A4FDC593DD6 /* KeyboardDismissal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC8EF30B2D8BD3431761C17 /* KeyboardDismissal.swift */; };
 		56306CC87A3D1029D016754E /* NavigationTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 850FE3162586054D9B2887EB /* NavigationTracker.swift */; };
@@ -63,7 +57,6 @@
 		877CB92A9A53C3D2350D3912 /* ExcelParityReferenceSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E99D6E0F96A732513934E9 /* ExcelParityReferenceSheetTests.swift */; };
 		887EF829CD41895EF91CA4EA /* NautiDeterministicIntentRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB18B008C18D76091F873FC7 /* NautiDeterministicIntentRouter.swift */; };
 		8BBE3BE504E8AD2A678606E6 /* BSHWaterLevelForecastService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DF95CFE56A1939FA4B8AF8B /* BSHWaterLevelForecastService.swift */; };
-		8BD087FDCEC0A37B565A216E /* CalculatorResultsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97FCC92A2AD55D7EE953DDA /* CalculatorResultsSection.swift */; };
 		8DDCF877DA1FE1B33756A817 /* WaterLevelCorrectionSeries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83105E893C78E910D98B69B6 /* WaterLevelCorrectionSeries.swift */; };
 		9002302A1C2A513C6113CEC3 /* CrewEventShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382EC71F535DF0A12A810A58 /* CrewEventShareView.swift */; };
 		913CA912C4A8524B5E206699 /* CrewPlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C822138A0DF958C6D01269F2 /* CrewPlanningTests.swift */; };
@@ -83,7 +76,6 @@
 		BA7D41C2443E8E448B0E9E8E /* ContentView+NautiDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02EA164DA3FD962BCCFF9640 /* ContentView+NautiDrawer.swift */; };
 		BA89B835246BA7901CC3EA4C /* wadden_sea_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = F15FF5ACB5DCB786EC2A97FD /* wadden_sea_catalog.json */; };
 		BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */; };
-		BF01C38C2FDFCD34C0144646 /* MapLibreRouteRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B037C9EEFE6106D9FE1EA8C1 /* MapLibreRouteRenderer.swift */; };
 		C22357698F7C3305939282E7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BE4B963C1585049389268D0D /* PrivacyInfo.xcprivacy */; };
 		C6629693F3A1BA38B3EB10B6 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F50F04D34679E0E056B9C47 /* WebView.swift */; };
 		C7F8DC9E8C8A5D642C214DCD /* NautiSpeechInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8ABC75A8C6E08417C1E9FDE /* NautiSpeechInputTests.swift */; };
@@ -97,14 +89,11 @@
 		D8BF3522BDC3AF4755CE3BE2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5AF1A741D27CBF4BCC0FA087 /* Assets.xcassets */; };
 		DCEE953FBF73EECE6EACB04E /* ContentView+MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */; };
 		DDB825DCAC8CF212878F8B70 /* WeatherDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB541BDC708D99C83CCFF35C /* WeatherDetailViews.swift */; };
-		DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */; };
-		E66B2F8786297C22F26956D7 /* WattseglerLotungenService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C715475AD626695C1776565 /* WattseglerLotungenService.swift */; };
 		E8C97909A63F90D438247502 /* ExcelParityTwelfthsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EF4E0A0F894DD35221BEDA1 /* ExcelParityTwelfthsTests.swift */; };
 		E9986BBF226BD3368DA35C96 /* PassageWindowSolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E9EC3511246CA062CF4B33E /* PassageWindowSolverTests.swift */; };
 		EBF4D6ECA5179A5486582306 /* RouteCalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CD4DBBBC9671B0C9E5C1B0 /* RouteCalculationService.swift */; };
 		EC64AD99A94155A38E1D4D2E /* CellType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF93182DE9CBACE33738186 /* CellType.swift */; };
 		F139CCBE12014D4F550A1213 /* BSHTideService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */; };
-		F181E236B3B5D93DAB1CA78B /* RuleOfTwelfthsInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16DFDF8C3F8C400C60303FC6 /* RuleOfTwelfthsInterpolationTests.swift */; };
 		F241C1AC3877E8623BDB0315 /* ContentView+InitialData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA329872470DA8D67C51E0 /* ContentView+InitialData.swift */; };
 		FA8D7B0B156A80E68B7970B8 /* TideNodeNautiStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C13D7B48A109D0921CCBF6 /* TideNodeNautiStateTests.swift */; };
 		FC17D1758DF9D6E9849C9F13 /* LocalAIInferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36D3F2C1B0F2FA4590C85A2A /* LocalAIInferenceTests.swift */; };
@@ -134,17 +123,13 @@
 		0A7A360C93882D2D4BCD9FCA /* NauticalRouteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NauticalRouteService.swift; sourceTree = "<group>"; };
 		0BBA897B12C1BC2FE7634506 /* RoutePlannerViewModel+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RoutePlannerViewModel+Support.swift"; sourceTree = "<group>"; };
 		0DC8EF30B2D8BD3431761C17 /* KeyboardDismissal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardDismissal.swift; sourceTree = "<group>"; };
-		169593BB0CD5790CBECE6649 /* EmdenPlantabelleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmdenPlantabelleService.swift; sourceTree = "<group>"; };
-		16DFDF8C3F8C400C60303FC6 /* RuleOfTwelfthsInterpolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleOfTwelfthsInterpolationTests.swift; sourceTree = "<group>"; };
 		181421DC8A360277DAD5544B /* IslandPolygons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandPolygons.swift; sourceTree = "<group>"; };
-		19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+RouteDetail.swift"; sourceTree = "<group>"; };
 		1E9EC3511246CA062CF4B33E /* PassageWindowSolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassageWindowSolverTests.swift; sourceTree = "<group>"; };
 		21A96710FE2085EF2F0513DF /* NautiConversationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NautiConversationRepository.swift; sourceTree = "<group>"; };
 		23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlannerViewModel.swift; sourceTree = "<group>"; };
 		2699D36FEC3B279D7828DBC8 /* LocalAIInferenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAIInferenceManager.swift; sourceTree = "<group>"; };
 		274236500C1B928A068F3783 /* ActiveVoyageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveVoyageManager.swift; sourceTree = "<group>"; };
 		2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		2C715475AD626695C1776565 /* WattseglerLotungenService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WattseglerLotungenService.swift; sourceTree = "<group>"; };
 		2D96FAFEC88A7B5407880B6B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2DF95CFE56A1939FA4B8AF8B /* BSHWaterLevelForecastService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHWaterLevelForecastService.swift; sourceTree = "<group>"; };
 		2EE385DABDC8E369D3F65A36 /* ProtectedZoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedZoneCatalog.swift; sourceTree = "<group>"; };
@@ -170,9 +155,6 @@
 		5C8D4F5A3D748B4BE30BECA6 /* AStarPathfinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AStarPathfinder.swift; sourceTree = "<group>"; };
 		5CAEC547A53377F8F6CAE5D8 /* NautiConversationPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NautiConversationPersistenceTests.swift; sourceTree = "<group>"; };
 		617F84FCDB1A17F8EB7E2233 /* SeaMask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeaMask.swift; sourceTree = "<group>"; };
-		61D433292A9FE8CD89D07B3E /* StringHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringHelpers.swift; sourceTree = "<group>"; };
-		640393A55B27F29286BA7281 /* RuleOfTwelfths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleOfTwelfths.swift; sourceTree = "<group>"; };
-		645CA1CC6BEB3E7B371C68E6 /* FullScreenMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenMapView.swift; sourceTree = "<group>"; };
 		64ADD85525E57CD3C2F69C82 /* NautiSpeechInputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NautiSpeechInputManager.swift; sourceTree = "<group>"; };
 		6D761D8EA2DD50E216BB78B2 /* CrewEventEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrewEventEditor.swift; sourceTree = "<group>"; };
 		6EF4E0A0F894DD35221BEDA1 /* ExcelParityTwelfthsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelParityTwelfthsTests.swift; sourceTree = "<group>"; };
@@ -195,11 +177,9 @@
 		9F50F04D34679E0E056B9C47 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
 		A0F93A8CC11873165313A6C2 /* FullScreenNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenNavigationView.swift; sourceTree = "<group>"; };
 		A4E99D6E0F96A732513934E9 /* ExcelParityReferenceSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelParityReferenceSheetTests.swift; sourceTree = "<group>"; };
-		A97FCC92A2AD55D7EE953DDA /* CalculatorResultsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorResultsSection.swift; sourceTree = "<group>"; };
 		A9C13D7B48A109D0921CCBF6 /* TideNodeNautiStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TideNodeNautiStateTests.swift; sourceTree = "<group>"; };
 		AAF2C827FD36960A66C93637 /* NauticalRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NauticalRouter.swift; sourceTree = "<group>"; };
 		ADAE27DA1F418F346EAC503F /* GridConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridConfig.swift; sourceTree = "<group>"; };
-		B037C9EEFE6106D9FE1EA8C1 /* MapLibreRouteRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapLibreRouteRenderer.swift; sourceTree = "<group>"; };
 		B05EA47177A55060F125A959 /* ExcelParityRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelParityRouteTests.swift; sourceTree = "<group>"; };
 		B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Toernberechnung.docc; sourceTree = "<group>"; };
 		B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Weather.swift"; sourceTree = "<group>"; };
@@ -213,8 +193,6 @@
 		C148FB3D3B65E8FF5740090D /* ExcelParityDepthChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelParityDepthChainTests.swift; sourceTree = "<group>"; };
 		C224CA0A7F40A17EF6067E2B /* ContentView+Nauti.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Nauti.swift"; sourceTree = "<group>"; };
 		C822138A0DF958C6D01269F2 /* CrewPlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrewPlanningTests.swift; sourceTree = "<group>"; };
-		CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeaRoutePlanner.swift; sourceTree = "<group>"; };
-		CB571B02B695D39AE30977AC /* BuoyValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuoyValidator.swift; sourceTree = "<group>"; };
 		CB983A46EA4BC5DBA65F12DA /* RouteExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteExpander.swift; sourceTree = "<group>"; };
 		CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideService.swift; sourceTree = "<group>"; };
 		CEE7644C4B5B691C0A8C7ACC /* east_frisia_osm.geojson */ = {isa = PBXFileReference; path = east_frisia_osm.geojson; sourceTree = "<group>"; };
@@ -261,11 +239,9 @@
 			isa = PBXGroup;
 			children = (
 				5C8D4F5A3D748B4BE30BECA6 /* AStarPathfinder.swift */,
-				CB571B02B695D39AE30977AC /* BuoyValidator.swift */,
 				2EF93182DE9CBACE33738186 /* CellType.swift */,
 				ADAE27DA1F418F346EAC503F /* GridConfig.swift */,
 				181421DC8A360277DAD5544B /* IslandPolygons.swift */,
-				B037C9EEFE6106D9FE1EA8C1 /* MapLibreRouteRenderer.swift */,
 				0A7A360C93882D2D4BCD9FCA /* NauticalRouteService.swift */,
 				38107A2D8C1890639AE7875F /* PathSmoother.swift */,
 				820370648785ECCE1B72E848 /* RouteResult.swift */,
@@ -289,7 +265,6 @@
 			children = (
 				CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */,
 				2DF95CFE56A1939FA4B8AF8B /* BSHWaterLevelForecastService.swift */,
-				169593BB0CD5790CBECE6649 /* EmdenPlantabelleService.swift */,
 				2699D36FEC3B279D7828DBC8 /* LocalAIInferenceManager.swift */,
 				9F1D5D2D3DE4D18E6CE44C3E /* LocationService.swift */,
 				21A96710FE2085EF2F0513DF /* NautiConversationRepository.swift */,
@@ -297,7 +272,6 @@
 				4F84E95744304C38CDDE075D /* SpeechAudioFormatConverter.swift */,
 				B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */,
 				83105E893C78E910D98B69B6 /* WaterLevelCorrectionSeries.swift */,
-				2C715475AD626695C1776565 /* WattseglerLotungenService.swift */,
 				BD2EE863A1B996B4F4D70A72 /* WeatherKitManager.swift */,
 			);
 			name = Services;
@@ -326,9 +300,6 @@
 				23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */,
 				0BBA897B12C1BC2FE7634506 /* RoutePlannerViewModel+Support.swift */,
 				854BD2E3D8ECB6A2F6829B1D /* RouteSummary.swift */,
-				640393A55B27F29286BA7281 /* RuleOfTwelfths.swift */,
-				CAF8E6C9CDF0019594FD90F9 /* SeaRoutePlanner.swift */,
-				61D433292A9FE8CD89D07B3E /* StringHelpers.swift */,
 				BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */,
 				FCD559185A21CCD913BF3C85 /* WaddenSeaCatalog.swift */,
 				C147B3C44BBEE29AF5B07473 /* WaypointDepthSolver.swift */,
@@ -356,7 +327,6 @@
 		D439D35983ED21D420788A42 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				A97FCC92A2AD55D7EE953DDA /* CalculatorResultsSection.swift */,
 				4653D4F082EF987F05C20FDA /* ContentView.swift */,
 				77784D022DC6C5A1DDD22C1A /* ContentView+Crew.swift */,
 				8A11AA1B18E952AE2F3AF386 /* ContentView+FloatingTabBar.swift */,
@@ -365,14 +335,12 @@
 				41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */,
 				C224CA0A7F40A17EF6067E2B /* ContentView+Nauti.swift */,
 				02EA164DA3FD962BCCFF9640 /* ContentView+NautiDrawer.swift */,
-				19A2072E7B5949490C294D2E /* ContentView+RouteDetail.swift */,
 				96EEBB350BF60F2D33A0C364 /* ContentView+SharedUI.swift */,
 				334F1156467F5D6BBBF09E88 /* ContentView+Tides.swift */,
 				B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */,
 				6D761D8EA2DD50E216BB78B2 /* CrewEventEditor.swift */,
 				382EC71F535DF0A12A810A58 /* CrewEventShareView.swift */,
 				92BFFCA0A4FDB1B9A0855A21 /* CrewPlanningView.swift */,
-				645CA1CC6BEB3E7B371C68E6 /* FullScreenMapView.swift */,
 				A0F93A8CC11873165313A6C2 /* FullScreenNavigationView.swift */,
 				0DC8EF30B2D8BD3431761C17 /* KeyboardDismissal.swift */,
 				F5016CCE6316F4B434C6DDF5 /* LiquidGlassStyle.swift */,
@@ -410,7 +378,6 @@
 				5CAEC547A53377F8F6CAE5D8 /* NautiConversationPersistenceTests.swift */,
 				D8ABC75A8C6E08417C1E9FDE /* NautiSpeechInputTests.swift */,
 				1E9EC3511246CA062CF4B33E /* PassageWindowSolverTests.swift */,
-				16DFDF8C3F8C400C60303FC6 /* RuleOfTwelfthsInterpolationTests.swift */,
 				DCE07C2DC113AB1C53E2FEF1 /* SpeechAudioFormatConverterTests.swift */,
 				A9C13D7B48A109D0921CCBF6 /* TideNodeNautiStateTests.swift */,
 				FF89B087CA35D93DF854F82C /* WaterLevelCorrectionSeriesTests.swift */,
@@ -645,8 +612,6 @@
 				CA9D14A609AC483EE02C5538 /* AppDateFormatters.swift in Sources */,
 				F139CCBE12014D4F550A1213 /* BSHTideService.swift in Sources */,
 				8BBE3BE504E8AD2A678606E6 /* BSHWaterLevelForecastService.swift in Sources */,
-				2003540FEF954C3BBA859B0C /* BuoyValidator.swift in Sources */,
-				8BD087FDCEC0A37B565A216E /* CalculatorResultsSection.swift in Sources */,
 				EC64AD99A94155A38E1D4D2E /* CellType.swift in Sources */,
 				08EE46604BBABD5BF8E74522 /* ContentView+Crew.swift in Sources */,
 				96647EBFED6F26725EFB2ADB /* ContentView+FloatingTabBar.swift in Sources */,
@@ -655,7 +620,6 @@
 				DCEE953FBF73EECE6EACB04E /* ContentView+MapTab.swift in Sources */,
 				7CE880658F32B7DBEA358451 /* ContentView+Nauti.swift in Sources */,
 				BA7D41C2443E8E448B0E9E8E /* ContentView+NautiDrawer.swift in Sources */,
-				341D4D819FF47AEA79150034 /* ContentView+RouteDetail.swift in Sources */,
 				4016C38D4688B7BB0A45EDD7 /* ContentView+SharedUI.swift in Sources */,
 				2F17F8E1AE1CC501F580EC41 /* ContentView+Tides.swift in Sources */,
 				BEB8D10667F890D4782C3330 /* ContentView+Weather.swift in Sources */,
@@ -664,8 +628,6 @@
 				4A66344FA10440B2F4FE1062 /* CrewEventEditor.swift in Sources */,
 				9002302A1C2A513C6113CEC3 /* CrewEventShareView.swift in Sources */,
 				1626CDB1902FD2A29CF22FE7 /* CrewPlanningView.swift in Sources */,
-				40DEEC6A3524EA510BB3799F /* EmdenPlantabelleService.swift in Sources */,
-				4C0AE1CE7C8713E2C0F274AC /* FullScreenMapView.swift in Sources */,
 				A4D6436A002F3856A3ACDF55 /* FullScreenNavigationView.swift in Sources */,
 				2CA0578F0E47A86ED0677954 /* GridConfig.swift in Sources */,
 				3613AEEB458B2095CA8A7CF5 /* HarbourCatalog.swift in Sources */,
@@ -674,7 +636,6 @@
 				07E1FDCB94A68E112861A2C4 /* LiquidGlassStyle.swift in Sources */,
 				B667149CD9F6DB8E1FCDCE7B /* LocalAIInferenceManager.swift in Sources */,
 				096FAA13B941E1EAD1314CB3 /* LocationService.swift in Sources */,
-				BF01C38C2FDFCD34C0144646 /* MapLibreRouteRenderer.swift in Sources */,
 				7ACB055CB43EB4F54C5C362D /* MapView.swift in Sources */,
 				A975B586BE3D0D5B6F67F926 /* MarineWeatherModels.swift in Sources */,
 				306BEF3DDCA492F13D5DF406 /* MeasurementTextField.swift in Sources */,
@@ -699,19 +660,15 @@
 				69F5BB2092DC89486E00BCA2 /* RoutePlannerViewModel.swift in Sources */,
 				99725B6408248A676400550D /* RouteResult.swift in Sources */,
 				163EE3299E5F965B0DBDBF93 /* RouteSummary.swift in Sources */,
-				3EED05627FF4619CAF4C0088 /* RuleOfTwelfths.swift in Sources */,
 				732255BF275060C8032934EB /* SeaMask.swift in Sources */,
 				5C0A4D29AC3689010ACA1556 /* SeaMaskBuilder.swift in Sources */,
-				DE650CBEFA07890031D1A514 /* SeaRoutePlanner.swift in Sources */,
 				77E276C3E5D56FC66A94BE28 /* SpeechAudioFormatConverter.swift in Sources */,
-				5177240AA629369FD41F60D4 /* StringHelpers.swift in Sources */,
 				2E5D6CF2857614B287146E8D /* TidalHeightStrategy.swift in Sources */,
 				D49DFE01FB1CF2EEB8323297 /* TideDataProvider.swift in Sources */,
 				B069F8AFF73E9CFBD3BB93B0 /* Toernberechnung.docc in Sources */,
 				B035B2EBB7CE0CEE1C4E6522 /* ToernberechnungApp.swift in Sources */,
 				73A27DD5E9AD6ECD2E0A9118 /* WaddenSeaCatalog.swift in Sources */,
 				8DDCF877DA1FE1B33756A817 /* WaterLevelCorrectionSeries.swift in Sources */,
-				E66B2F8786297C22F26956D7 /* WattseglerLotungenService.swift in Sources */,
 				5358D53E0C82493B269FD378 /* WaypointDepthSolver.swift in Sources */,
 				B33D266055E57E61EA869511 /* WaypointTideContext.swift in Sources */,
 				DDB825DCAC8CF212878F8B70 /* WeatherDetailViews.swift in Sources */,
@@ -734,7 +691,6 @@
 				02C9B87E406A487D6250FB79 /* NautiConversationPersistenceTests.swift in Sources */,
 				C7F8DC9E8C8A5D642C214DCD /* NautiSpeechInputTests.swift in Sources */,
 				E9986BBF226BD3368DA35C96 /* PassageWindowSolverTests.swift in Sources */,
-				F181E236B3B5D93DAB1CA78B /* RuleOfTwelfthsInterpolationTests.swift in Sources */,
 				A3C304008842D73441678B79 /* SpeechAudioFormatConverterTests.swift in Sources */,
 				FA8D7B0B156A80E68B7970B8 /* TideNodeNautiStateTests.swift in Sources */,
 				B36E78D18A73D43DEBD6C7DE /* WaterLevelCorrectionSeriesTests.swift in Sources */,

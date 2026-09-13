@@ -34,31 +34,6 @@ extension ContentView {
         }
     }
 
-    func dismissNautiProactiveIssue() {
-        dismissedNautiIssueID = proactiveNautiIssue?.id
-    }
-
-    func performNautiProactiveAction(_ action: NautiProactiveAction) {
-        switch action {
-        case .showPassageWindow:
-            viewModel.refreshPassageWindow()
-            mapPlanningShown = true
-        case .adoptSuggestedDeparture(let date):
-            pendingNautiConversationID = nil
-            pendingNautiAction = .suggestedDeparture(date)
-        case .showWeather:
-            guard let destination = viewModel.selectedDestinationHarbour else { return }
-            weatherRegionID = destination.id
-            selectedConditionsSection = .weather
-            selectedTab = .conditions
-            Task {
-                await loadWeather(userInitiated: false)
-            }
-        case .openPlanner:
-            mapPlanningShown = true
-        }
-    }
-
     @MainActor
     func handleNautiAction(_ dispatch: NautiActionDispatch) {
         let action = dispatch.action
@@ -112,23 +87,6 @@ extension ContentView {
                 "Ich habe die vorgeschlagene Abfahrt gesetzt. Du kannst den Törn weiterhin manuell anpassen.",
                 conversationID: conversationID
             )
-        }
-    }
-
-    @MainActor
-    func replaceNautiPreparationMessage(
-        _ action: NautiAppAction,
-        with message: String,
-        conversationID: UUID
-    ) {
-        if let initial = action.message, !initial.isEmpty {
-            nautiViewModel.replaceLastAssistantMessage(
-                matching: initial,
-                with: message,
-                conversationID: conversationID
-            )
-        } else {
-            nautiViewModel.appendAssistantMessage(message, conversationID: conversationID)
         }
     }
 

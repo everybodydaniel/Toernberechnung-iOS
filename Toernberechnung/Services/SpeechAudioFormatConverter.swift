@@ -40,8 +40,7 @@ final class SpeechAudioFormatConverter: @unchecked Sendable {
         }
     }
 
-    /// `true` when input and output formats match and `convert` is a no-op.
-    var isPassthrough: Bool { converter == nil }
+
 
     /// Resamples one capture buffer. Returns `nil` if the conversion fails or
     /// produced no frames; callers should simply drop that buffer.

@@ -62,14 +62,6 @@ struct WaterLevelForecast: Codable, Equatable, Sendable {
     var isStale: Bool {
         Date().timeIntervalSince(issuedAt) > 8 * 3_600
     }
-
-    var forecastRange: ClosedRange<Date>? {
-        let dates = events.map(\.time) + curve.compactMap { point in
-            point.forecastMetersSkn == nil ? nil : point.time
-        }
-        guard let first = dates.min(), let last = dates.max() else { return nil }
-        return first ... last
-    }
 }
 
 struct WaterLevelCurvePoint: Identifiable, Codable, Equatable, Sendable {
@@ -94,11 +86,6 @@ struct WaterLevelEvent: Identifiable, Codable, Equatable, Sendable {
 
     var id: String { "\(time.timeIntervalSince1970)-\(type)" }
     var symbol: String { type == "HW" ? "arrow.up.circle.fill" : "arrow.down.circle.fill" }
-
-    var centralCorrectionMeters: Double? {
-        guard let forecastCmAbovePnp, let tidalPredictionCmAbovePnp else { return nil }
-        return (forecastCmAbovePnp - tidalPredictionCmAbovePnp) / 100
-    }
 
     var conservativeCorrectionMeters: Double? {
         guard let forecastCmAbovePnp,
