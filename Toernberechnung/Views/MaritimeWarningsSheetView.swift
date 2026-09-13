@@ -4,19 +4,22 @@ import SafariServices
 
 public struct MaritimeWarningsSheetView: View {
     var service: MaritimeWarningsService
-    var onSelectCoordinate: ((CLLocationCoordinate2D) -> Void)? = nil
+    var onSelectCoordinate: ((CLLocationCoordinate2D) -> Void)?
+    var onSelectWarning: ((MaritimeWarning) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedFilter: WarningFilter = .all
-    @State private var presentedWebURL: URL? = nil
-    @State private var expandedWarningID: String? = nil
+    @State private var presentedWebURL: URL?
+    @State private var expandedWarningID: String?
 
     public init(
         service: MaritimeWarningsService = .shared,
-        onSelectCoordinate: ((CLLocationCoordinate2D) -> Void)? = nil
+        onSelectCoordinate: ((CLLocationCoordinate2D) -> Void)? = nil,
+        onSelectWarning: ((MaritimeWarning) -> Void)? = nil
     ) {
         self.service = service
         self.onSelectCoordinate = onSelectCoordinate
+        self.onSelectWarning = onSelectWarning
     }
 
     enum WarningFilter: String, CaseIterable, Identifiable {
@@ -277,8 +280,12 @@ public struct MaritimeWarningsSheetView: View {
                 if let coord = warning.coordinate {
                     Button {
                         service.markAsRead(id: warning.id)
+                        if let onSelectWarning {
+                            onSelectWarning(warning)
+                        } else {
+                            onSelectCoordinate?(coord)
+                        }
                         dismiss()
-                        onSelectCoordinate?(coord)
                     } label: {
                         Label("Auf Seekarte", systemImage: "map.fill")
                             .font(.system(size: 11, weight: .bold))
@@ -288,6 +295,7 @@ public struct MaritimeWarningsSheetView: View {
                             .foregroundStyle(Color.appPrimary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("WarningActionSeekarte")
                 }
 
                 if let url = warning.webUrl {
@@ -342,11 +350,7 @@ public struct MaritimeWarningsSheetView: View {
     }
 
     private func severityColor(_ severity: MaritimeWarningSeverity) -> Color {
-        switch severity {
-        case .hazard: return .red
-        case .warning: return .orange
-        case .notice: return .cyan
-        }
+        severity.displayColor
     }
 
     private var emptyStateView: some View {

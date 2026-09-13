@@ -134,7 +134,7 @@
 		23A239DCC14682368FA5B071 /* RoutePlannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlannerViewModel.swift; sourceTree = "<group>"; };
 		2699D36FEC3B279D7828DBC8 /* LocalAIInferenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAIInferenceManager.swift; sourceTree = "<group>"; };
 		274236500C1B928A068F3783 /* ActiveVoyageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveVoyageManager.swift; sourceTree = "<group>"; };
-		2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2917EC741AABF1955BA9C928 /* ToernberechnungUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ToernberechnungUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D96FAFEC88A7B5407880B6B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2DF95CFE56A1939FA4B8AF8B /* BSHWaterLevelForecastService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHWaterLevelForecastService.swift; sourceTree = "<group>"; };
 		2EE385DABDC8E369D3F65A36 /* ProtectedZoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedZoneCatalog.swift; sourceTree = "<group>"; };
@@ -149,10 +149,10 @@
 		41531CAB6284338FF5EB955D /* ContentView+MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+MapTab.swift"; sourceTree = "<group>"; };
 		42B431AA8D7856026BE53835 /* AppDateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDateFormatters.swift; sourceTree = "<group>"; };
 		446C16D2630809C1DD0D7B24 /* MeasurementTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementTextField.swift; sourceTree = "<group>"; };
-		46164987EADE0733B79899D3 /* east_frisia.geojson */ = {isa = PBXFileReference; path = east_frisia.geojson; sourceTree = "<group>"; };
+		46164987EADE0733B79899D3 /* east_frisia.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = east_frisia.geojson; sourceTree = "<group>"; };
 		4653D4F082EF987F05C20FDA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		4849C70A0415321C72AAB927 /* NautiChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NautiChatView.swift; sourceTree = "<group>"; };
-		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C7B1E74599E5B9DE9AA1B70 /* Toernberechnung.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Toernberechnung.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F84E95744304C38CDDE075D /* SpeechAudioFormatConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechAudioFormatConverter.swift; sourceTree = "<group>"; };
 		55126DA0E7F2D9E1A9E610A5 /* ContentView+Logbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Logbook.swift"; sourceTree = "<group>"; };
 		57C7D963418D4EA56DA151FB /* MarineWeatherModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarineWeatherModels.swift; sourceTree = "<group>"; };
@@ -168,11 +168,11 @@
 		80B6620CB5596CAAF780630E /* SeaMaskBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeaMaskBuilder.swift; sourceTree = "<group>"; };
 		820370648785ECCE1B72E848 /* RouteResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteResult.swift; sourceTree = "<group>"; };
 		83105E893C78E910D98B69B6 /* WaterLevelCorrectionSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaterLevelCorrectionSeries.swift; sourceTree = "<group>"; };
-		832A4D0EF23DA499958BE153 /* nordsbefv.geojson */ = {isa = PBXFileReference; path = nordsbefv.geojson; sourceTree = "<group>"; };
+		832A4D0EF23DA499958BE153 /* nordsbefv.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = nordsbefv.geojson; sourceTree = "<group>"; };
 		83A33A91CDA768763868520B /* WeatherKitMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherKitMigrationTests.swift; sourceTree = "<group>"; };
 		850FE3162586054D9B2887EB /* NavigationTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationTracker.swift; sourceTree = "<group>"; };
 		854BD2E3D8ECB6A2F6829B1D /* RouteSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteSummary.swift; sourceTree = "<group>"; };
-		86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ToernberechnungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		86C032F5BB5BA0C306FF7509 /* ToernberechnungTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ToernberechnungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A11AA1B18E952AE2F3AF386 /* ContentView+FloatingTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+FloatingTabBar.swift"; sourceTree = "<group>"; };
 		90B3D983FA6E3D15A7E41EFE /* MaritimeWarningModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaritimeWarningModels.swift; sourceTree = "<group>"; };
 		92BFFCA0A4FDB1B9A0855A21 /* CrewPlanningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrewPlanningView.swift; sourceTree = "<group>"; };
@@ -189,11 +189,11 @@
 		B05EA47177A55060F125A959 /* ExcelParityRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelParityRouteTests.swift; sourceTree = "<group>"; };
 		B2EF3B4FE4B69E46775E9C70 /* Toernberechnung.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = Toernberechnung.docc; sourceTree = "<group>"; };
 		B40349DB0F0E612273A4D24B /* ContentView+Weather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Weather.swift"; sourceTree = "<group>"; };
-		B679E8AB74AB58AE4E4FB1C5 /* nordsbefv_eastfrisia.geojson */ = {isa = PBXFileReference; path = nordsbefv_eastfrisia.geojson; sourceTree = "<group>"; };
+		B679E8AB74AB58AE4E4FB1C5 /* nordsbefv_eastfrisia.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = nordsbefv_eastfrisia.geojson; sourceTree = "<group>"; };
 		B7E7A0E4792C7B91263648E2 /* TideDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TideDataProvider.swift; sourceTree = "<group>"; };
 		BBC8EA575915AE2FB0948A07 /* BSHTideMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideMigrationTests.swift; sourceTree = "<group>"; };
 		BD2EE863A1B996B4F4D70A72 /* WeatherKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherKitManager.swift; sourceTree = "<group>"; };
-		BE4B963C1585049389268D0D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BE4B963C1585049389268D0D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BF787BD3E7248CD341B1394B /* TidalHeightStrategy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TidalHeightStrategy.swift; sourceTree = "<group>"; };
 		C147B3C44BBEE29AF5B07473 /* WaypointDepthSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointDepthSolver.swift; sourceTree = "<group>"; };
 		C148FB3D3B65E8FF5740090D /* ExcelParityDepthChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelParityDepthChainTests.swift; sourceTree = "<group>"; };
@@ -202,7 +202,7 @@
 		C822138A0DF958C6D01269F2 /* CrewPlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrewPlanningTests.swift; sourceTree = "<group>"; };
 		CB983A46EA4BC5DBA65F12DA /* RouteExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteExpander.swift; sourceTree = "<group>"; };
 		CDA2F2DF97DBFBF90BF701C9 /* BSHTideService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSHTideService.swift; sourceTree = "<group>"; };
-		CEE7644C4B5B691C0A8C7ACC /* east_frisia_osm.geojson */ = {isa = PBXFileReference; path = east_frisia_osm.geojson; sourceTree = "<group>"; };
+		CEE7644C4B5B691C0A8C7ACC /* east_frisia_osm.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = east_frisia_osm.geojson; sourceTree = "<group>"; };
 		D8ABC75A8C6E08417C1E9FDE /* NautiSpeechInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NautiSpeechInputTests.swift; sourceTree = "<group>"; };
 		DB5177B11D64D6BD70160E16 /* WaypointTideContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointTideContext.swift; sourceTree = "<group>"; };
 		DB541BDC708D99C83CCFF35C /* WeatherDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherDetailViews.swift; sourceTree = "<group>"; };
@@ -483,7 +483,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					1BE8DB3DE33B704C3E5A5227 = {
 						TestTargetID = 5F9D9C3365B426B92A441223;
@@ -805,6 +805,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -817,6 +818,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -902,6 +904,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -921,6 +924,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;

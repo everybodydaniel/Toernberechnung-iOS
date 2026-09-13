@@ -225,7 +225,13 @@ extension ContentView {
                     waypointResults: viewModel.calculationResult?.waypointResults,
                     voyageActive: voyageManager.isVoyageActive,
                     breadcrumbCoordinates: voyageManager.breadcrumbs.map(\.coordinate),
-                    focusCoordinate: mapFocusCoordinate
+                    focusCoordinate: mapFocusCoordinate,
+                    focusWarning: selectedMapWarning,
+                    onSelectWarning: { warning in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedMapWarning = warning
+                        }
+                    }
                 )
                 .ignoresSafeArea()
 
@@ -251,6 +257,22 @@ extension ContentView {
                     }
 
                     Spacer(minLength: 20)
+                }
+
+                // MARK: Floating Warning Callout Card
+                if let warning = selectedMapWarning, !nautiDashboardMode.isExpanded {
+                    warningMapCalloutCard(warning: warning)
+                        .frame(maxWidth: min(geometry.size.width - 32, 440))
+                        .padding(.horizontal, 16)
+                        .padding(
+                            .bottom,
+                            dashboardBottomInset + (dashboardDetent == .nautiOnly ? (hasCalculatedRouteDashboard ? 80 : 66) : (dashboardDetent.height + 16))
+                        )
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.95)),
+                            removal: .opacity.combined(with: .scale(scale: 0.95))
+                        ))
+                        .zIndex(15)
                 }
 
                 // MARK: Draggable Bottom Dashboard
@@ -287,6 +309,120 @@ extension ContentView {
         .appDarkFloatingOverlay(cornerRadius: 22)
         .accessibilityLabel("Törnplanung bearbeiten")
         .accessibilityIdentifier("MapPlanningPill")
+    }
+
+    // MARK: - Maritime Warning Map Callout Card
+
+    private func warningMapCalloutCard(warning: MaritimeWarning) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            warningCalloutHeader(warning: warning)
+
+            // Description Details
+            Text(warning.details)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.secondary)
+                .lineLimit(4)
+                .lineSpacing(2)
+
+            warningCalloutMetaRow(warning: warning)
+        }
+        .padding(14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(warning.severity.displayColor.opacity(0.35), lineWidth: 1.2)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 16, x: 0, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("MaritimeWarningMapCallout")
+    }
+
+    private func warningCalloutHeader(warning: MaritimeWarning) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: warning.severity.systemImage)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(warning.severity.displayColor)
+                .frame(width: 32, height: 32)
+                .background(warning.severity.displayColor.opacity(0.14), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(warning.areaName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.appPrimary)
+                        .lineLimit(1)
+
+                    Text("•")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.secondary)
+
+                    Text(warning.severity.title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(warning.severity.displayColor)
+                        .lineLimit(1)
+                }
+
+                Text(warning.title)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 4)
+
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    selectedMapWarning = nil
+                }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 22))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Warnung schließen")
+        }
+    }
+
+    private func warningCalloutMetaRow(warning: MaritimeWarning) -> some View {
+        HStack(spacing: 8) {
+            if let coords = warning.formattedCoordinates {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text(coords)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                }
+                .foregroundStyle(Color.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.06), in: Capsule())
+            }
+
+            Text(warning.source.shortName)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+
+            Spacer()
+
+            if let url = warning.webUrl {
+                Link(destination: url) {
+                    HStack(spacing: 4) {
+                        Text("Quelle")
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.appPrimary.opacity(0.14), in: Capsule())
+                    .foregroundStyle(Color.appPrimary)
+                }
+            }
+        }
     }
 
     /// Space reserved under the map dashboard. Normally that is the floating
@@ -1112,7 +1248,11 @@ extension ContentView {
                         .font(.system(size: 15, weight: .heavy))
                         .foregroundStyle(Color.appPrimary)
 
-                    Text("Für diese lokalen Gezeitenpegel veröffentlicht das BSH keine eigene Modellprognose. Astronomische Zeiten bleiben lokal; ein Vergleichspegel überträgt ausschließlich den meteorologischen Restwasserstand.")
+                    Text(
+                        "Für diese lokalen Gezeitenpegel veröffentlicht das BSH keine eigene Modellprognose. " +
+                        "Astronomische Zeiten bleiben lokal; ein Vergleichspegel überträgt ausschließlich " +
+                        "den meteorologischen Restwasserstand."
+                    )
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.secondary)
                         .fixedSize(horizontal: false, vertical: true)

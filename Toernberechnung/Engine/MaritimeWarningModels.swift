@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import SwiftUI
 
 // MARK: - Maritime Warning Source & Severity
 
@@ -37,6 +38,14 @@ public enum MaritimeWarningSeverity: String, Codable, Sendable, CaseIterable {
         case .hazard: return "exclamationmark.octagon.fill"
         case .warning: return "exclamationmark.triangle.fill"
         case .notice: return "info.circle.fill"
+        }
+    }
+
+    public var displayColor: Color {
+        switch self {
+        case .hazard: return .red
+        case .warning: return .orange
+        case .notice: return .cyan
         }
     }
 }
@@ -88,6 +97,19 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
     public var coordinate: CLLocationCoordinate2D? {
         guard let latitude, let longitude else { return nil }
         return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    public var formattedCoordinates: String? {
+        guard let latitude, let longitude else { return nil }
+        let latDeg = Int(abs(latitude))
+        let latMin = (abs(latitude) - Double(latDeg)) * 60.0
+        let latDir = latitude >= 0 ? "N" : "S"
+
+        let lonDeg = Int(abs(longitude))
+        let lonMin = (abs(longitude) - Double(lonDeg)) * 60.0
+        let lonDir = longitude >= 0 ? "E" : "W"
+
+        return String(format: "%02d°%05.2f' %@ · %03d°%05.2f' %@", latDeg, latMin, latDir, lonDeg, lonMin, lonDir)
     }
 
     public var isNorthSeaOrGermanBight: Bool {

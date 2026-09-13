@@ -38,7 +38,9 @@ struct CompactMapView: UIViewRepresentable {
     /// Drawn on top of the planned polyline as a thin orange line.
     var breadcrumbCoordinates: [CLLocationCoordinate2D] = []
     /// Optional coordinate to center and highlight (e.g. from a maritime warning).
-    var focusCoordinate: CLLocationCoordinate2D? = nil
+    var focusCoordinate: CLLocationCoordinate2D?
+    var focusWarning: MaritimeWarning?
+    var onSelectWarning: ((MaritimeWarning) -> Void)?
 
     // MARK: - UIViewRepresentable
 
@@ -79,7 +81,9 @@ struct CompactMapView: UIViewRepresentable {
             waypointResults: waypointResults,
             voyageActive: voyageActive,
             breadcrumbCoordinates: breadcrumbCoordinates,
-            focusCoordinate: focusCoordinate
+            focusCoordinate: focusCoordinate,
+            focusWarning: focusWarning,
+            onSelectWarning: onSelectWarning
         )
     }
 
@@ -122,7 +126,8 @@ struct CompactMapView: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate {
 
         private var lastRouteKey: String = ""
-        private var lastFocusCoordinate: CLLocationCoordinate2D? = nil
+        private var lastFocusCoordinate: CLLocationCoordinate2D?
+        var onSelectWarning: ((MaritimeWarning) -> Void)?
 
         /// Retained so a SeaMask-ready notification can re-run the last draw.
         private weak var lastMap: MKMapView?
@@ -136,6 +141,7 @@ struct CompactMapView: UIViewRepresentable {
             let voyageActive: Bool
             let breadcrumbCoordinates: [CLLocationCoordinate2D]
             let focusCoordinate: CLLocationCoordinate2D?
+            let focusWarning: MaritimeWarning?
         }
 
         override init() {
@@ -169,7 +175,9 @@ struct CompactMapView: UIViewRepresentable {
                     waypointResults: inputs.waypointResults,
                     voyageActive: inputs.voyageActive,
                     breadcrumbCoordinates: inputs.breadcrumbCoordinates,
-                    focusCoordinate: inputs.focusCoordinate
+                    focusCoordinate: inputs.focusCoordinate,
+                    focusWarning: inputs.focusWarning,
+                    onSelectWarning: onSelectWarning
                 )
             }
         }
@@ -224,10 +232,19 @@ struct CompactMapView: UIViewRepresentable {
                 let view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseID)
                     ?? MKAnnotationView(annotation: warningPin, reuseIdentifier: reuseID)
                 view.annotation = warningPin
-                let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .bold)
-                view.image = UIImage(systemName: "exclamationmark.triangle.fill", withConfiguration: config)?
-                    .withTintColor(.systemOrange, renderingMode: .alwaysOriginal)
-                view.canShowCallout = true
+                let config = UIImage.SymbolConfiguration(pointSize: 26, weight: .bold)
+                let iconName = warningPin.warning?.severity.systemImage ?? "exclamationmark.triangle.fill"
+                let tintColor: UIColor = {
+                    guard let sev = warningPin.warning?.severity else { return .systemOrange }
+                    switch sev {
+                    case .hazard: return .systemRed
+                    case .warning: return .systemOrange
+                    case .notice: return .systemTeal
+                    }
+                }()
+                view.image = UIImage(systemName: iconName, withConfiguration: config)?
+                    .withTintColor(tintColor, renderingMode: .alwaysOriginal)
+                view.canShowCallout = false
                 view.centerOffset = CGPoint(x: 0, y: -12)
                 return view
             }
@@ -242,9 +259,17 @@ struct CompactMapView: UIViewRepresentable {
             return view
         }
 
+        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            if let warningPin = view.annotation as? WarningPinAnnotation, let warning = warningPin.warning {
+                onSelectWarning?(warning)
+                mapView.deselectAnnotation(warningPin, animated: false)
+            }
+        }
+
         // MARK: Update entrypoint
 
         @MainActor
+        // swiftlint:disable:next function_parameter_count function_body_length
         func update(
             map: MKMapView,
             start: HarbourOption?,
@@ -253,8 +278,11 @@ struct CompactMapView: UIViewRepresentable {
             waypointResults: [WaypointCalculationResult]?,
             voyageActive: Bool,
             breadcrumbCoordinates: [CLLocationCoordinate2D],
-            focusCoordinate: CLLocationCoordinate2D? = nil
+            focusCoordinate: CLLocationCoordinate2D? = nil,
+            focusWarning: MaritimeWarning? = nil,
+            onSelectWarning: ((MaritimeWarning) -> Void)? = nil
         ) {
+            self.onSelectWarning = onSelectWarning
             // Remember the latest inputs so a SeaMask-ready notification can
             // redraw the route once the mask finishes building.
             lastMap = map
@@ -265,7 +293,8 @@ struct CompactMapView: UIViewRepresentable {
                 waypointResults: waypointResults,
                 voyageActive: voyageActive,
                 breadcrumbCoordinates: breadcrumbCoordinates,
-                focusCoordinate: focusCoordinate
+                focusCoordinate: focusCoordinate,
+                focusWarning: focusWarning
             )
 
             // Center on warning coordinate if provided
@@ -277,10 +306,19 @@ struct CompactMapView: UIViewRepresentable {
                     lastFocusCoordinate = focus
                     let span = MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.22)
                     map.setRegion(MKCoordinateRegion(center: focus, span: span), animated: true)
+                }
 
+                let currentPin = map.annotations.compactMap { $0 as? WarningPinAnnotation }.first
+                let pinNeedsUpdate = currentPin == nil || currentPin?.warning?.id != focusWarning?.id
+                if pinNeedsUpdate {
                     let oldPins = map.annotations.compactMap { $0 as? WarningPinAnnotation }
                     map.removeAnnotations(oldPins)
-                    let pin = WarningPinAnnotation(coordinate: focus, title: "Nautische Warnung")
+                    let pin = WarningPinAnnotation(
+                        coordinate: focus,
+                        title: focusWarning?.title ?? "Nautische Warnung",
+                        subtitle: focusWarning?.areaName,
+                        warning: focusWarning
+                    )
                     map.addAnnotation(pin)
                 }
             }
@@ -314,7 +352,9 @@ struct CompactMapView: UIViewRepresentable {
             let tileOverlays = map.overlays.compactMap { $0 as? MKTileOverlay }
             let polylines    = map.overlays.compactMap { $0 as? MKPolyline }
             map.removeOverlays(polylines)
+            let preservedWarningPins = map.annotations.compactMap { $0 as? WarningPinAnnotation }
             map.removeAnnotations(map.annotations)
+            map.addAnnotations(preservedWarningPins)
 
             // Re-add tile overlays only if MapKit dropped them (rare).
             if tileOverlays.count < 2 {
@@ -595,9 +635,18 @@ final class RoutePinAnnotation: NSObject, MKAnnotation {
 final class WarningPinAnnotation: NSObject, MKAnnotation {
     let coordinate: CLLocationCoordinate2D
     let title: String?
+    let subtitle: String?
+    let warning: MaritimeWarning?
 
-    init(coordinate: CLLocationCoordinate2D, title: String? = "Nautische Warnung") {
+    init(
+        coordinate: CLLocationCoordinate2D,
+        title: String? = "Nautische Warnung",
+        subtitle: String? = nil,
+        warning: MaritimeWarning? = nil
+    ) {
         self.coordinate = coordinate
         self.title = title
+        self.subtitle = subtitle
+        self.warning = warning
     }
 }

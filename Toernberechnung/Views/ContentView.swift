@@ -75,7 +75,8 @@ struct ContentView: View {
     @State var settingsShown = false
     @State var warningsSheetShown = false
     @State var maritimeWarningsService = MaritimeWarningsService.shared
-    @State var mapFocusCoordinate: CLLocationCoordinate2D? = nil
+    @State var mapFocusCoordinate: CLLocationCoordinate2D?
+    @State var selectedMapWarning: MaritimeWarning?
     @State var nautiDashboardMode: NautiDashboardMode = .dashboard
     @State var dashboardDetentBeforeNauti: DashboardDetent = .nautiOnly
     @State var nautiFocusDismissTrigger = 0
@@ -164,6 +165,16 @@ struct ContentView: View {
                     warningsSheetShown = false
                     selectedTab = .map
                     mapFocusCoordinate = coord
+                },
+                onSelectWarning: { warning in
+                    warningsSheetShown = false
+                    selectedTab = .map
+                    if let coord = warning.coordinate {
+                        mapFocusCoordinate = coord
+                    }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedMapWarning = warning
+                    }
                 }
             )
             .presentationDetents([.large])

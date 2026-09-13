@@ -137,4 +137,32 @@ final class MaritimeWarningsTests: XCTestCase {
         XCTAssertNotNil(result3)
         XCTAssertEqual(result3?.action?.kind, .showWarnings)
     }
+
+    func testWarningFormattedCoordinatesAndDisplayColor() {
+        let warning = MaritimeWarning(
+            id: "test-1",
+            source: .bsh,
+            severity: .hazard,
+            title: "Test Gefahrenstelle",
+            details: "Details",
+            areaName: "Deutsche Bucht",
+            publishDate: Date(),
+            latitude: 53.85,
+            longitude: 7.9
+        )
+
+        XCTAssertNotNil(warning.formattedCoordinates)
+        XCTAssertTrue(warning.formattedCoordinates?.contains("53°51.00' N") == true)
+        XCTAssertTrue(warning.formattedCoordinates?.contains("007°54.00' E") == true)
+        XCTAssertEqual(warning.severity.displayColor, .red)
+
+        let pin = WarningPinAnnotation(
+            coordinate: warning.coordinate!,
+            title: warning.title,
+            subtitle: warning.areaName,
+            warning: warning
+        )
+        XCTAssertEqual(pin.warning?.id, "test-1")
+        XCTAssertEqual(pin.subtitle, "Deutsche Bucht")
+    }
 }

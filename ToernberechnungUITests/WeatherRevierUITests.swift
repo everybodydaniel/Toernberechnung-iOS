@@ -439,4 +439,36 @@ final class WeatherRevierUITests: XCTestCase {
             saveShot(name: "warnings_header_after_read")
         }
     }
+
+    func testWarningSeekarteJumpsAndShowsCallout() {
+        let app = makeApp()
+        app.launch()
+
+        let bell = app.buttons["AppHeaderWarningsButton"]
+        XCTAssertTrue(bell.waitForExistence(timeout: 8))
+        bell.tap()
+
+        let seekarteButton = app.buttons["WarningActionSeekarte"].firstMatch
+        XCTAssertTrue(seekarteButton.waitForExistence(timeout: 6))
+        seekarteButton.tap()
+
+        // Wait for sheet dismissal and map callout card appearance
+        let closeButton = app.buttons["Warnung schließen"]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 8))
+
+        let callout = app.descendants(matching: .any)["MaritimeWarningMapCallout"]
+
+        let fileManager = FileManager.default
+        let targetDir = "/tmp/tagnode_screenshots"
+        try? fileManager.createDirectory(atPath: targetDir, withIntermediateDirectories: true)
+        let screenshot = XCUIScreen.main.screenshot()
+        let data = screenshot.pngRepresentation
+        let path = "\(targetDir)/warning_map_callout.png"
+        try? data.write(to: URL(fileURLWithPath: path))
+
+        // Also test closing the callout card via close button
+        closeButton.tap()
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertFalse(closeButton.exists)
+    }
 }
