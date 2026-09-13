@@ -20,10 +20,10 @@ public struct MaritimeWarningsSheetView: View {
     }
 
     enum WarningFilter: String, CaseIterable, Identifiable {
-        case all = "Alle"
-        case northSea = "Nordsee & D. Bucht"
-        case baltic = "Ostsee & Dänemark"
-        case hazards = "Dringend / Sperrung"
+        case all = "Alle Nordsee"
+        case hazards = "Gefahr / Sperrung"
+        case warnings = "Warnung / Tonnen"
+        case notices = "Hinweise"
 
         var id: Self { self }
     }
@@ -32,12 +32,12 @@ public struct MaritimeWarningsSheetView: View {
         switch selectedFilter {
         case .all:
             return service.warnings
-        case .northSea:
-            return service.warnings.filter { $0.isNorthSeaOrGermanBight }
-        case .baltic:
-            return service.warnings.filter { $0.isBalticSea }
         case .hazards:
             return service.warnings.filter { $0.severity == .hazard }
+        case .warnings:
+            return service.warnings.filter { $0.severity == .warning }
+        case .notices:
+            return service.warnings.filter { $0.severity == .notice }
         }
     }
 
@@ -58,7 +58,7 @@ public struct MaritimeWarningsSheetView: View {
                 .padding(.vertical, 14)
             }
             .background(Color.appBackground.ignoresSafeArea())
-            .navigationTitle("Nautische Warnungen")
+            .navigationTitle("Nordsee Warnmeldungen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

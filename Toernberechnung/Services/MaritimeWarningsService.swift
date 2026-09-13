@@ -29,12 +29,20 @@ public final class MaritimeWarningsService {
         }
     }
 
+    @ObservationIgnored
+    private var periodicTimerTask: Task<Void, Never>?
+
     public init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
         loadCachedWarnings()
+        startPeriodicRefresh()
         Task {
             await refresh()
         }
+    }
+
+    deinit {
+        periodicTimerTask?.cancel()
     }
 
     public func resetReadStateForTesting() {
@@ -42,7 +50,26 @@ public final class MaritimeWarningsService {
         updateUnreadCount()
     }
 
-    // MARK: - Official Authorities Quick Access
+    private func startPeriodicRefresh() {
+        periodicTimerTask?.cancel()
+        periodicTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                // Periodischer automatischer Abruf alle 30 Minuten
+                try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000)
+                if Task.isCancelled { break }
+                await self?.refresh()
+            }
+        }
+    }
+
+    public func refreshIfNeeded() async {
+        if let last = lastRefreshDate, Date().timeIntervalSince(last) < 15 * 60 {
+            return
+        }
+        await refresh()
+    }
+
+    // MARK: - Official Authorities Quick Access (Nordsee)
 
     public struct OfficialBulletin: Identifiable, Sendable {
         public let id: String
@@ -65,28 +92,28 @@ public final class MaritimeWarningsService {
             icon: "doc.text.fill"
         ),
         OfficialBulletin(
-            id: "bsh-nwn-ost",
-            title: "BSH Nautische Warnnachrichten Ostsee",
-            subtitle: "Tagesaktuelle Funkwarnnachrichten für deutsche Ostseeküste & Zugänge",
-            authority: "BSH Seewarndienst",
-            url: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-ost.pdf")!,
-            isPDF: true,
-            icon: "doc.text.fill"
-        ),
-        OfficialBulletin(
-            id: "elwis-bfs",
-            title: "ELWIS Bekanntmachungen für Seefahrer",
-            subtitle: "Amtliche Veröffentlichungen der Wasserstraßen- & Schifffahrtsämter (WSV)",
-            authority: "GDWS / WSV",
-            url: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/bfsSeeregion:alle")!,
+            id: "elwis-bfs-nordsee",
+            title: "ELWIS Bekanntmachungen Nordsee",
+            subtitle: "Amtliche Mitteilungen der WSV für Ems, Weser, Jade und Elbe",
+            authority: "WSA Ems-Nordsee / Weser-Jade / Elbe",
+            url: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/bfsSeeregion:kuestengebiet-nordsee")!,
             isPDF: false,
             icon: "antenna.radiowaves.left.and.right"
         ),
         OfficialBulletin(
-            id: "bsh-schiessgebiete",
-            title: "BSH Schießgebiete & Schießzeiten",
-            subtitle: "Aktuelle militärische Übungs- und Sperrgebiete in Nord- & Ostsee",
-            authority: "Bundesamt für Seeschifffahrt und Hydrographie",
+            id: "seefunk-nordsee",
+            title: "Seefunk & Küstenfunkstellen Nordsee",
+            subtitle: "Arbeitskanäle & Sendezeiten für Bremen Rescue Radio, DP07 & NAVTEX",
+            authority: "DGzRS / DP07 Seefunk / DWD",
+            url: URL(string: "https://www.seenotretter.de/wer-wir-sind/seenotleitstelle-mrcc/funkstellen")!,
+            isPDF: false,
+            icon: "radio.fill"
+        ),
+        OfficialBulletin(
+            id: "bsh-schiessgebiete-nordsee",
+            title: "Nordsee Schieß- & Warngebiete",
+            subtitle: "Militärische Übungs- und Sperrzeiten in der Deutschen Bucht & Helgoland",
+            authority: "BSH Seewarndienst",
             url: URL(string: "https://www.bsh.de/DE/THEMEN/Schifffahrt/Nautische_Informationen/Warnungen_und_Nachrichten/Schiessgebiete/schiessgebiete_node.html")!,
             isPDF: false,
             icon: "shield.lefthalf.filled"
@@ -118,14 +145,15 @@ public final class MaritimeWarningsService {
                 let decoder = JSONDecoder()
                 let items = try decoder.decode([NiordSearchResponseItem].self, from: data)
 
-                let parsed = items.compactMap { $0.toMaritimeWarning() }
+                // Filter strictly to North Sea / German Bight
+                let northSeaLive = items.compactMap { $0.toMaritimeWarning() }.filter { $0.isNorthSeaOrGermanBight }
 
                 // Combine curated BSH/ELWIS notices with live DMA notices (avoid duplicate IDs)
                 var existingMap: [String: MaritimeWarning] = [:]
                 for item in Self.defaultCuratedWarnings {
                     existingMap[item.id] = item
                 }
-                for item in parsed {
+                for item in northSeaLive {
                     existingMap[item.id] = item
                 }
 
@@ -261,21 +289,21 @@ public final class MaritimeWarningsService {
             pdfUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf")
         ),
         MaritimeWarning(
-            id: "bsh-nwn-2026-14",
+            id: "bsh-nwn-2026-15",
             source: .bsh,
             severity: .hazard,
-            title: "Ostsee: Schießgebiet Putlos & Todendorf – Schießzeiten aktiv",
+            title: "Nordsee: Helgoland Reede – Schießübung & Sperrgebiet Scharhörn",
             details: """
-            Militärische Schießübungen im Seegebiet Todendorf/Putlos (Kieler Bucht). \
-            Warngebiete A, B und C zu den veröffentlichten Schießzeiten für jegliche zivile Schifffahrt \
-            und Fischerei gesperrt. Warnsignale (Lichtsignale und rote Flaggen an den Signalstellen) beachten.
+            Militärische Schießübungen im Seegebiet Helgoland Reede / Scharhörnriff. \
+            Sperrgebiete während der angekündigten Schießzeiten meiden. \
+            Sicherungsfahrzeuge führen die vorgeschriebenen Signale und halten UKW-Kanal 16 abhörbereit.
             """,
-            areaName: "Ostsee · Kieler Bucht",
+            areaName: "Deutsche Bucht · Helgoland",
             publishDate: Date().addingTimeInterval(-3600 * 24),
-            latitude: 54.3410,
-            longitude: 10.6350,
-            webUrl: URL(string: "https://www.bsh.de/DE/THEMEN/Schifffahrt/Nautische_Informationen/Warnungen_und_Nachrichten/Schiessgebiete/schiessgebiete_node.html"),
-            pdfUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-ost.pdf")
+            latitude: 54.1800,
+            longitude: 7.8900,
+            webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
+            pdfUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf")
         ),
         MaritimeWarning(
             id: "elwis-bfs-2026-04",

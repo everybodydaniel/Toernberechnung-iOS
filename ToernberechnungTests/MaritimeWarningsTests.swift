@@ -5,7 +5,7 @@ import CoreLocation
 final class MaritimeWarningsTests: XCTestCase {
 
     @MainActor
-    func testCuratedWarningsContainNorthSeaAndBalticNotices() {
+    func testCuratedWarningsContainNorthSeaNotices() {
         let warnings = MaritimeWarningsService.defaultCuratedWarnings
         XCTAssertGreaterThanOrEqual(warnings.count, 5)
 
@@ -17,11 +17,16 @@ final class MaritimeWarningsTests: XCTestCase {
         XCTAssertTrue(wangerooge?.isNorthSeaOrGermanBight == true)
         XCTAssertNotNil(wangerooge?.coordinate)
 
-        // Verify Putlos shooting area notice
-        let putlos = warnings.first { $0.id == "bsh-nwn-2026-14" }
-        XCTAssertNotNil(putlos)
-        XCTAssertEqual(putlos?.severity, .hazard)
-        XCTAssertTrue(putlos?.isBalticSea == true)
+        // Verify Helgoland shooting area notice
+        let helgoland = warnings.first { $0.id == "bsh-nwn-2026-15" }
+        XCTAssertNotNil(helgoland)
+        XCTAssertEqual(helgoland?.severity, .hazard)
+        XCTAssertTrue(helgoland?.isNorthSeaOrGermanBight == true)
+
+        // Ensure all curated warnings are strictly North Sea / German Bight
+        for warning in warnings {
+            XCTAssertTrue(warning.isNorthSeaOrGermanBight)
+        }
     }
 
     @MainActor

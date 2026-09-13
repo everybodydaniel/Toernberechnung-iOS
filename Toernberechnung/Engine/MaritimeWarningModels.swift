@@ -91,12 +91,19 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
     }
 
     public var isNorthSeaOrGermanBight: Bool {
+        if let lat = latitude, let lon = longitude {
+            // Coordinate bounding box for German Bight, East Frisian Islands, and Southern North Sea
+            if (53.0...56.2).contains(lat) && (3.0...9.2).contains(lon) {
+                return true
+            }
+        }
         let text = "\(areaName) \(title) \(details)".lowercased()
         let keywords = [
             "nordsee", "north sea", "german bight", "deutsche bucht",
             "ems", "weser", "elbe", "jade", "borkum", "norderney",
             "juist", "baltrum", "langeoog", "spiekeroog", "wangerooge",
-            "helgoland", "sylt", "amrum", "foehr", "watt", "wadden"
+            "helgoland", "sylt", "amrum", "foehr", "watt", "wadden",
+            "horn rev", "esbjerg", "dan tysk", "butendiek"
         ]
         return keywords.contains { text.contains($0) }
     }

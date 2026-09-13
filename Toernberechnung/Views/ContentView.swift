@@ -344,6 +344,7 @@ struct ContentView: View {
         guard phase == .active else { return }
         Task {
             await aiAccess.refresh()
+            await maritimeWarningsService.refreshIfNeeded()
             await loadWaterLevelForecast(for: tideStationID, force: false)
             if selectedTab == .map {
                 await loadWaterLevelForecast(for: destinationHarbour.tideStationID, force: false)
