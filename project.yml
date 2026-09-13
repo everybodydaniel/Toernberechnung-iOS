@@ -40,9 +40,11 @@ targets:
       - path: Toernberechnung/Views/MeasurementTextField.swift
       - path: Toernberechnung/Views/NautiChatView.swift
       - path: Toernberechnung/Views/NautiPremiumChatView.swift
+      - path: Toernberechnung/Views/MaritimeWarningsSheetView.swift
       - path: Toernberechnung/Engine/AppDateFormatters.swift
       - path: Toernberechnung/Engine/HarbourCatalog.swift
       - path: Toernberechnung/Engine/MarineWeatherModels.swift
+      - path: Toernberechnung/Engine/MaritimeWarningModels.swift
       - path: Toernberechnung/Engine/NautiModels.swift
       - path: Toernberechnung/Engine/NautiDeterministicIntentRouter.swift
       - path: Toernberechnung/Engine/NautiChatViewModel.swift
@@ -73,6 +75,7 @@ targets:
       - path: Toernberechnung/Services/BSHWaterLevelForecastService.swift
       - path: Toernberechnung/Services/WaterLevelCorrectionSeries.swift
       - path: Toernberechnung/Services/TideDataProvider.swift
+      - path: Toernberechnung/Services/MaritimeWarningsService.swift
       - path: Toernberechnung/Resources/wadden_sea_catalog.json
         type: file
         buildPhase: resources
@@ -133,6 +136,7 @@ targets:
       gatherCoverageData: true
       testTargets:
         - ToernberechnungTests
+        - ToernberechnungUITests
 
   ToernberechnungTests:
     type: bundle.unit-test

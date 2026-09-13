@@ -396,4 +396,47 @@ final class WeatherRevierUITests: XCTestCase {
             saveScreenshot(name: "05_logbook_tab")
         }
     }
+
+    func testMaritimeWarningsFlow() {
+        let app = makeApp()
+        app.launch()
+
+        let fileManager = FileManager.default
+        let targetDir = "/tmp/tagnode_screenshots"
+        try? fileManager.createDirectory(atPath: targetDir, withIntermediateDirectories: true)
+
+        func saveShot(name: String) {
+            let screenshot = XCUIScreen.main.screenshot()
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+
+            let data = screenshot.pngRepresentation
+            let path = "\(targetDir)/\(name).png"
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
+
+        let bell = app.buttons["AppHeaderWarningsButton"]
+        XCTAssertTrue(bell.waitForExistence(timeout: 8))
+        saveShot(name: "warnings_header_button")
+
+        bell.tap()
+        Thread.sleep(forTimeInterval: 2.0)
+        saveShot(name: "warnings_sheet_open")
+
+        let allReadButton = app.buttons["Gelesen"]
+        if allReadButton.waitForExistence(timeout: 3) {
+            allReadButton.tap()
+            Thread.sleep(forTimeInterval: 1.0)
+            saveShot(name: "warnings_sheet_after_read")
+        }
+
+        let doneButton = app.buttons["Fertig"]
+        if doneButton.waitForExistence(timeout: 3) {
+            doneButton.tap()
+            Thread.sleep(forTimeInterval: 1.5)
+            saveShot(name: "warnings_header_after_read")
+        }
+    }
 }

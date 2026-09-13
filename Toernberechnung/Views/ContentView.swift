@@ -73,6 +73,9 @@ struct ContentView: View {
     @State var logbookHeaderVisible = true
     @State var selectedConditionsSection: ConditionsSection = .weather
     @State var settingsShown = false
+    @State var warningsSheetShown = false
+    @State var maritimeWarningsService = MaritimeWarningsService.shared
+    @State var mapFocusCoordinate: CLLocationCoordinate2D? = nil
     @State var nautiDashboardMode: NautiDashboardMode = .dashboard
     @State var dashboardDetentBeforeNauti: DashboardDetent = .nautiOnly
     @State var nautiFocusDismissTrigger = 0
@@ -153,6 +156,18 @@ struct ContentView: View {
             }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $warningsSheetShown) {
+            MaritimeWarningsSheetView(
+                service: maritimeWarningsService,
+                onSelectCoordinate: { coord in
+                    warningsSheetShown = false
+                    selectedTab = .map
+                    mapFocusCoordinate = coord
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $mapPlanningShown) {
             manualPlanningSheet
@@ -504,7 +519,9 @@ struct ContentView: View {
     private func appHeader(brandStyle: AppHeaderBrandStyle) -> some View {
         AppHeader(
             brandStyle: brandStyle,
-            settingsAction: { settingsShown = true }
+            settingsAction: { settingsShown = true },
+            warningsAction: { warningsSheetShown = true },
+            unreadWarningsCount: maritimeWarningsService.unreadCount
         )
         .padding(.top, isPad ? 16 : 0)
     }

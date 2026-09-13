@@ -59,6 +59,10 @@ extension ContentView {
             openNautiWeather(action)
         case .showTides, .showWaterLevel:
             openNautiTides(action)
+        case .showWarnings:
+            openNautiWarnings()
+        case .getWarningsSummary:
+            Task { await answerNautiWarnings(conversationID: conversationID) }
         }
     }
 
@@ -616,5 +620,29 @@ extension ContentView {
 
     func shortHarbourName(_ harbour: HarbourOption) -> String {
         harbour.name.components(separatedBy: ",").first ?? harbour.name
+    }
+
+    @MainActor
+    func openNautiWarnings() {
+        closeNautiChat()
+        warningsSheetShown = true
+    }
+
+    @MainActor
+    func answerNautiWarnings(conversationID: UUID) async {
+        if maritimeWarningsService.warnings.isEmpty && !maritimeWarningsService.isLoading {
+            await maritimeWarningsService.refresh()
+        }
+        let unread = maritimeWarningsService.unreadCount
+        let total = maritimeWarningsService.warnings.count
+        let hazards = maritimeWarningsService.warnings.filter { $0.severity == .hazard }.count
+        let response: String
+        if total == 0 {
+            response = "Aktuell liegen keine aktiven nautischen Warnmeldungen vor. Alle erfassten Schifffahrtswege in der Deutschen Bucht und Ostsee sind frei von akuten Sperrungen."
+        } else {
+            let hazardText = hazards > 0 ? " (\(hazards) dringende Gefahren/Sperrungen)" : ""
+            response = "Es liegen aktuell \(total) amtliche nautische Warnmeldungen\(hazardText) vor, davon \(unread) ungelesen. Du kannst die Warnungen über das Glocken-Symbol im Header oder direkt in der Übersicht ansehen."
+        }
+        nautiViewModel.appendAssistantMessage(response, conversationID: conversationID)
     }
 }

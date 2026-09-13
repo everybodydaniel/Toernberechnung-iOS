@@ -68,6 +68,22 @@ struct PassageWindowScanner {
     // MARK: - Entry point
 
 
+    /// Route-wide departure window search.
+    func findSafeWindow(
+        route: RoutePlan,
+        boatSettings: BoatSettings,
+        tideDataProvider: TideDataProvider,
+        confirmedComparisonGaugeIDs: [String: String] = [:]
+    ) async -> Window? {
+        let solution = await solve(
+            route: route,
+            boatSettings: boatSettings,
+            tideDataProvider: tideDataProvider,
+            confirmedComparisonGaugeIDs: confirmedComparisonGaugeIDs
+        )
+        return solution.routeWindow
+    }
+
     /// Full solution including the per-bottleneck windows.
     func solve(
         route: RoutePlan,

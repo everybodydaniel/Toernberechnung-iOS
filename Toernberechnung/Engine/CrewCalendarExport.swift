@@ -132,3 +132,12 @@ struct CrewCalendarExport: Identifiable, Sendable, Transferable {
         return result
     }
 }
+
+enum CrewEventFormat {
+    static func timeRange(_ event: CrewEventRecord) -> String {
+        guard !event.isAllDay else { return "ganztägig" }
+        let start = AppDateFormatters.hourMinute.string(from: event.startsAt)
+        let end = AppDateFormatters.hourMinute.string(from: event.endsAt)
+        return "\(start) – \(end) Uhr"
+    }
+}

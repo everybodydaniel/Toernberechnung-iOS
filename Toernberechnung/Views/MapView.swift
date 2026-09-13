@@ -37,6 +37,8 @@ struct CompactMapView: UIViewRepresentable {
     /// Real-time breadcrumb trail of the currently recording voyage.
     /// Drawn on top of the planned polyline as a thin orange line.
     var breadcrumbCoordinates: [CLLocationCoordinate2D] = []
+    /// Optional coordinate to center and highlight (e.g. from a maritime warning).
+    var focusCoordinate: CLLocationCoordinate2D? = nil
 
     // MARK: - UIViewRepresentable
 
@@ -76,7 +78,8 @@ struct CompactMapView: UIViewRepresentable {
             routePlan: routePlan,
             waypointResults: waypointResults,
             voyageActive: voyageActive,
-            breadcrumbCoordinates: breadcrumbCoordinates
+            breadcrumbCoordinates: breadcrumbCoordinates,
+            focusCoordinate: focusCoordinate
         )
     }
 
@@ -119,6 +122,7 @@ struct CompactMapView: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate {
 
         private var lastRouteKey: String = ""
+        private var lastFocusCoordinate: CLLocationCoordinate2D? = nil
 
         /// Retained so a SeaMask-ready notification can re-run the last draw.
         private weak var lastMap: MKMapView?
@@ -131,6 +135,7 @@ struct CompactMapView: UIViewRepresentable {
             let waypointResults: [WaypointCalculationResult]?
             let voyageActive: Bool
             let breadcrumbCoordinates: [CLLocationCoordinate2D]
+            let focusCoordinate: CLLocationCoordinate2D?
         }
 
         override init() {
@@ -163,7 +168,8 @@ struct CompactMapView: UIViewRepresentable {
                     routePlan: inputs.routePlan,
                     waypointResults: inputs.waypointResults,
                     voyageActive: inputs.voyageActive,
-                    breadcrumbCoordinates: inputs.breadcrumbCoordinates
+                    breadcrumbCoordinates: inputs.breadcrumbCoordinates,
+                    focusCoordinate: inputs.focusCoordinate
                 )
             }
         }
@@ -213,6 +219,18 @@ struct CompactMapView: UIViewRepresentable {
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MKUserLocation { return nil }
+            if let warningPin = annotation as? WarningPinAnnotation {
+                let reuseID = "pin-warning"
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseID)
+                    ?? MKAnnotationView(annotation: warningPin, reuseIdentifier: reuseID)
+                view.annotation = warningPin
+                let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .bold)
+                view.image = UIImage(systemName: "exclamationmark.triangle.fill", withConfiguration: config)?
+                    .withTintColor(.systemOrange, renderingMode: .alwaysOriginal)
+                view.canShowCallout = true
+                view.centerOffset = CGPoint(x: 0, y: -12)
+                return view
+            }
             guard let pin = annotation as? RoutePinAnnotation else { return nil }
 
             let reuseID = "pin-\(pin.kind.rawValue)"
@@ -234,7 +252,8 @@ struct CompactMapView: UIViewRepresentable {
             routePlan: RoutePlan?,
             waypointResults: [WaypointCalculationResult]?,
             voyageActive: Bool,
-            breadcrumbCoordinates: [CLLocationCoordinate2D]
+            breadcrumbCoordinates: [CLLocationCoordinate2D],
+            focusCoordinate: CLLocationCoordinate2D? = nil
         ) {
             // Remember the latest inputs so a SeaMask-ready notification can
             // redraw the route once the mask finishes building.
@@ -245,8 +264,26 @@ struct CompactMapView: UIViewRepresentable {
                 routePlan: routePlan,
                 waypointResults: waypointResults,
                 voyageActive: voyageActive,
-                breadcrumbCoordinates: breadcrumbCoordinates
+                breadcrumbCoordinates: breadcrumbCoordinates,
+                focusCoordinate: focusCoordinate
             )
+
+            // Center on warning coordinate if provided
+            if let focus = focusCoordinate {
+                let isNew = lastFocusCoordinate == nil ||
+                    abs(lastFocusCoordinate!.latitude - focus.latitude) > 0.0001 ||
+                    abs(lastFocusCoordinate!.longitude - focus.longitude) > 0.0001
+                if isNew {
+                    lastFocusCoordinate = focus
+                    let span = MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.22)
+                    map.setRegion(MKCoordinateRegion(center: focus, span: span), animated: true)
+
+                    let oldPins = map.annotations.compactMap { $0 as? WarningPinAnnotation }
+                    map.removeAnnotations(oldPins)
+                    let pin = WarningPinAnnotation(coordinate: focus, title: "Nautische Warnung")
+                    map.addAnnotation(pin)
+                }
+            }
 
             // Apply voyage-driven map state on every update so it picks up
             // mid-session transitions instantly.
@@ -550,5 +587,17 @@ final class RoutePinAnnotation: NSObject, MKAnnotation {
         self.title = title
         self.kind = kind
         self.status = status
+    }
+}
+
+// MARK: - Warning Pin Annotation
+
+final class WarningPinAnnotation: NSObject, MKAnnotation {
+    let coordinate: CLLocationCoordinate2D
+    let title: String?
+
+    init(coordinate: CLLocationCoordinate2D, title: String? = "Nautische Warnung") {
+        self.coordinate = coordinate
+        self.title = title
     }
 }

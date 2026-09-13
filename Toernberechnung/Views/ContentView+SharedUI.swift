@@ -113,6 +113,10 @@ enum AppHeaderBrandStyle {
 struct AppHeader: View {
     let brandStyle: AppHeaderBrandStyle
     let settingsAction: () -> Void
+    var warningsAction: (() -> Void)? = nil
+    var unreadWarningsCount: Int = 0
+
+    @State private var isGlowPulsing: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -129,12 +133,72 @@ struct AppHeader: View {
                     .minimumScaleFactor(0.72)
             }
             Spacer()
-            settingsButton
+            HStack(spacing: 8) {
+                if let warningsAction {
+                    warningsButton(action: warningsAction)
+                }
+                settingsButton
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 8)
         .background(Color.clear)
+    }
+
+    private func warningsButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "bell.fill")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(headerIconColor)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .appDarkCircularLiquidGlass(diameter: 44)
+        .overlay(alignment: .topTrailing) {
+            if unreadWarningsCount > 0 {
+                ZStack {
+                    // Outer pulsing breathing halo
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.18, blue: 0.22).opacity(0.55))
+                        .frame(width: 14, height: 14)
+                        .scaleEffect(isGlowPulsing ? 1.45 : 0.85)
+                        .opacity(isGlowPulsing ? 0.9 : 0.3)
+                        .blur(radius: 2)
+
+                    // Sharp inner glowing dot with dark outline
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.35, blue: 0.35),
+                                    Color(red: 0.95, green: 0.08, blue: 0.12)
+                                ],
+                                center: .center,
+                                startRadius: 1,
+                                endRadius: 5
+                            )
+                        )
+                        .frame(width: 9, height: 9)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black.opacity(0.45), lineWidth: 1)
+                        )
+                        .shadow(color: Color.red.opacity(0.9), radius: 3, x: 0, y: 0)
+                }
+                .padding(.top, 4)
+                .padding(.trailing, 4)
+                .allowsHitTesting(false)
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                isGlowPulsing = true
+            }
+        }
+        .accessibilityLabel(unreadWarningsCount > 0 ? "Nautische Warnungen, \(unreadWarningsCount) ungelesen" : "Nautische Warnungen")
+        .accessibilityIdentifier("AppHeaderWarningsButton")
     }
 
     // The glass surface sits OUTSIDE the button and `.contentShape` is the

@@ -224,7 +224,8 @@ extension ContentView {
                     routePlan: viewModel.routePlan,
                     waypointResults: viewModel.calculationResult?.waypointResults,
                     voyageActive: voyageManager.isVoyageActive,
-                    breadcrumbCoordinates: voyageManager.breadcrumbs.map(\.coordinate)
+                    breadcrumbCoordinates: voyageManager.breadcrumbs.map(\.coordinate),
+                    focusCoordinate: mapFocusCoordinate
                 )
                 .ignoresSafeArea()
 

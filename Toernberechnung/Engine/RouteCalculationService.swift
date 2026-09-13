@@ -393,6 +393,14 @@ final class RouteCalculationService {
     /// Returns nil if SOG <= 0.
 
 
+    static func calculateTravelTimeHours(
+        distanceNm: Double,
+        speedOverGroundKnots: Double
+    ) -> Double? {
+        guard speedOverGroundKnots > 0 else { return nil }
+        return distanceNm / speedOverGroundKnots
+    }
+
     /// Calculate leg results including arrival times, cumulative distance, and validity.
     static func calculateLegResults(
         startTime: Date,

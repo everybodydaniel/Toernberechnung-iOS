@@ -1008,3 +1008,45 @@ enum ToernPDFExporter {
         return formatter
     }()
 }
+
+struct LogbookEntryDraft {
+    var routeTitle: String
+    var startName: String
+    var destinationName: String
+    var departureAt: Date
+    var arrivalAt: Date
+    var distanceNM: Double
+    var status: String
+    var fmw: Double
+    var wt: Double
+    var wuk: Double
+    var weatherSummary: String
+    var tideSummary: String
+    var crewSummary: String
+    var notes: String
+
+    init(record: CalculationRecord? = nil) {
+        let now = Date()
+        routeTitle = record?.routeTitle ?? "Manueller Törn"
+        startName = record?.startName ?? ""
+        destinationName = record?.destinationName ?? ""
+        departureAt = record?.departureAt ?? now
+        arrivalAt = record?.arrivalAt ?? now.addingTimeInterval(3600)
+        distanceNM = record?.distanceNM ?? 0
+        status = record?.status ?? "Entwurf"
+        fmw = record?.fmw ?? 0
+        wt = record?.wt ?? 0
+        wuk = record?.wuk ?? 0
+        weatherSummary = record?.weatherSummary ?? ""
+        tideSummary = record?.tideSummary ?? ""
+        crewSummary = record?.crewSummary ?? ""
+        notes = record?.notes ?? ""
+    }
+
+    var isValid: Bool {
+        !startName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !destinationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && arrivalAt >= departureAt
+            && distanceNM >= 0 && fmw >= 0 && wt >= 0 && wuk >= 0
+    }
+}

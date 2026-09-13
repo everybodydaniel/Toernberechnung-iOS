@@ -124,6 +124,8 @@ enum NautiActionKind: String, Equatable, Codable, Sendable {
     case showWeather
     case showTides
     case showWaterLevel
+    case showWarnings
+    case getWarningsSummary
 }
 
 struct NautiAppAction: Equatable, Codable, Sendable {
@@ -414,7 +416,7 @@ enum NautiActionValidator {
                 return clarification("Für welches gültige Datum soll ich die Daten laden?")
             }
 
-        case .saveTrip, .openNavigation:
+        case .saveTrip, .openNavigation, .showWarnings, .getWarningsSummary:
             break
         }
 

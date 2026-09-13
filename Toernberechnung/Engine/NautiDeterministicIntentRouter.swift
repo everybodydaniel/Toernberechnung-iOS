@@ -24,6 +24,19 @@ enum NautiDeterministicIntentRouter {
             return routeTrip(latest, requestedAt: request.requestedAt)
         }
 
+        if let latest = request.messages.last(where: { $0.role == .user })?.text,
+           looksLikeWarningsRequest(latest) {
+            let opens = explicitlyOpensAppSection(latest) || containsAny(folded(latest), ["offne", "zeige", "anzeigen", "offnen"])
+            let kind: NautiActionKind = opens ? .showWarnings : .getWarningsSummary
+            let message = opens
+                ? "Ich öffne die nautischen Warnmeldungen."
+                : "Ich rufe die aktuellen Seefahrer-Nachrichten und Warnungen ab."
+            return NautiActionValidator.validate(
+                NautiAppAction(kind: kind, message: message),
+                reply: message
+            )
+        }
+
         guard let latest = request.messages.last(where: { $0.role == .user })?.text,
               let intent = dataIntent(in: latest),
               !looksLikeTripPlanning(latest) else {
@@ -164,6 +177,17 @@ enum NautiDeterministicIntentRouter {
         let namesSection = containsAny(text, ["tab", "reiter", "bereich", "seite"])
         let opens = containsAny(text, ["offne", "wechsel", "gehe", "springe"])
         return namesSection && opens
+    }
+
+    private static func looksLikeWarningsRequest(_ text: String) -> Bool {
+        let text = folded(text)
+        let keywords = [
+            "warnung", "warnungen", "warnmeldung", "warnmeldungen", "warnhinweis",
+            "seefahrer", "seefahrernachricht", "nwn", "bekanntmachung", "bekanntmachungen",
+            "gefahr", "sperrung", "sperrgebiet", "schiessgebiet", "schiesszeiten",
+            "funkwarnung", "funkwarnungen", "elwis", "notices to mariners"
+        ]
+        return containsAny(text, keywords)
     }
 
     private static func resolveHarbour(in request: NautiInferenceRequest) -> HarbourOption? {
