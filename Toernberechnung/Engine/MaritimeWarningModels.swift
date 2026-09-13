@@ -91,21 +91,24 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
     }
 
     public var isNorthSeaOrGermanBight: Bool {
+        let lower = "\(areaName) \(title) \(details)".lowercased()
+        // Exclude Danish and Baltic inland/foreign firing ranges outside German cruising grounds
+        if lower.contains("kattegat") || lower.contains("vejers") || lower.contains("great belt") || lower.contains("sound") {
+            return false
+        }
         if let lat = latitude, let lon = longitude {
-            // Coordinate bounding box for German Bight, East Frisian Islands, and Southern North Sea
-            if (53.0...56.2).contains(lat) && (3.0...9.2).contains(lon) {
+            // Coordinate bounding box strictly for German Bight, East Frisian Islands, Helgoland, Sylt
+            if (53.0...55.1).contains(lat) && (6.0...9.2).contains(lon) {
                 return true
             }
         }
-        let text = "\(areaName) \(title) \(details)".lowercased()
         let keywords = [
-            "nordsee", "north sea", "german bight", "deutsche bucht",
+            "deutsche bucht", "german bight",
             "ems", "weser", "elbe", "jade", "borkum", "norderney",
             "juist", "baltrum", "langeoog", "spiekeroog", "wangerooge",
-            "helgoland", "sylt", "amrum", "foehr", "watt", "wadden",
-            "horn rev", "esbjerg", "dan tysk", "butendiek"
+            "helgoland", "sylt", "amrum", "foehr", "wattenmeer", "wadden"
         ]
-        return keywords.contains { text.contains($0) }
+        return keywords.contains { lower.contains($0) }
     }
 
     public var isBalticSea: Bool {
@@ -145,47 +148,67 @@ struct NiordSearchResponseItem: Decodable {
     let parts: [NiordPart]?
     let descs: [NiordDesc]?
 
-    func toMaritimeWarning() -> MaritimeWarning? {
-        guard let warnId = shortId ?? id?.value, !warnId.isEmpty,
-              status == "PUBLISHED" || status == nil else {
-            return nil
+    private static func germanizeMaritimeText(_ text: String) -> String {
+        var res = text
+        let replacements: [(String, String)] = [
+            ("Firing exercises", "Militärische Schießübungen"),
+            ("firing exercises", "Militärische Schießübungen"),
+            ("Warning", "Warnung"),
+            ("warning", "Warnung"),
+            ("The North Sea", "Nordsee"),
+            ("the North Sea", "Nordsee"),
+            ("Denmark", "Dänemark"),
+            ("Light unlit", "Leuchtfeuer verloschen"),
+            ("Light unreliable", "Leuchtfeuer unzuverlässig"),
+            ("Buoy missing", "Tonne fehlt / vertrieben"),
+            ("Buoy off station", "Tonne verlegt"),
+            ("Underwater operations", "Unterwasserarbeiten"),
+            ("Cable laying operations", "Kabelverlegearbeiten"),
+            ("Dredging operations", "Baggerarbeiten"),
+            ("Shoal reported", "Untiefe gemeldet"),
+            ("Wreck", "Wrack"),
+            ("hours", "Uhr"),
+            ("September", "September"),
+            ("October", "Oktober"),
+            ("November", "November"),
+            ("December", "Dezember"),
+            ("January", "Januar"),
+            ("February", "Februar"),
+            ("March", "März"),
+            ("May", "Mai"),
+            ("June", "Juni"),
+            ("July", "Juli")
+        ]
+        for (eng, deu) in replacements {
+            res = res.replacingOccurrences(of: eng, with: deu)
         }
+        return res
+    }
 
-        // Get English or fallback description
+    func toMaritimeWarning() -> MaritimeWarning? {
+        guard let warnId = shortId ?? id?.value, !warnId.isEmpty else { return nil }
+
+        // Find primary english or fallback description
         let desc = descs?.first(where: { $0.lang == "en" }) ?? descs?.first
-        let title = desc?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? warnId
+        let title = desc?.title ?? "Nautische Warnung \(shortId ?? warnId)"
 
-        // Gather details from parts
+        // Extract coordinates and details
+        var coordinates: (lat: Double, lon: Double)? = nil
         var detailsText = ""
-        var coordinates: (lat: Double, lon: Double)?
 
-        if let parts {
-            for part in parts {
-                if let partDesc = part.descs?.first(where: { $0.lang == "en" }) ?? part.descs?.first,
-                   let details = partDesc.details {
-                    let cleaned = details
-                        .replacingOccurrences(of: "<br/>", with: "\n")
-                        .replacingOccurrences(of: "<br>", with: "\n")
-                        .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !cleaned.isEmpty {
-                        if !detailsText.isEmpty { detailsText += "\n\n" }
-                        detailsText += cleaned
-                    }
-                }
-
-                // Try to extract coordinate from part geometry
-                if coordinates == nil, let geom = part.geometry, let features = geom.features {
-                    for feat in features {
-                        if let geomObj = feat.geometry, let coords = geomObj.coordinates {
-                            if let firstPoint = coords.firstPoint {
-                                coordinates = firstPoint
-                                break
-                            }
+        if let firstPart = parts?.first {
+            if let geom = firstPart.geometry, let features = geom.features {
+                for feat in features {
+                    if let geomObj = feat.geometry, let coords = geomObj.coordinates {
+                        if let firstPoint = coords.firstPoint {
+                            coordinates = firstPoint
+                            break
                         }
                     }
                 }
+            }
+            if let partDesc = firstPart.descs?.first(where: { $0.lang == "en" }) ?? firstPart.descs?.first {
+                detailsText = partDesc.details?.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression) ?? ""
             }
         }
 
@@ -195,7 +218,7 @@ struct NiordSearchResponseItem: Decodable {
 
         // Area name
         let areaName = areas?.compactMap { $0.descs?.first?.name }.joined(separator: " · ")
-            ?? "Nordsee & Dänemark"
+            ?? "Deutsche Bucht & Nordsee"
 
         // Severity
         let severity: MaritimeWarningSeverity
@@ -227,9 +250,9 @@ struct NiordSearchResponseItem: Decodable {
             id: warnId,
             source: .dma,
             severity: severity,
-            title: title,
-            details: detailsText,
-            areaName: areaName,
+            title: Self.germanizeMaritimeText(title),
+            details: Self.germanizeMaritimeText(detailsText),
+            areaName: Self.germanizeMaritimeText(areaName),
             publishDate: pubDate,
             validUntil: valUntil,
             latitude: coordinates?.lat,
