@@ -238,8 +238,9 @@ public final class MaritimeWarningsService {
             do {
                 let data = try Data(contentsOf: file)
                 let cached = try JSONDecoder().decode([MaritimeWarning].self, from: data)
-                if !cached.isEmpty {
-                    self.warnings = cached
+                let validGerman = cached.filter { $0.isNorthSeaOrGermanBight }
+                if !validGerman.isEmpty {
+                    self.warnings = validGerman
                     self.updateUnreadCount()
                     return
                 }
@@ -248,7 +249,7 @@ public final class MaritimeWarningsService {
             }
         }
 
-        // Fallback baseline for German Bight / Ostsee
+        // Fallback baseline for German Bight & East Frisian Waters
         self.warnings = Self.defaultCuratedWarnings
         self.updateUnreadCount()
     }
@@ -319,7 +320,7 @@ public final class MaritimeWarningsService {
             publishDate: Date().addingTimeInterval(-3600 * 48),
             latitude: 53.8400,
             longitude: 8.1200,
-            webUrl: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/bfsSeeregion:alle")
+            webUrl: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/")
         ),
         MaritimeWarning(
             id: "bsh-nwn-2026-19",
@@ -336,6 +337,54 @@ public final class MaritimeWarningsService {
             longitude: 8.1083,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
             pdfUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf")
+        ),
+        MaritimeWarning(
+            id: "bsh-nwn-2026-21",
+            source: .bsh,
+            severity: .warning,
+            title: "Ostfriesische Inseln: Borkum Hubertgat – Mindertiefe 1,80 m über SKN",
+            details: """
+            Wegen anhaltender Sandverlagerungen im Hubertgat beträgt die Wassertiefe im Bereich der \
+            Tonnen H2 bis H4 bei mittlerem Niedrigwasser örtlich nur noch 1,80 m. Tiefgang beachten.
+            """,
+            areaName: "Borkum · Hubertgat",
+            publishDate: Date().addingTimeInterval(-3600 * 96),
+            latitude: 53.6200,
+            longitude: 6.6400,
+            webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
+            pdfUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf")
+        ),
+        MaritimeWarning(
+            id: "bsh-nwn-2026-22",
+            source: .bsh,
+            severity: .notice,
+            title: "Ostfriesische Inseln: Juister Wattfahrwasser – Prickenverlegung",
+            details: """
+            Das Wattfahrwasser von Norddeich nach Juist Hafen wurde neu ausgeprickt. Die Prickenspuren \
+            haben sich gegenüber dem Vorjahr um bis zu 80 m verlagert. Der Prickung ist strikt zu folgen.
+            """,
+            areaName: "Juist · Wattfahrwasser",
+            publishDate: Date().addingTimeInterval(-3600 * 120),
+            latitude: 53.6800,
+            longitude: 7.0500,
+            webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
+            pdfUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf")
+        ),
+        MaritimeWarning(
+            id: "elwis-bfs-2026-07",
+            source: .elwis,
+            severity: .warning,
+            title: "WSA Weser-Jade-Nordsee: Unterwasserkabel-Verlegearbeiten Jade",
+            details: """
+            Im Bereich des Fahrwassers Innenjade (Höhe Wilhelmshaven Voslapper Groden) finden Verlegearbeiten \
+            für Seekabel statt. Sperrfahrzeug führt Manövrierbehinderungssignale (Rot-Weiß-Rot). \
+            Passieren mit reduzierter Geschwindigkeit.
+            """,
+            areaName: "Jade · Wilhelmshaven",
+            publishDate: Date().addingTimeInterval(-3600 * 140),
+            latitude: 53.5800,
+            longitude: 8.1600,
+            webUrl: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/")
         )
     ]
 }

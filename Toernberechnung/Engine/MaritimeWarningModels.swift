@@ -92,13 +92,20 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
 
     public var isNorthSeaOrGermanBight: Bool {
         let lower = "\(areaName) \(title) \(details)".lowercased()
-        // Exclude Danish and Baltic inland/foreign firing ranges outside German cruising grounds
-        if lower.contains("kattegat") || lower.contains("vejers") || lower.contains("great belt") || lower.contains("sound") {
+        // Exclude foreign Danish / Baltic territorial notices
+        let foreignKeywords = [
+            "dänemark", "denmark", "danmark", "rømø", "romo",
+            "lister dyb", "kattegat", "vejers", "great belt",
+            "sound", "esbjerg", "bornholm", "limfjord", "fanø", "fanoe"
+        ]
+        if foreignKeywords.contains(where: { lower.contains($0) }) {
             return false
         }
         if let lat = latitude, let lon = longitude {
-            // Coordinate bounding box strictly for German Bight, East Frisian Islands, Helgoland, Sylt
-            if (53.0...55.1).contains(lat) && (6.0...9.2).contains(lon) {
+            // Coordinate bounding box strictly for German Bight, East Frisian Islands, Helgoland, Elbe, Weser, Jade, Ems
+            // German Bight latitude: Helgoland is at 54.18°N.
+            // Strict upper bound is 54.4°N to exclude all Danish territory (Rømø 55.08°N, Lister Dyb 55.09°N, Vejers 55.6°N)
+            if (53.1...54.4).contains(lat) && (6.2...9.2).contains(lon) {
                 return true
             }
         }
@@ -106,7 +113,7 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
             "deutsche bucht", "german bight",
             "ems", "weser", "elbe", "jade", "borkum", "norderney",
             "juist", "baltrum", "langeoog", "spiekeroog", "wangerooge",
-            "helgoland", "sylt", "amrum", "foehr", "wattenmeer", "wadden"
+            "helgoland", "wattenmeer", "wadden"
         ]
         return keywords.contains { lower.contains($0) }
     }
@@ -148,8 +155,28 @@ struct NiordSearchResponseItem: Decodable {
     let parts: [NiordPart]?
     let descs: [NiordDesc]?
 
+    private static func stripAndDecodeHTMLEntities(_ text: String) -> String {
+        var str = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        let entities: [(String, String)] = [
+            ("&deg;", "°"),
+            ("&nbsp;", " "),
+            ("&raquo;", "»"),
+            ("&laquo;", "«"),
+            ("&amp;", "&"),
+            ("&quot;", "\""),
+            ("&apos;", "'"),
+            ("&#39;", "'"),
+            ("&ndash;", "–"),
+            ("&mdash;", "—")
+        ]
+        for (ent, val) in entities {
+            str = str.replacingOccurrences(of: ent, with: val)
+        }
+        return str.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private static func germanizeMaritimeText(_ text: String) -> String {
-        var res = text
+        var res = stripAndDecodeHTMLEntities(text)
         let replacements: [(String, String)] = [
             ("Firing exercises", "Militärische Schießübungen"),
             ("firing exercises", "Militärische Schießübungen"),
@@ -160,8 +187,12 @@ struct NiordSearchResponseItem: Decodable {
             ("Denmark", "Dänemark"),
             ("Light unlit", "Leuchtfeuer verloschen"),
             ("Light unreliable", "Leuchtfeuer unzuverlässig"),
+            ("Light buoy moved", "Leuchttonne verlegt"),
+            ("Light buoy", "Leuchttonne"),
             ("Buoy missing", "Tonne fehlt / vertrieben"),
             ("Buoy off station", "Tonne verlegt"),
+            ("Buoyage off station", "Betonnung verlegt"),
+            ("Maintenance", "Wartungsarbeiten"),
             ("Underwater operations", "Unterwasserarbeiten"),
             ("Cable laying operations", "Kabelverlegearbeiten"),
             ("Dredging operations", "Baggerarbeiten"),
@@ -208,12 +239,12 @@ struct NiordSearchResponseItem: Decodable {
                 }
             }
             if let partDesc = firstPart.descs?.first(where: { $0.lang == "en" }) ?? firstPart.descs?.first {
-                detailsText = partDesc.details?.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression) ?? ""
+                detailsText = Self.stripAndDecodeHTMLEntities(partDesc.details ?? "")
             }
         }
 
         if detailsText.isEmpty {
-            detailsText = desc?.details?.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression) ?? "Keine weiteren Details angegeben."
+            detailsText = Self.stripAndDecodeHTMLEntities(desc?.details ?? "Keine weiteren Details angegeben.")
         }
 
         // Area name
