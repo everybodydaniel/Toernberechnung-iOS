@@ -93,19 +93,19 @@ public final class MaritimeWarningsService {
         ),
         OfficialBulletin(
             id: "elwis-bfs-nordsee",
-            title: "ELWIS Bekanntmachungen Nordsee",
+            title: "ELWIS Bekanntmachungen für Seefahrer",
             subtitle: "Amtliche Mitteilungen der WSV für Ems, Weser, Jade und Elbe",
-            authority: "WSA Ems-Nordsee / Weser-Jade / Elbe",
-            url: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/bfsSeeregion:kuestengebiet-nordsee")!,
+            authority: "WSV Küstengebiet Nordsee",
+            url: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/")!,
             isPDF: false,
             icon: "antenna.radiowaves.left.and.right"
         ),
         OfficialBulletin(
             id: "seefunk-nordsee",
-            title: "Seefunk & Küstenfunkstellen Nordsee",
-            subtitle: "Arbeitskanäle & Sendezeiten für Bremen Rescue Radio, DP07 & NAVTEX",
-            authority: "DGzRS / DP07 Seefunk / DWD",
-            url: URL(string: "https://www.seenotretter.de/wer-wir-sind/seenotleitstelle-mrcc/funkstellen")!,
+            title: "Notfunk & Seenotretter (DGzRS)",
+            subtitle: "UKW-Kanal 16, DSC Kanal 70 und Notfallleitstelle MRCC Bremen",
+            authority: "DGzRS Seenotleitung Bremen",
+            url: URL(string: "https://www.seenotretter.de/notfall")!,
             isPDF: false,
             icon: "radio.fill"
         ),
