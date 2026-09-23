@@ -32,10 +32,6 @@
 	<string>TideNode speichert geplante Törn- und Crew-Termine auf deinen Wunsch im Kalender.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>TideNode speichert geplante Törn- und Crew-Termine auf deinen Wunsch im Kalender.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>TideNode benötigt Zugriff auf das Mikrofon für lokale Nauti-Diktate.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>TideNode wandelt deine gesprochenen Nauti-Anfragen auf dem Gerät in Text um.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -404,7 +404,6 @@ extension ContentView {
 
     func closeNautiChat() {
         guard nautiDashboardMode.isExpanded else { return }
-        nautiSpeechController.cancel()
         nautiFocusDismissTrigger &+= 1
         withAnimation(NautiDashboardGeometry.animation(reduceMotion: reduceMotion)) {
             nautiDashboardMode = .dashboard

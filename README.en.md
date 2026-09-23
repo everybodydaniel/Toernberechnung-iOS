@@ -122,7 +122,7 @@ graph TD
         BSHS["BSHTideService"]:::service
         BSHWLS["BSHWaterLevelForecastService"]:::service
         WKS["WeatherKitManager"]:::service
-        NAUTIS["NautiConversationRepository & Speech"]:::service
+        NAUTIS["NautiConversationRepository"]:::service
     end
 
     subgraph UI ["SwiftUI Views (4 Tabs & Adaptive UI)"]
@@ -257,8 +257,6 @@ Toernberechnung-iOS/
 │   │   ├── WeatherKitManager.swift          # Apple WeatherKit manager with caching
 │   │   ├── LocalAIInferenceManager.swift    # On-device Foundation Models inference
 │   │   ├── NautiConversationRepository.swift # Local persistence of chat conversations
-│   │   ├── NautiSpeechInputManager.swift    # Local speech recognition
-│   │   ├── SpeechAudioFormatConverter.swift # Audio format conversion for on-device models
 │   │   ├── WaterLevelCorrectionSeries.swift # Time series interpolation for water levels
 │   │   └── LocationService.swift            # CoreLocation service for GPS tracking
 │   └── Resources/

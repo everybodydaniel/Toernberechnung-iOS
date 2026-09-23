@@ -461,7 +461,6 @@ extension ContentView {
                 NautiInlineDashboardHost(
                     mode: $nautiDashboardMode,
                     viewModel: nautiViewModel,
-                    speechController: nautiSpeechController,
                     focusDismissTrigger: nautiFocusDismissTrigger,
                     onCollapse: closeNautiChat,
                     onAction: handleNautiAction,

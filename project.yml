@@ -66,8 +66,6 @@ targets:
       - path: Toernberechnung/Services/WeatherKitManager.swift
       - path: Toernberechnung/Services/LocalAIInferenceManager.swift
       - path: Toernberechnung/Services/NautiConversationRepository.swift
-      - path: Toernberechnung/Services/NautiSpeechInputManager.swift
-      - path: Toernberechnung/Services/SpeechAudioFormatConverter.swift
       - path: Toernberechnung/Services/BSHTideService.swift
       - path: Toernberechnung/Services/BSHWaterLevelForecastService.swift
       - path: Toernberechnung/Services/WaterLevelCorrectionSeries.swift

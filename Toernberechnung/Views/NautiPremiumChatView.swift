@@ -1,11 +1,9 @@
 import SwiftData
 import SwiftUI
-import UIKit
 
 struct NautiPremiumChatOverlay: View {
     @Binding var mode: NautiDashboardMode
     @Bindable var viewModel: NautiChatViewModel
-    @Bindable var speechController: NautiSpeechInputController
 
     let focusDismissTrigger: Int
     let onCollapse: () -> Void
@@ -43,17 +41,6 @@ struct NautiPremiumChatOverlay: View {
                 .environment(\.locale, Locale(identifier: "de_DE"))
         }
         .animation(NautiDashboardGeometry.animation(reduceMotion: reduceMotion), value: mode)
-        .onChange(of: viewModel.activeConversationID) { _, _ in
-            speechController.cancel()
-        }
-        .onChange(of: mode) { _, newMode in
-            if newMode != .chat {
-                speechController.cancel()
-            }
-        }
-        .onDisappear {
-            speechController.cancel()
-        }
         .alert("Chat umbenennen", isPresented: renameAlertPresented) {
             TextField("Titel", text: $renameDraft)
             Button("Abbrechen", role: .cancel) {
@@ -101,9 +88,7 @@ struct NautiPremiumChatOverlay: View {
             Divider().opacity(0.12)
             MessageInputView(
                 draft: $viewModel.draft,
-                speechController: speechController,
                 canSend: viewModel.canSend,
-                assistantEnabled: accessState.canUseAssistant,
                 isSending: viewModel.isSending,
                 focusDismissTrigger: focusDismissTrigger,
                 onSend: send,
@@ -554,29 +539,17 @@ private struct NautiHistoryList: View {
 
 private struct MessageInputView: View {
     @Binding var draft: String
-    @Bindable var speechController: NautiSpeechInputController
 
     let canSend: Bool
-    let assistantEnabled: Bool
     let isSending: Bool
     let focusDismissTrigger: Int
     let onSend: () -> Void
     let onStop: () -> Void
 
-    @Environment(\.openURL) private var openURL
     @FocusState private var inputFocused: Bool
-    @State private var dictationPrefix = ""
-
-    // Feature flag: Spracheingabe für App Store Release 1.0 deaktiviert,
-    // um Rejections wegen fehlender lokaler de-DE Sprachmodelle auf US-Reviewer-Geräten zu vermeiden.
-    private let isVoiceInputEnabled = false
 
     var body: some View {
         VStack(spacing: 7) {
-            if isVoiceInputEnabled, let error = speechController.errorMessage {
-                speechError(error)
-            }
-
             HStack(alignment: .bottom, spacing: 7) {
                 TextField("Nachricht", text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -587,10 +560,6 @@ private struct MessageInputView: View {
                     .disabled(isSending)
                     .padding(.leading, 13)
                     .padding(.vertical, 10)
-
-                if isVoiceInputEnabled {
-                    microphoneButton
-                }
 
                 if isSending {
                     Button(action: onStop) {
@@ -633,10 +602,6 @@ private struct MessageInputView: View {
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 12)
-        .onChange(of: speechController.transcript) { _, transcript in
-            guard speechController.isActive || !transcript.isEmpty else { return }
-            draft = joinedDraft(prefix: dictationPrefix, transcript: transcript)
-        }
         .onChange(of: focusDismissTrigger) { _, _ in
             inputFocused = false
         }
@@ -646,69 +611,7 @@ private struct MessageInputView: View {
     }
 
     private var sendEnabled: Bool {
-        canSend && !speechController.isActive && !isSending
-    }
-
-    private var microphoneButton: some View {
-        Button {
-            guard assistantEnabled, !isSending else { return }
-            if speechController.isActive {
-                Task { await speechController.stop() }
-            } else {
-                dictationPrefix = draft
-                inputFocused = false
-                Task { await speechController.start() }
-            }
-        } label: {
-            ZStack {
-                if speechController.isRecording {
-                    SpeechPulseView()
-                }
-
-                if speechController.state == .preparing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(.red)
-                } else {
-                    Image(systemName: speechController.isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(speechController.isRecording ? Color.white : Color.primary)
-                }
-            }
-            .frame(width: 36, height: 36)
-            .background(
-                speechController.isRecording ? Color.red : Color.primary.opacity(0.09),
-                in: Circle()
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(!assistantEnabled || isSending)
-        .accessibilityLabel(speechController.isRecording ? "Diktat stoppen" : "Diktat starten")
-        .padding(.bottom, 4)
-    }
-
-    private func speechError(_ error: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(.orange)
-            Text(error)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 4)
-            Button("Einstellungen") {
-                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                openURL(url)
-            }
-            .font(.system(size: 11, weight: .bold))
-            Button {
-                speechController.clearError()
-            } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Fehlerhinweis schließen")
-        }
-        .padding(.vertical, 6)
+        canSend && !isSending
     }
 
     private func send() {
@@ -719,36 +622,4 @@ private struct MessageInputView: View {
         inputFocused = true
     }
 
-    private func joinedDraft(prefix: String, transcript: String) -> String {
-        let prefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-        let transcript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        if prefix.isEmpty { return transcript }
-        if transcript.isEmpty { return prefix }
-        return "\(prefix) \(transcript)"
-    }
-}
-
-private struct SpeechPulseView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var animate = false
-
-    var body: some View {
-        ZStack {
-            ForEach(0..<3, id: \.self) { index in
-                Circle()
-                    .stroke(Color.red.opacity(0.42 - Double(index) * 0.10), lineWidth: 1.4)
-                    .scaleEffect(reduceMotion ? 1.15 : (animate ? 1.75 + CGFloat(index) * 0.22 : 0.82))
-                    .opacity(reduceMotion ? 0.7 : (animate ? 0 : 0.9))
-                    .animation(
-                        reduceMotion
-                            ? nil
-                            : .easeOut(duration: 1.25)
-                                .repeatForever(autoreverses: false)
-                                .delay(Double(index) * 0.22),
-                        value: animate
-                    )
-            }
-        }
-        .onAppear { animate = true }
-    }
 }

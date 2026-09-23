@@ -33,7 +33,6 @@ enum NautiDashboardGeometry {
 struct NautiInlineDashboardHost: View {
     @Binding var mode: NautiDashboardMode
     @Bindable var viewModel: NautiChatViewModel
-    @Bindable var speechController: NautiSpeechInputController
 
     let focusDismissTrigger: Int
     let onCollapse: () -> Void
@@ -46,7 +45,6 @@ struct NautiInlineDashboardHost: View {
         NautiPremiumChatOverlay(
             mode: $mode,
             viewModel: viewModel,
-            speechController: speechController,
             focusDismissTrigger: focusDismissTrigger,
             onCollapse: onCollapse,
             onAction: onAction,

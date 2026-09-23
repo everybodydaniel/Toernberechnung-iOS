@@ -90,7 +90,6 @@ struct ContentView: View {
     @State var dismissedNautiIssueID: String?
     @State var aiAccess = AIAccessController()
     @State var nautiViewModel = NautiChatViewModel()
-    @State var nautiSpeechController = NautiSpeechInputController()
     @State var voyageDisclaimerShown = false
     @State var stopVoyageAlertShown = false
     @State var navigationFullScreenShown = false
@@ -331,7 +330,6 @@ struct ContentView: View {
             handleScenePhaseChange(phase)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
-            nautiSpeechController.cancel()
             nautiViewModel.releaseResources()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
@@ -345,7 +343,6 @@ struct ContentView: View {
     @MainActor
     private func handleScenePhaseChange(_ phase: ScenePhase) {
         if phase != .active {
-            nautiSpeechController.cancel()
         }
         // When the app comes back to the foreground, re-check the BSH peak
         // forecast for whatever the user is currently looking at. Cache TTL

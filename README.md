@@ -90,7 +90,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit vier harmon
 | 🔍 | **Passagefenster-Solver** | Automatische Suche nach dem optimalen und sicheren Abfahrtsfenster basierend auf Gezeiten und Wasserstandsvorhersage |
 | 🌊 | **BSH-Gezeitendaten** | Direkter Abruf astronomischer Hoch-/Niedrigwasservorhersagen für alle Inselpegel (Borkum, Juist, Norderney, Baltrum, Langeoog, Spiekeroog, Wangerooge, Emden) |
 | 🌤️ | **Apple WeatherKit** | Echtzeit-Wetter, 48-Stunden-Windprognose, Böenanzeige und 7-Tage-Vorhersage in nautischen Einheiten (Knoten, Bft) |
-| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten mit Spracheingabe – vollständig offline ohne Server-Upload |
+| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten mit Texteingabe – vollständig offline ohne Server-Upload |
 | 🚦 | **Go / Warning / No-Go** | Transparente Gesamteinschätzung aus Gezeitentiefe, Seegang und Wetterbedingungen zu einer klaren Passage-Empfehlung |
 | 🧭 | **Mehrstrecken-Routing** | Routenplanung mit flexiblen Zwischenstopps und automatischer Etappenberechnung über den Wattenmeer-Katalog |
 | 📱 | **Responsive iPad-Layout** | Adaptive Oberfläche mit schwebender Tab-Leiste, Mehrspalten-Controls und optimierten Popovers für iPad und iPhone |
@@ -122,7 +122,7 @@ graph TD
         BSHS["BSHTideService"]:::service
         BSHWLS["BSHWaterLevelForecastService"]:::service
         WKS["WeatherKitManager"]:::service
-        NAUTIS["NautiConversationRepository & Speech"]:::service
+        NAUTIS["NautiConversationRepository"]:::service
     end
 
     subgraph UI ["SwiftUI Views (4 Tabs & Adaptive UI)"]
@@ -257,8 +257,6 @@ Toernberechnung-iOS/
 │   │   ├── WeatherKitManager.swift          # Apple WeatherKit Manager mit Caching
 │   │   ├── LocalAIInferenceManager.swift    # On-Device Foundation Models Inferenz
 │   │   ├── NautiConversationRepository.swift # Lokale Speicherung von Chatverläufen
-│   │   ├── NautiSpeechInputManager.swift    # Lokale Spracheingabe (Speech Recognition)
-│   │   ├── SpeechAudioFormatConverter.swift # Audio-Konvertierung für On-Device-Modelle
 │   │   ├── WaterLevelCorrectionSeries.swift # Zeitreihen-Interpolation für Wasserstände
 │   │   └── LocationService.swift            # CoreLocation-Dienst für GPS-Tracking
 │   └── Resources/
