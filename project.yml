@@ -135,7 +135,7 @@ targets:
         DEVELOPMENT_TEAM: L9T7RPMW5H
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.9"
-        CURRENT_PROJECT_VERSION: "3"
+        CURRENT_PROJECT_VERSION: "4"
         MARKETING_VERSION: "1.1.0"
     scheme:
       gatherCoverageData: true

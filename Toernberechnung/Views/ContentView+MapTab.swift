@@ -234,6 +234,11 @@ extension ContentView {
                     }
                 )
                 .ignoresSafeArea()
+                .overlay(alignment: .topTrailing) {
+                    MapAttributionView()
+                        .padding(.top, 208)
+                        .padding(.trailing, 12)
+                }
 
                 LinearGradient(
                     colors: [

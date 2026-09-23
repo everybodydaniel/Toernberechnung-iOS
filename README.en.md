@@ -6,13 +6,13 @@
 
 [Deutsch](README.md) · **English**
 
-A native iOS app that combines routes, tides, water levels, weather data, and crew information in a modern SwiftUI interface to calculate a transparent **Go / Warning / No-Go** assessment — fully offline-capable with a curated Wadden Sea catalog.
+A native iOS app that combines routes, tides, water levels, weather data, and crew information in a modern SwiftUI interface to calculate a transparent **Go / Warning / No-Go** assessment — with a local Wadden Sea catalog and online requests for current data.
 
 [![CI](https://github.com/everybodydaniel/Toernberechnung-iOS/actions/workflows/ci.yml/badge.svg)](https://github.com/everybodydaniel/Toernberechnung-iOS/actions/workflows/ci.yml)
 [![Swift 5.9](https://img.shields.io/badge/Swift-5.9-F05138?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
 [![Platform iOS 18+](https://img.shields.io/badge/Platform-iOS%2018%2B-007AFF?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/ios/)
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071E3?style=flat-square&logo=swift&logoColor=white)](#-system-architecture)
-[![MapLibre](https://img.shields.io/badge/Map-MapLibre-396CB2?style=flat-square&logo=maplibre&logoColor=white)](https://maplibre.org/)
+[![MapKit](https://img.shields.io/badge/Map-MapKit-396CB2?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/documentation/mapkit/)
 [![Docs](https://img.shields.io/badge/Docs-DocC%20→%20Pages-blue?style=flat-square&logo=readthedocs)](https://everybodydaniel.github.io/Toernberechnung-iOS/documentation/toernberechnung/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
@@ -53,7 +53,7 @@ TideNode is a modern, native iOS app for **planning sailing passages and tidal r
 
 The application follows a cleanly decoupled **MVVM architecture** organized into four harmoniously integrated primary sections:
 
-- **🗺️ Map** – MapLibre-based nautical chart with interactive multi-leg route planning, waypoints, protected zone overlays (NordsBefV), depth profiles, and Go / Warning / No-Go status indicators
+- **🗺️ Map** – MapKit-based nautical chart with interactive multi-leg route planning, waypoints, protected zone overlays (NordsBefV), depth profiles, and Go / Warning / No-Go status indicators
 - **🌤️ Weather & Tides** – Apple WeatherKit forecasts featuring 48-hour wind and gust charts in knots combined with official BSH tidal data, astronomical high/low water times, and water level forecast curves
 - **👥 Crewspace** – Local crew management with roles (Skipper, Co-Skipper, Navigator, Deckhand), emergency contacts, phone numbers, onboard status ("On Board"), and integrated monthly appointment planning
 - **📒 Logbook** – Digital ship's logbook with complete passage history, automatic voyage logging from planned trips, and PDF export via SwiftData
@@ -85,12 +85,12 @@ The application follows a cleanly decoupled **MVVM architecture** organized into
 
 | | Feature | Description |
 |---|---|---|
-| 🗺️ | **Nautical Chart** | MapLibre-based chart view with route vectors, waypoints, environmental protection zones, and fullscreen navigation mode |
+| 🗺️ | **Nautical Chart** | MapKit-based chart view with route vectors, waypoints, environmental protection zones, and fullscreen navigation mode |
 | 🧮 | **Tide-Based Calculations** | Automatic computation of fall height (FmW), water depth (WT), and water column above keel (WuK) using the Rule of Twelfths, factoring in draft and safety margin |
 | 🔍 | **Passage Window Solver** | Automatic search for the optimal safe departure window based on tidal and water level predictions |
 | 🌊 | **BSH Tidal Data** | Direct retrieval of astronomical high/low water predictions for all island gauges (Borkum, Juist, Norderney, Baltrum, Langeoog, Spiekeroog, Wangerooge, Emden) |
 | 🌤️ | **Apple WeatherKit** | Real-time weather, 48-hour wind forecasts, gust indicators, and 7-day outlook in nautical units (knots, Beaufort) |
-| ✨ | **Nauti On-Device** | Local skipper assistant powered by Apple Foundation Models on supported iOS 26 devices with voice input — fully offline with no server upload |
+| ✨ | **Nauti On-Device** | Local skipper assistant powered by Apple Foundation Models on supported iOS 26 devices with text input — no external AI server upload |
 | 🚦 | **Go / Warning / No-Go** | Clear composite recommendation combining depth over seabed, sea state, and weather conditions |
 | 🧭 | **Multi-Leg Routing** | Route planning with flexible intermediate stops and automatic leg calculation via the Wadden Sea catalog |
 | 📱 | **Responsive iPad Layout** | Adaptive interface with floating tab bar, wide multi-column controls, and optimized popovers for iPad and iPhone |
@@ -190,7 +190,7 @@ graph TD
 - **Persistence:** SwiftData (Logbook, Crew Roster, Appointments, AuditLog)
 
 ### Chart & Mapping
-- **Rendering:** MapLibre GL Native 6.28+
+- **Rendering:** MapKit with OpenStreetMap and OpenSeaMap tiles
 - **Chart Style:** Nautical chart with custom vector and raster tile styling
 - **Protected Zones:** North Sea Protection Ordinance (GeoJSON layers for Zone I and II)
 
@@ -230,7 +230,7 @@ Toernberechnung-iOS/
 │   │   ├── CrewPlanningView.swift           # Monthly calendar & schedule overview
 │   │   ├── NautiChatView.swift              # AI chat interface with speech output
 │   │   ├── NautiPremiumChatView.swift       # Full-screen chat with context actions
-│   │   ├── MapView.swift                    # MapLibre chart integration
+│   │   ├── MapView.swift                    # MapKit chart integration
 │   │   ├── LiquidGlassStyle.swift           # Glassmorphism design system
 │   │   └── WeatherDetailViews.swift         # Detail cards for wind, gusts, and pressure
 │   ├── Engine/
@@ -308,7 +308,7 @@ The preconfigured project `Toernberechnung.xcodeproj` is included directly in th
 open Toernberechnung.xcodeproj
 ```
 
-All external dependencies (such as MapLibre GL Native) are automatically resolved via **Swift Package Manager** on first launch.
+The map uses MapKit with OpenStreetMap and OpenSeaMap tiles. Required source files are included in the Xcode project.
 
 *(Optional)* If changes are made to `project.yml`, regenerate the project with XcodeGen:
 

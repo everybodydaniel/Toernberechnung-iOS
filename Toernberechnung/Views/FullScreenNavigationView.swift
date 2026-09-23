@@ -40,6 +40,11 @@ struct FullScreenNavigationView: View {
                 breadcrumbCoordinates: voyageManager.breadcrumbs.map(\.coordinate)
             )
             .ignoresSafeArea()
+            .overlay(alignment: .topTrailing) {
+                MapAttributionView()
+                    .padding(.top, 132)
+                    .padding(.trailing, 12)
+            }
 
             LinearGradient(
                 colors: [

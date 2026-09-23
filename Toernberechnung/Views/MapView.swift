@@ -94,14 +94,14 @@ struct CompactMapView: UIViewRepresentable {
     fileprivate static func installBaseAndSeamarkOverlays(on map: MKMapView) {
         // OSM standard raster — replaces Apple basemap so labels / POIs
         // disappear and the look matches OpenSeaMap on the web.
-        let base = MKTileOverlay(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+        let base = IdentifiedMapTileOverlay(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
         base.canReplaceMapContent = true
         base.maximumZ = 19
         base.minimumZ = 0
         map.addOverlay(base, level: .aboveRoads)
 
         // OpenSeaMap seamark symbols on top.
-        let seamark = MKTileOverlay(urlTemplate: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png")
+        let seamark = IdentifiedMapTileOverlay(urlTemplate: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png")
         seamark.canReplaceMapContent = false
         seamark.maximumZ = 18
         seamark.minimumZ = 0
@@ -756,5 +756,83 @@ final class WarningPinAnnotation: NSObject, MKAnnotation {
         self.title = title
         self.subtitle = subtitle
         self.warning = warning
+    }
+}
+
+/// Identifies TideNode to the community tile servers and respects their cache headers.
+private final class IdentifiedMapTileOverlay: MKTileOverlay {
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = URLCache(
+            memoryCapacity: 32 * 1024 * 1024,
+            diskCapacity: 256 * 1024 * 1024,
+            diskPath: "TideNodeMapTiles"
+        )
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        configuration.httpAdditionalHeaders = [
+            "User-Agent": "TideNode/1.1 (+https://everybodydaniel.github.io/Toernberechnung-iOS/; contact: tidenode@gmx.de)"
+        ]
+        return URLSession(configuration: configuration)
+    }()
+
+    override func loadTile(at path: MKTileOverlayPath, result: @escaping (Data?, Error?) -> Void) {
+        let request = URLRequest(url: url(forTilePath: path), cachePolicy: .useProtocolCachePolicy)
+        Self.session.dataTask(with: request) { data, response, error in
+            if let response = response as? HTTPURLResponse, !(200...299).contains(response.statusCode) {
+                result(nil, NSError(domain: "TideNodeMapTiles", code: response.statusCode))
+            } else {
+                result(data, error)
+            }
+        }.resume()
+    }
+}
+
+/// Compact, tappable source information. The licence credits stay visible on the map.
+struct MapAttributionView: View {
+    @State private var showingSources = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("© OpenStreetMap contributors")
+                Text("© OpenSeaMap")
+            }
+            .font(.system(size: 8, weight: .medium))
+            .foregroundStyle(.black.opacity(0.8))
+            .lineLimit(1)
+
+            Button {
+                showingSources = true
+            } label: {
+                Image(systemName: "exclamationmark")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Color.appPrimary, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Kartenquellen und Lizenzen anzeigen")
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 4)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.82), in: Capsule())
+        .sheet(isPresented: $showingSources) {
+            NavigationStack {
+                List {
+                    Section("Kartenquellen") {
+                        Link("© OpenStreetMap contributors", destination: URL(string: "https://www.openstreetmap.org/copyright")!)
+                        Link("© OpenSeaMap", destination: URL(string: "https://www.openseamap.org/index.php?id=faq")!)
+                    }
+                }
+                .navigationTitle("Kartenquellen")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Schließen") { showingSources = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
     }
 }

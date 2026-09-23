@@ -872,7 +872,7 @@
 				CODE_SIGN_ENTITLEMENTS = Toernberechnung/Toernberechnung.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = L9T7RPMW5H;
 				INFOPLIST_FILE = Toernberechnung/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -976,7 +976,7 @@
 				CODE_SIGN_ENTITLEMENTS = Toernberechnung/Toernberechnung.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = L9T7RPMW5H;
 				INFOPLIST_FILE = Toernberechnung/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

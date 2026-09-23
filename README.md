@@ -6,13 +6,13 @@
 
 **Deutsch** · [English](README.en.md)
 
-Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordinformationen in einer modernen SwiftUI-Oberfläche vereint und daraus eine nachvollziehbare **Go / Warning / No-Go**-Einschätzung berechnet – vollständig offline-fähig mit kuratiertem Wattenmeer-Katalog.
+Eine native iOS-App, die Routen, Gezeiten, Wasserstände, Wetterdaten und Bordinformationen in einer modernen SwiftUI-Oberfläche vereint und daraus eine nachvollziehbare **Go / Warning / No-Go**-Einschätzung berechnet – mit lokalem Wattenmeer-Katalog und Online-Abfragen für aktuelle Daten.
 
 [![CI](https://github.com/everybodydaniel/Toernberechnung-iOS/actions/workflows/ci.yml/badge.svg)](https://github.com/everybodydaniel/Toernberechnung-iOS/actions/workflows/ci.yml)
 [![Swift 5.9](https://img.shields.io/badge/Swift-5.9-F05138?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
 [![Platform iOS 18+](https://img.shields.io/badge/Platform-iOS%2018%2B-007AFF?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/ios/)
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071E3?style=flat-square&logo=swift&logoColor=white)](#-systemarchitektur)
-[![MapLibre](https://img.shields.io/badge/Map-MapLibre-396CB2?style=flat-square&logo=maplibre&logoColor=white)](https://maplibre.org/)
+[![MapKit](https://img.shields.io/badge/Map-MapKit-396CB2?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/documentation/mapkit/)
 [![Docs](https://img.shields.io/badge/Docs-DocC%20→%20Pages-blue?style=flat-square&logo=readthedocs)](https://everybodydaniel.github.io/Toernberechnung-iOS/documentation/toernberechnung/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
@@ -53,7 +53,7 @@ TideNode ist eine moderne, native iOS-App für die **Planung von Segeltörns und
 
 Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit vier harmonisch integrierten Kernbereichen:
 
-- **🗺️ Karte** – MapLibre-basierte nautische Seekarte mit interaktiver Mehrstrecken-Routenplanung, Wegpunkten, Schutzzonenmarkierungen, Tiefenprofil und Go / Warning / No-Go Statusanzeige
+- **🗺️ Karte** – MapKit-basierte nautische Seekarte mit interaktiver Mehrstrecken-Routenplanung, Wegpunkten, Schutzzonenmarkierungen, Tiefenprofil und Go / Warning / No-Go Statusanzeige
 - **🌤️ Wetter & Gezeiten** – Apple-WeatherKit-Prognosen mit 48-Stunden-Wind- und Böendiagrammen in Knoten kombiniert mit offiziellen BSH-Gezeitendaten, astronomischen Hoch-/Niedrigwasserzeiten und Wasserstandsvorhersagekurven
 - **👥 Crewspace** – Lokale Crewverwaltung mit Rollen (Skipper, Co-Skipper, Navigation, Deck), Notfallkontakten, Telefonnummern, Bordstatus ("An Bord") sowie integrierter Monats-Terminplanung
 - **📒 Logbuch** – Digitales Schiffstagebuch mit vollständiger Törnhistorie, automatischer Übernahme berechneter Fahrten und PDF-Export via SwiftData
@@ -85,7 +85,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit vier harmon
 
 | | Feature | Beschreibung |
 |---|---|---|
-| 🗺️ | **Nautische Seekarte** | MapLibre-basierte Kartenansicht mit Kartendarstellung, Routenvektoren, Wegpunkten, Schutzzonen (Nordseebefundverordnung) und Vollbildmodus |
+| 🗺️ | **Nautische Seekarte** | MapKit-basierte Kartenansicht mit Kartendarstellung, Routenvektoren, Wegpunkten, Schutzzonen (Nordseebefundverordnung) und Vollbildmodus |
 | 🧮 | **Gezeitenbasierte Berechnung** | Automatische Berechnung von Fallhöhe (FmW), Wassertiefe (WT) und Wassersäule über Kiel (WuK) nach der Zwölftelregel unter Berücksichtigung von Tiefgang und Sicherheitsmarge |
 | 🔍 | **Passagefenster-Solver** | Automatische Suche nach dem optimalen und sicheren Abfahrtsfenster basierend auf Gezeiten und Wasserstandsvorhersage |
 | 🌊 | **BSH-Gezeitendaten** | Direkter Abruf astronomischer Hoch-/Niedrigwasservorhersagen für alle Inselpegel (Borkum, Juist, Norderney, Baltrum, Langeoog, Spiekeroog, Wangerooge, Emden) |
@@ -190,7 +190,7 @@ graph TD
 - **Persistenz:** SwiftData (Logbuch, Crew-Roster, Termine, AuditLog)
 
 ### Kartendarstellung
-- **Rendering:** MapLibre GL Native 6.28+
+- **Rendering:** MapKit mit OpenStreetMap- und OpenSeaMap-Kacheln
 - **Kartentyp:** Nautische Seekarte mit benutzerdefinierten Vektor- und Rasterkacheln
 - **Schutzzonen:** Nordseebefundverordnung (GeoJSON-Layer mit Zonen I und II)
 
@@ -230,7 +230,7 @@ Toernberechnung-iOS/
 │   │   ├── CrewPlanningView.swift           # Monatskalender & Terminübersicht
 │   │   ├── NautiChatView.swift              # KI-Chatoberfläche mit Sprachausgabe
 │   │   ├── NautiPremiumChatView.swift       # Vollbild-Chat mit Kontextaktionen
-│   │   ├── MapView.swift                    # MapLibre-Kartenintegration
+│   │   ├── MapView.swift                    # MapKit-Kartenintegration
 │   │   ├── LiquidGlassStyle.swift           # Glasmorphismus-Designsystem
 │   │   └── WeatherDetailViews.swift         # Detailkarten für Wind, Böen und Luftdruck
 │   ├── Engine/
@@ -308,7 +308,7 @@ Das vorkonfigurierte Projekt `Toernberechnung.xcodeproj` ist direkt im Repositor
 open Toernberechnung.xcodeproj
 ```
 
-Alle externen Abhängigkeiten (wie MapLibre GL Native) werden beim ersten Öffnen automatisch über den **Swift Package Manager** bezogen.
+Die Karte nutzt MapKit sowie OpenStreetMap- und OpenSeaMap-Kacheln. Die benötigten Quelldateien sind im Xcode-Projekt eingebunden.
 
 *(Optional)* Falls Änderungen an `project.yml` vorgenommen wurden, kann das Projekt mit XcodeGen neu generiert werden:
 

@@ -399,6 +399,8 @@ struct SettingsSheet: View {
             sourceRow(name: "WSV / ELWIS", detail: "Bekanntmachungen für Seefahrer", icon: "antenna.radiowaves.left.and.right")
             sourceRow(name: "BrightSky / DWD", detail: "Offene Wetter- und Winddaten des Deutschen Wetterdienstes für die Routenberechnung", icon: "wind")
             sourceRow(name: "Apple Weather", detail: "WeatherKit-Prognosen, Wind und Böen", icon: "cloud.sun.rain.fill")
+            sourceRow(name: "OpenStreetMap / OpenSeaMap", detail: "Kartendaten und Seezeichen; Lizenzhinweise direkt auf der Karte", icon: "map")
+            sourceRow(name: "Wattsegler", detail: "Veröffentlichte Lotungswerte mit Quellen- und Datumsangabe", icon: "ruler")
         }
     }
 
@@ -437,7 +439,7 @@ struct SettingsSheet: View {
     private var privacySection: some View {
         settingsSection(title: "Datenschutz & Privatsphäre", icon: "hand.raised.fill") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("100% lokal: Deine Törns, Notizen, Crew-Daten und GPS-Aufzeichnungen verbleiben ausschließlich auf deinem Gerät.")
+                Text("Törns, Notizen, Crew-Daten und GPS-Aufzeichnungen werden lokal gespeichert. Wetter- und Kartenabfragen benötigen Internetverbindungen.")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.secondary)
 
@@ -463,7 +465,7 @@ struct SettingsSheet: View {
     private var legalSection: some View {
         settingsGlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("© 2026 TideNode")
+                Text("© 2026 Daniel Horst")
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(Color.appPrimary)
                 Text("TideNode ersetzt keine Seeordnung, amtlichen Bekanntmachungen, Revierinformationen oder die nautische Verantwortung der Schiffsführung.")
@@ -729,16 +731,16 @@ struct PrivacyPolicySheet: View {
 
                     privacyCard(
                         icon: "internaldrive",
-                        title: "100% Lokale Datenspeicherung",
+                        title: "Lokale Speicherung deiner Inhalte",
                         detail: "Alle Törnplanungen, Routen, Logbücher, Crewdaten und Kalendertermine werden ausschließlich lokal auf deinem Gerät gespeichert."
                     )
 
                     privacyCard(
                         icon: "location.fill",
                         title: "Standortdaten & Hintergrund-GPS",
-                        detail: "Standortdaten werden nur auf dem Gerät verarbeitet, um deine Position auf der Seekarte "
-                            + "anzuzeigen und während eines aktiven Törns die GPS-Spur im Logbuch aufzuzeichnen. "
-                            + "Es findet keine Übertragung an externe Server statt."
+                        detail: "Deine GPS-Spur wird während eines aktiven Törns lokal im Logbuch gespeichert. "
+                            + "Für ortsbezogene Wetterabfragen und Kartenkacheln können Koordinaten oder "
+                            + "Informationen zum betrachteten Kartenausschnitt an externe Anbieter gelangen."
                     )
 
                     privacyCard(
@@ -747,8 +749,13 @@ struct PrivacyPolicySheet: View {
                         detail: "Gezeiten- und Wasserstandsvorhersagen stammen aus den amtlichen Schnittstellen des BSH "
                             + "(Bundesamt für Seeschifffahrt und Hydrographie). Wetter- und Winddaten werden über die "
                             + "BrightSky-Schnittstelle (DWD – Deutscher Wetterdienst) sowie Apple WeatherKit bezogen. "
-                            + "Dabei werden keinerlei personenbezogene Daten übertragen."
+                            + "Dabei können Ortskoordinaten und technisch notwendige Verbindungsdaten übertragen werden."
                     )
+
+                    Link(destination: URL(string: "https://everybodydaniel.github.io/Toernberechnung-iOS/datenschutz.html")!) {
+                        Label("Vollständige Datenschutzerklärung online", systemImage: "arrow.up.right.square")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
                 }
                 .padding(20)
             }
@@ -786,4 +793,3 @@ struct PrivacyPolicySheet: View {
         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
-
