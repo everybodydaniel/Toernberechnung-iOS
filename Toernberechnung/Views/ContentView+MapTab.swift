@@ -5,14 +5,14 @@ import SwiftUI
 
 enum DashboardDetent: CaseIterable {
     case nautiOnly  // Compact assistant launcher (~58pt)
-    case summary    // Status + Nauti + passage window + metrics (~440pt)
-    case full       // Everything including voyage actions (~540pt)
+    case summary    // Status + Nauti + passage window + metrics
+    case full       // Everything including voyage actions
 
     var height: CGFloat {
         switch self {
         case .nautiOnly: return 58
-        case .summary: return 440
-        case .full: return 485
+        case .summary: return 485
+        case .full: return 530
         }
     }
 
@@ -552,7 +552,8 @@ extension ContentView {
                             mapDashboardMetric("Ankunft", value: viewModel.arrivalTimeText, icon: "flag.checkered")
                             mapDashboardMetric("Distanz", value: viewModel.totalDistanceText, icon: "ruler")
                             mapDashboardMetric("WuK", value: viewModel.worstWuKText, icon: "water.waves")
-                            mapDashboardMetric("Diesel", value: String(format: "%.1f l", dieselLiters), icon: "fuelpump.fill")
+                            mapDashboardWindMetric
+                            mapDashboardMetric("Speed", value: String(format: "%.1f kn", viewModel.speedKnots), icon: "speedometer")
                         }
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
@@ -960,11 +961,6 @@ extension ContentView {
                     .frame(maxWidth: 160)
                     .accessibilityLabel("Wetterprüfung")
                     .accessibilityValue("\(weatherProgress.completed) von \(weatherProgress.total) Seegebieten")
-                } else if case .unavailable(let message) = viewModel.routeWeatherValidationState {
-                    Text(message)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(mapGlassSecondary)
-                        .lineLimit(2)
                 }
             }
 
@@ -981,7 +977,7 @@ extension ContentView {
                 .appGlassIconBackground()
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sicheres Abfahrtsfenster")
+                Text("Abfahrtsfenster")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(mapGlassSecondary)
                 if let window = viewModel.passageWindow {
@@ -990,6 +986,9 @@ extension ContentView {
                         .foregroundStyle(window.contains(viewModel.departure) ? mapGlassPrimary : Color.orange)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
+                    Text("Empfohlene Abfahrt: \(AppDateFormatters.hourMinute.string(from: window.recommendedDeparture)) Uhr")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(mapGlassSecondary)
                 } else {
                     Text(viewModel.isSearchingWindow ? "Wird berechnet…" : (viewModel.passageWindowMessage ?? "Noch nicht berechnet"))
                         .font(.system(size: 14, weight: .heavy))
@@ -1000,18 +999,6 @@ extension ContentView {
             }
 
             Spacer()
-
-            Button {
-                viewModel.refreshPassageWindow()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.appPrimary)
-                    .frame(width: 34, height: 34)
-                    .appGlassIconBackground()
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Passagefenster aktualisieren")
         }
         .padding(10)
         .appMapDashboardInset(cornerRadius: 20)
@@ -1033,6 +1020,26 @@ extension ContentView {
                 .foregroundStyle(mapGlassPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .appMapDashboardInset(cornerRadius: 20)
+    }
+
+    private var mapDashboardWindMetric: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: "wind")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.appPrimary)
+                .frame(width: 25, height: 25)
+                .appGlassIconBackground()
+            Text("WIND")
+                .font(.system(size: 8, weight: .heavy))
+                .foregroundStyle(mapGlassSecondary)
+            Text(viewModel.routeWindSummaryText ?? (viewModel.weatherStatus == .incomplete ? "Wird geladen…" : "–"))
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(mapGlassPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(10)
         .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
@@ -1154,6 +1161,7 @@ extension ContentView {
                     intermediateStopsSection
                     routePickerPill(title: "Ziel", icon: "flag.checkered", selection: $viewModel.destinationHarbourID)
                     routeDatePicker
+                    routeSpeedControl
                 }
             }
         }
@@ -1165,7 +1173,7 @@ extension ContentView {
                 VStack(alignment: .leading, spacing: 16) {
                     routeControlPanel
                     planningPassageWindowCard
-                    planningWaterLevelSourcesCard
+                    mapWaypointDepthsCard
                 }
                 .padding(16)
                 .padding(.bottom, 28)
@@ -1232,104 +1240,13 @@ extension ContentView {
         }
     }
 
-    private var routeStationsNeedingComparison: [BSHTideStation] {
-        let identifiers = viewModel.routePlan?.waypoints.map(\.tidalReferenceStationID) ?? []
-        return Array(Set(identifiers))
-            .compactMap(BSHTideStationCatalog.station(id:))
-            .filter { !$0.hasLocalWaterLevelForecast }
-            .sorted { $0.name < $1.name }
-    }
 
-    @ViewBuilder
-    private var planningWaterLevelSourcesCard: some View {
-        if !routeStationsNeedingComparison.isEmpty {
-            card {
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Wasserstandsquelle", systemImage: "checkmark.shield")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(Color.appPrimary)
-
-                    Text(
-                        "Für diese lokalen Gezeitenpegel veröffentlicht das BSH keine eigene Modellprognose. " +
-                        "Astronomische Zeiten bleiben lokal; ein Vergleichspegel überträgt ausschließlich " +
-                        "den meteorologischen Restwasserstand."
-                    )
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    ForEach(routeStationsNeedingComparison) { station in
-                        VStack(alignment: .leading, spacing: 9) {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(station.name)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.appPrimary)
-                                    Text("BSH \(station.id) · keine lokale Modellprognose")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(Color.secondary)
-                                }
-                                Spacer()
-                                if viewModel.confirmedComparisonGaugeIDs[station.id] != nil {
-                                    Button {
-                                        viewModel.clearComparisonGauge(localStationID: station.id)
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 20, weight: .semibold))
-                                            .foregroundStyle(Color.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Vergleichspegel entfernen")
-                                }
-                            }
-
-                            if let comparisonID = viewModel.confirmedComparisonGaugeIDs[station.id],
-                               let comparison = BSHTideStationCatalog.station(id: comparisonID) {
-                                Label(
-                                    "Bestätigt: \(comparison.name) · \(String(format: "%.1f", station.distanceKilometers(to: comparison))) km",
-                                    systemImage: "exclamationmark.shield.fill"
-                                )
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color(hex: 0xD97706))
-                            } else {
-                                Menu {
-                                    ForEach(BSHTideStationCatalog.comparisonCandidates(for: station.id)) { candidate in
-                                        Button {
-                                            viewModel.confirmComparisonGauge(
-                                                localStationID: station.id,
-                                                comparisonStationID: candidate.id
-                                            )
-                                        } label: {
-                                            Text("\(candidate.name) · \(String(format: "%.1f", station.distanceKilometers(to: candidate))) km")
-                                        }
-                                    }
-                                } label: {
-                                    Label("Vergleichspegel ausdrücklich bestätigen", systemImage: "checkmark.circle")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(Color(hex: 0xD97706))
-                            }
-                        }
-                        .padding(12)
-                        .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
-
-                    Text("Mit Vergleichspegel kann ein rechnerisch sicheres Ergebnis höchstens gelb sein. No-Go bleibt No-Go.")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-                }
-            }
-        }
-    }
 
     private var planningPassageWindowCard: some View {
         card {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("Sicheres Abfahrtsfenster", systemImage: "clock.badge.checkmark")
+                    Label("Abfahrtsfenster", systemImage: "clock.badge.checkmark")
                         .font(.system(size: 15, weight: .heavy))
                         .foregroundStyle(Color.appPrimary)
                     Spacer()
@@ -1343,24 +1260,104 @@ extension ContentView {
                     .accessibilityLabel("Passagefenster aktualisieren")
                 }
 
-                if let window = viewModel.passageWindow {
-                    Text(window.displayString)
-                        .font(.system(size: 24, weight: .heavy))
-                        .foregroundStyle(Color.appPrimary)
-                    Text(window.contains(viewModel.departure)
-                         ? "Die gewählte Abfahrt liegt innerhalb des sicheren Fensters."
-                         : "Die gewählte Abfahrt liegt außerhalb des sicheren Fensters.")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(window.contains(viewModel.departure) ? Color.secondary : Color(hex: 0xD97706))
-                    if window.waterLevelQuality != .localOfficial {
-                        Label(
-                            window.waterLevelDetail ?? "Das Passagefenster basiert nicht auf einer aktuellen lokalen BSH-Prognose.",
-                            systemImage: "exclamationmark.triangle.fill"
-                        )
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0xD97706))
-                        .fixedSize(horizontal: false, vertical: true)
+                if let window = viewModel.passageWindow ?? viewModel.passageWindows.first {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("MÖGLICHE ABFAHRT")
+                                    .font(.system(size: 10, weight: .heavy))
+                                    .foregroundStyle(.secondary)
+                                Text(window.displayString)
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(Color.primary)
+                            }
+                            Spacer()
+                            if let hw = window.anchoredHighWater {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("HW-REFERENZ")
+                                        .font(.system(size: 8, weight: .heavy))
+                                        .foregroundStyle(.secondary)
+                                    Text("\(AppDateFormatters.hourMinute.string(from: hw)) Uhr")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.appPrimary)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.appPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            Image(systemName: "sailboat.fill")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.appPrimary)
+                            Text("Empfohlene Abfahrt:")
+                                .font(.subheadline.weight(.medium))
+                            Text("\(AppDateFormatters.hourMinute.string(from: window.recommendedDeparture)) Uhr")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Color.appPrimary)
+                        }
+
+                        Divider()
+
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("GERINGSTER WUK")
+                                    .font(.system(size: 9, weight: .heavy))
+                                    .foregroundStyle(.secondary)
+                                Text(String(format: "%.2f m", window.recommendedClearanceMeters))
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(
+                                        window.recommendedClearanceMeters >= viewModel.boatSettings.safetyMarginMeters
+                                            ? Color(hex: 0x16A34A) : Color.orange
+                                    )
+                            }
+                            if let name = window.bottleneckName {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("ENGSTELLE")
+                                        .font(.system(size: 9, weight: .heavy))
+                                        .foregroundStyle(.secondary)
+                                    Text(
+                                        window.bottleneckArrival.map {
+                                            "\(SurveyedDepthCatalog.displayName(for: name)) · \(AppDateFormatters.hourMinute.string(from: $0)) Uhr"
+                                        } ?? SurveyedDepthCatalog.displayName(for: name)
+                                    )
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.primary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        if let depthDetail = window.bottleneckDepthDetail {
+                            Label(depthDetail, systemImage: "ruler")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
+                    .padding(14)
+                    .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.appPrimary.opacity(0.35), lineWidth: 1.5)
+                    )
+
+                    if viewModel.passageWindows.count > 1 {
+                        ForEach(Array(viewModel.passageWindows.enumerated()), id: \.offset) { _, alternative in
+                            Button {
+                                viewModel.selectDepartureWindow(alternative)
+                            } label: {
+                                HStack {
+                                    Text(alternative.displayString)
+                                    Spacer()
+                                    if alternative == viewModel.passageWindow {
+                                        Image(systemName: "checkmark.circle.fill")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                 } else if viewModel.isSearchingWindow {
                     HStack(spacing: 8) {
                         ProgressView()
@@ -1372,6 +1369,79 @@ extension ContentView {
                     Text(viewModel.passageWindowMessage ?? "Für diese Route liegt noch kein Passagefenster vor.")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mapWaypointDepthsCard: some View {
+        if let result = viewModel.calculationResult, !result.waypointResults.isEmpty {
+            let selectedWaypointIDs = Set(viewModel.userWaypointIDs)
+            let harbourResults = result.waypointResults.filter { selectedWaypointIDs.contains($0.waypoint.id) }
+            card {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("Engstellen (WuK)", systemImage: "water.waves")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Color.appPrimary)
+                        Spacer()
+                    }
+
+                    if harbourResults.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                            Text("Für die gewählten Häfen liegen noch keine Tiefenwerte vor.")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(harbourResults) { wpResult in
+                                HStack(alignment: .center, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(wpResult.waypoint.name)
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(Color.primary)
+                                            .lineLimit(1)
+                                        HStack(spacing: 5) {
+                                            Text("ETA: \(AppDateFormatters.hourMinute.string(from: wpResult.arrivalTime)) Uhr")
+                                            if let depth = wpResult.availableWaterDepthWTMeters {
+                                                Text("· Tiefe: \(String(format: "%.2f", depth)) m")
+                                            }
+                                        }
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    if let wuk = wpResult.clearanceUnderKeelWuKMeters {
+                                        Text(String(format: "%+.2f m WuK", wuk))
+                                            .font(.system(size: 12, weight: .heavy))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(
+                                                wuk >= viewModel.boatSettings.safetyMarginMeters
+                                                    ? Color.green.opacity(0.18)
+                                                    : (wuk >= 0 ? Color.orange.opacity(0.18) : Color.red.opacity(0.18)),
+                                                in: Capsule()
+                                            )
+                                            .foregroundStyle(
+                                                wuk >= viewModel.boatSettings.safetyMarginMeters
+                                                    ? Color.green
+                                                    : (wuk >= 0 ? Color.orange : Color.red)
+                                            )
+                                    }
+                                }
+                                if wpResult.id != harbourResults.last?.id {
+                                    Divider()
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1445,7 +1515,7 @@ extension ContentView {
                 .frame(width: 34, height: 34)
                 .background(Color(hex: 0x14B8A6), in: Circle())
 
-            Text("Abfahrt")
+            Text("Abfahrtstag")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color.primary)
                 .lineLimit(1)
@@ -1453,12 +1523,68 @@ extension ContentView {
 
             Spacer(minLength: 6)
 
-            CustomCompactDatePicker(selection: $viewModel.departure, backgroundColor: .clear)
+            CustomCompactDatePicker(selection: $viewModel.planningDay, components: [.date], backgroundColor: .clear)
                 .fixedSize()
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
         .padding(.vertical, 8)
+        .background(Color.fieldBackground, in: Capsule(style: .continuous))
+    }
+
+    private var routeSpeedControl: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "speedometer")
+                .font(.system(size: 14, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(Color(hex: 0x0284C7), in: Circle())
+
+            Text("Reisegeschwindigkeit")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.primary)
+                .lineLimit(1)
+                .fixedSize()
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 4) {
+                Button {
+                    let next = max(1.0, ((viewModel.speedKnots - 0.5) * 10).rounded() / 10)
+                    viewModel.speedKnots = next
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(Color.appPrimary)
+                        .frame(width: 30, height: 30)
+                        .background(Color.cardBackground, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Geschwindigkeit verringern")
+
+                Text(String(format: "%.1f kn", viewModel.speedKnots))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.primary)
+                    .frame(minWidth: 52)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    let next = min(30.0, ((viewModel.speedKnots + 0.5) * 10).rounded() / 10)
+                    viewModel.speedKnots = next
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(Color.appPrimary)
+                        .frame(width: 30, height: 30)
+                        .background(Color.cardBackground, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Geschwindigkeit erhöhen")
+            }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 8)
+        .padding(.vertical, 6)
         .background(Color.fieldBackground, in: Capsule(style: .continuous))
     }
 

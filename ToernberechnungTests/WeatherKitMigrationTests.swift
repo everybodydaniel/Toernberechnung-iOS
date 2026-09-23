@@ -137,6 +137,34 @@ final class WeatherKitMigrationTests: XCTestCase {
         XCTAssertEqual(callCount, 1)
     }
 
+    func testRouteWeatherRequestsFortyEightHoursStartingOneWeekAhead() async throws {
+        let setup = makeService()
+        let calendar = AppDateFormatters.berlinCalendar
+        let departure = try XCTUnwrap(calendar.date(byAdding: .day, value: 7, to: referenceDate))
+        let expectedStart = try XCTUnwrap(calendar.dateInterval(of: .hour, for: departure)?.start)
+        let coordinate = CLLocationCoordinate2D(latitude: 53.67, longitude: 7.0)
+
+        let batch = try await setup.service.weatherForRoute(
+            waypoints: [coordinate],
+            departure: departure,
+            progress: { _ in }
+        )
+
+        let requestedInterval = await setup.client.lastHourlyInterval
+        let requestedKinds = await setup.client.lastRequestedKinds
+        let snapshot = try XCTUnwrap(batch.snapshotsByArea.values.first)
+        XCTAssertEqual(batch.departure, departure)
+        XCTAssertEqual(requestedInterval?.start, expectedStart)
+        XCTAssertGreaterThanOrEqual(
+            requestedInterval?.end ?? .distantPast,
+            expectedStart.addingTimeInterval(48 * 3_600)
+        )
+        XCTAssertEqual(requestedKinds, [.hourly])
+        XCTAssertEqual(snapshot.hourly.count, 48)
+        XCTAssertEqual(snapshot.hourly.first?.date, expectedStart)
+        XCTAssertEqual(snapshot.hourly.last?.date, expectedStart.addingTimeInterval(47 * 3_600))
+    }
+
     func testMixedProductTTLOnlyReloadsExpiredCurrentWeather() async throws {
         let clock = TestWeatherClock(referenceDate)
         let configuration = WeatherCacheConfiguration(
@@ -339,9 +367,19 @@ final class WeatherKitMigrationTests: XCTestCase {
         XCTAssertEqual(callCount, 1)
     }
 
-    func testIncompleteWeatherCannotProduceCombinedGoStatus() {
-        XCTAssertEqual(CombinedRouteStatus.combine(tidal: .go, weather: .incomplete), .incomplete)
-        XCTAssertEqual(CombinedRouteStatus.combine(tidal: .warning, weather: .incomplete), .incomplete)
+    func testIncompleteWeatherIsAdvisoryWhenCoreTidalResultExists() {
+        XCTAssertEqual(CombinedRouteStatus.combine(tidal: .go, weather: .incomplete), .go)
+        XCTAssertEqual(CombinedRouteStatus.combine(tidal: .warning, weather: .incomplete), .warning)
+        XCTAssertEqual(CombinedRouteStatus.combine(tidal: .incomplete, weather: .go), .incomplete)
+        XCTAssertEqual(CombinedRouteStatus.combine(tidal: .go, weather: .noGo), .noGo)
+    }
+
+    func testMissingWeatherDoesNotMaskKnownWeatherHazards() {
+        let safe = WeatherSamples.assessment(wind: 12, gust: 18)
+        let storm = WeatherSamples.assessment(wind: 30, gust: 38)
+
+        XCTAssertEqual(RoutePlannerViewModel.assessRouteWeather([safe, nil]), .incomplete)
+        XCTAssertEqual(RoutePlannerViewModel.assessRouteWeather([safe, nil, storm]), .noGo)
     }
 
     func testExistingWeatherSafetyThresholdsRemainStable() {
@@ -442,6 +480,7 @@ private extension NetworkPathSnapshot {
 private actor FakeMarineWeatherClient: MarineWeatherClient {
     private(set) var callCount = 0
     private(set) var lastRequestedKinds: Set<MarineWeatherProductKind> = []
+    private(set) var lastHourlyInterval: DateInterval?
     private var failure: MarineWeatherError?
     private let delayNanoseconds: UInt64
 
@@ -460,6 +499,10 @@ private actor FakeMarineWeatherClient: MarineWeatherClient {
     ) async throws -> WeatherFetchPayload {
         callCount += 1
         lastRequestedKinds = Set(datasets.map(\.kind))
+        lastHourlyInterval = datasets.compactMap { dataset -> DateInterval? in
+            guard case .hourly(let interval) = dataset else { return nil }
+            return interval
+        }.first
         if delayNanoseconds > 0 {
             try await Task.sleep(nanoseconds: delayNanoseconds)
         }

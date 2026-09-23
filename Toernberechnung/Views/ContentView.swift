@@ -151,9 +151,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.24), value: selectedWeatherDay != nil)
         .sheet(isPresented: $settingsShown) {
             SettingsSheet {
-                if let plan = viewModel.routePlan {
-                    viewModel.runCalculation(plan: plan)
-                }
+                viewModel.reloadBoatSettings()
             }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)

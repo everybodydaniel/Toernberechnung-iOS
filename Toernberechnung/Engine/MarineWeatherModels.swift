@@ -359,6 +359,21 @@ struct RouteWeatherBatch: Equatable, Sendable {
     let departure: Date
     let snapshotsByArea: [WeatherAreaKey: MaritimeWeatherSnapshot]
     let areaKeysByWaypoint: [WeatherAreaKey]
+
+    var hasCompleteCoverage: Bool {
+        Set(areaKeysByWaypoint).isSubset(of: Set(snapshotsByArea.keys))
+    }
+
+    var primaryWind: MarineWind? {
+        let winds: [MarineWind] = snapshotsByArea.values.compactMap { snapshot in
+            if let closestHour = snapshot.hourly.min(by: { abs($0.date.timeIntervalSince(departure)) < abs($1.date.timeIntervalSince(departure)) }) {
+                return closestHour.wind
+            }
+            return snapshot.current?.wind
+        }
+        guard !winds.isEmpty else { return nil }
+        return winds.max(by: { $0.speedKnots < $1.speedKnots })
+    }
 }
 
 enum RouteWeatherValidationState: Equatable, Sendable {

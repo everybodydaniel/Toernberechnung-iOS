@@ -62,10 +62,21 @@ final class RoutePlannerViewModel {
         }
     }
     var departure: Date = Date() {
-        didSet { scheduleRecalculation() }
+        didSet { if !isApplyingDeparture { scheduleRecalculation() } }
     }
-    var speedKnots: Double = 6.0 {
-        didSet { scheduleRecalculation() }
+    private var isApplyingDeparture = false
+    var planningDay: Date {
+        get { AppDateFormatters.berlinCalendar.startOfDay(for: departure) }
+        set { departure = AppDateFormatters.berlinCalendar.startOfDay(for: newValue) }
+    }
+    var speedKnots: Double = RoutePlannerViewModel.loadSpeedFromSettings() {
+        didSet {
+            let formatted = String(format: "%.1f", speedKnots)
+            if UserDefaults.standard.string(forKey: "boatSpeed") != formatted {
+                UserDefaults.standard.set(formatted, forKey: "boatSpeed")
+            }
+            scheduleRecalculation()
+        }
     }
     /// Excel `$AD$13`. `nil` (the default) means the BSH forecast is used;
     /// setting a value — including `0` — overrides it for the whole trip.
@@ -89,6 +100,7 @@ final class RoutePlannerViewModel {
     // MARK: - Passage Window
 
     var passageWindow: PassageWindowScanner.Window?
+    var passageWindows: [PassageWindowScanner.Window] = []
     var isSearchingWindow: Bool = false
     var passageWindowMessage: String?
 
@@ -126,13 +138,22 @@ final class RoutePlannerViewModel {
         return CombinedRouteStatus.combine(tidal: result.tidalStatus, weather: weatherStatus)
     }
 
+    var hasIncompleteWeatherCoverage: Bool {
+        switch routeWeatherValidationState {
+        case .ready(_, let batch):
+            return !batch.hasCompleteCoverage
+        case .unavailable:
+            return true
+        case .idle, .loading:
+            return weatherStatus == .incomplete
+        }
+    }
+
     var statusText: String {
         switch routeWeatherValidationState {
         case .loading(let completed, let total):
             return total > 0 ? "Wetterprüfung \(completed)/\(total)" : "Wetter wird geprüft…"
-        case .unavailable:
-            return "Wetterdaten unvollständig"
-        case .idle, .ready:
+        case .idle, .ready, .unavailable:
             break
         }
         guard let status = combinedStatus else { return "Berechnung läuft…" }
@@ -144,8 +165,71 @@ final class RoutePlannerViewModel {
         }
     }
 
+    var statusDetailText: String? {
+        guard let status = combinedStatus else { return nil }
+        switch status {
+        case .go:
+            if hasIncompleteWeatherCoverage {
+                return "Wassertiefe ausreichend; Wetterdaten fehlen – vor Abfahrt aktuell prüfen."
+            }
+            if calculationResult?.waypointResults.contains(where: {
+                $0.waterLevelCorrectionQuality != .localOfficial
+            }) == true {
+                return "Kernkriterien erfüllt; Hinweise zur Datenqualität vor Abfahrt prüfen."
+            }
+            return "Ausreichend Wassertiefe und sichere Wetterbedingungen."
+        case .warning:
+            if weatherStatus == .warning {
+                return hasIncompleteWeatherCoverage
+                    ? "Wetter erfordert Aufmerksamkeit; die Routenabdeckung ist teilweise unvollständig."
+                    : "Wetterbedingungen erfordern erhöhte Aufmerksamkeit (Wind/Böen)."
+            }
+            guard let result = calculationResult else { return nil }
+            if let worst = result.worstClearanceUnderKeel, worst < boatSettings.safetyMarginMeters {
+                let bn = result.waypointResults.min(by: { ($0.clearanceUnderKeelWuKMeters ?? .infinity) < ($1.clearanceUnderKeelWuKMeters ?? .infinity) })?.waypoint.name ?? "Engstelle"
+                return String(format: "Reserve unterschritten: %.2f m WuK an %@", worst, SurveyedDepthCatalog.displayName(for: bn))
+            }
+            if result.waypointResults.contains(where: { $0.waterLevelCorrectionQuality == .unverifiedDepth }) {
+                return "Vorläufig: Unbestätigte Katalogtiefen, aktuelle Lotungen prüfen."
+            }
+            return "Erhöhte navigatorische Aufmerksamkeit auf der Strecke empfohlen."
+        case .noGo:
+            if let result = calculationResult, let worst = result.worstClearanceUnderKeel, worst < 0 {
+                let bn = result.waypointResults.min(by: { ($0.clearanceUnderKeelWuKMeters ?? .infinity) < ($1.clearanceUnderKeelWuKMeters ?? .infinity) })?.waypoint.name ?? "Engstelle"
+                return String(format: "Untiefe: %.2f m WuK an %@", worst, SurveyedDepthCatalog.displayName(for: bn))
+            }
+            if weatherStatus == .noGo {
+                return "Starkwind oder Sturm auf der Route."
+            }
+            return "Unzureichende Wassertiefe oder unpassierbare Bedingungen."
+        case .incomplete:
+            return "Gezeiten-, Pegel- oder Wetterdaten noch nicht vollständig."
+        }
+    }
+
     var isPassable: Bool {
         combinedStatus == .go || combinedStatus == .warning
+    }
+
+    var routeWind: MarineWind? {
+        if case .ready(_, let batch) = routeWeatherValidationState {
+            return batch.primaryWind
+        }
+        return nil
+    }
+
+    var routeWindSummaryText: String? {
+        guard let wind = routeWind else { return nil }
+        if let gust = wind.gustKnots, gust > wind.speedKnots + 3 {
+            return String(format: "%@ %d° · %.0f kn (Böen %.0f kn)", wind.compassDirection, wind.directionDegrees, wind.speedKnots, gust)
+        } else {
+            return String(format: "%@ %d° · %.0f kn", wind.compassDirection, wind.directionDegrees, wind.speedKnots)
+        }
+    }
+
+    var routeWindDirectionBadge: String? {
+        guard let wind = routeWind else { return nil }
+        return String(format: "%@ %d°", wind.compassDirection, wind.directionDegrees)
     }
 
     var totalDistanceText: String {
@@ -190,10 +274,23 @@ final class RoutePlannerViewModel {
         self.catalog = catalog ?? WaddenSeaCatalog.loadBundled()
         self.calculationService = calculationService
         self.tideDataProvider = tideDataProvider
-        self.passageScanner = PassageWindowScanner()
+        var scanner = PassageWindowScanner()
+        scanner.scanSelectedDay = true
+        self.passageScanner = scanner
     }
 
     // MARK: - Route Resolution
+
+    /// Reloads boat settings (cruising speed, draft, margin) from UserDefaults
+    /// and triggers recalculation if a route plan exists.
+    func reloadBoatSettings() {
+        let loadedSpeed = Self.loadSpeedFromSettings()
+        if abs(speedKnots - loadedSpeed) > 0.05 {
+            speedKnots = loadedSpeed
+        } else if let plan = routePlan {
+            runCalculation(plan: plan)
+        }
+    }
 
     /// Called when start / destination / intermediate stops change.
     func onRouteChanged() {
@@ -344,6 +441,10 @@ final class RoutePlannerViewModel {
             }
         }
 
+        for index in userWPs.indices {
+            userWPs[index] = SurveyedDepthCatalog.applying(to: userWPs[index], harbourID: harbourIDs[index])
+        }
+
         // Build placeholder legs (distance 0) — RouteExpander will re-emit
         // the legs with real Haversine distances after inserting fairway WPs.
         let placeholderLegs: [RouteLeg] = zip(userWPs, userWPs.dropFirst()).map { from, to in
@@ -366,7 +467,7 @@ final class RoutePlannerViewModel {
             waypoints: userWPs,
             legs: placeholderLegs,
             bshWaterLevelCorrectionMeters: bshWaterLevelCorrection,
-            tidalStateLabel: "Mitteltide"
+            tidalStateLabel: "BSH-Gezeiten am Reisetag"
         )
 
         // Remember which IDs are user-selected for the RouteSummary builder.
@@ -376,6 +477,13 @@ final class RoutePlannerViewModel {
         // shallow Watt-segments (bottlenecks).
         let plan = RouteExpander.expandWithFairwayWaypoints(basePlan)
         routePlan = plan
+        for stationID in Set(plan.waypoints.map(\.tidalReferenceStationID)) {
+            if confirmedComparisonGaugeIDs[stationID] == nil,
+               let comparison = BSHTideStationCatalog.requiredComparisonStation(for: stationID)
+                ?? BSHTideStationCatalog.nearestComparisonStation(for: stationID) {
+                confirmedComparisonGaugeIDs[stationID] = comparison.id
+            }
+        }
         invalidateRouteWeatherValidation()
         runCalculation(plan: plan)
     }
@@ -392,6 +500,7 @@ final class RoutePlannerViewModel {
         isCalculating = false
         calculationError = nil
         passageWindow = nil
+        passageWindows = []
         passageWindowMessage = nil
         isSearchingWindow = false
         invalidateRouteWeatherValidation()
@@ -408,6 +517,7 @@ final class RoutePlannerViewModel {
         // Rebuild the plan with updated parameters.
         var updatedPlan = plan
         updatedPlan.plannedStartTime = departure
+        updatedPlan.date = planningDay
         updatedPlan.bshWaterLevelCorrectionMeters = bshWaterLevelCorrection
 
         // Update leg speeds.
@@ -424,53 +534,85 @@ final class RoutePlannerViewModel {
         calculationTask?.cancel()
         passageWindowTask?.cancel()
         isCalculating = true
+        calculationResult = nil
+        routeSummary = nil
         calculationError = nil
         passageWindow = nil
+        passageWindows = []
         passageWindowMessage = nil
         isSearchingWindow = true
-
+        invalidateRouteWeatherValidation()
         calculationTask = Task { @MainActor [weak self] in
             guard let self else { return }
-
-            let boatSettings = self.boatSettings
-
-            let result = await self.calculationService.calculate(
-                route: plan,
-                boatSettings: boatSettings,
-                tideDataProvider: self.tideDataProvider,
+            let solution = await self.passageScanner.solve(
+                route: plan, boatSettings: self.boatSettings, tideDataProvider: self.tideDataProvider,
                 confirmedComparisonGaugeIDs: self.confirmedComparisonGaugeIDs
             )
-
             guard !Task.isCancelled else { return }
-
-            self.calculationResult = result
-            self.routeSummary = RouteSummary.build(
-                from: result,
-                userWaypointIDs: self.userWaypointIDs
-            )
-            self.isCalculating = false
-
-            if !result.messages.isEmpty {
-                self.calculationError = result.messages.joined(separator: "\n")
+            self.passageWindows = solution.routeWindows.filter(\.hasUsableDuration)
+            self.passageWindow = self.passageWindows.first { $0.contains(plan.plannedStartTime) }
+                ?? self.passageWindows.first { $0.start > plan.plannedStartTime }
+                ?? self.passageWindows.last
+            if !solution.missingWaypointNames.isEmpty {
+                self.passageWindowMessage = "Daten fehlen: " + solution.missingWaypointNames
+                    .map(SurveyedDepthCatalog.displayName(for:)).joined(separator: ", ")
+            } else if solution.hasInvalidLeg {
+                self.passageWindowMessage = "Fahrtzeit nicht berechenbar: Geschwindigkeit, Strom oder Strecke prüfen."
+            } else if self.passageWindows.isEmpty && !solution.routeWindows.isEmpty {
+                self.passageWindowMessage = "Nur einzelne Prüfzeitpunkte erfüllen die Reserve; kein nutzbares Abfahrtsfenster."
+            } else if solution.routeWindows.isEmpty {
+                self.passageWindowMessage = solution.hasCoverageGaps
+                    ? "Gezeitendaten unvollständig. Kein Abfahrtsfenster ableitbar."
+                    : solution.bottlenecks.allSatisfy({ $0.departureWindow != nil })
+                        ? String(format: "Die Gezeitenfenster der Engstellen überschneiden sich bei %.1f kn nicht. Zwischenstopp oder andere Route prüfen.", self.speedKnots)
+                        : String(format: "Mindestens eine Engstelle ist an diesem Tag bei %.1f kn nicht sicher passierbar. Zwischenstopp oder andere Route prüfen.", self.speedKnots)
+            } else if solution.hasCoverageGaps {
+                self.passageWindowMessage = "Das Fenster gilt für den Abschnitt mit verfügbaren Gezeitendaten."
             }
-
-            // Even without a current local model forecast, astronomical HW/NW
-            // can still provide a provisional window. Its quality flag keeps
-            // the route status from becoming green.
-            self.startPassageWindowSearch(for: plan)
+            self.isSearchingWindow = false
+            var selectedPlan = plan
+            if let window = self.passageWindow {
+                selectedPlan.plannedStartTime = window.recommendedDeparture
+                self.isApplyingDeparture = true
+                self.departure = window.recommendedDeparture
+                self.isApplyingDeparture = false
+            }
+            self.routePlan = selectedPlan
+            await self.calculateSelectedDeparture(selectedPlan)
         }
     }
 
-    /// Refresh the safe passage window for the current route.
-    func refreshPassageWindow() {
-        guard let plan = routePlan else {
-            passageWindow = nil
-                passageWindowMessage = "Keine Route für die Fenstersuche verfügbar."
-            isSearchingWindow = false
-            return
-        }
+    @MainActor
+    private func calculateSelectedDeparture(_ plan: RoutePlan) async {
+        let result = await calculationService.calculate(
+            route: plan, boatSettings: boatSettings, tideDataProvider: tideDataProvider,
+            confirmedComparisonGaugeIDs: confirmedComparisonGaugeIDs
+        )
+        guard !Task.isCancelled else { return }
+        calculationResult = result
+        routeSummary = RouteSummary.build(from: result, userWaypointIDs: userWaypointIDs)
+        calculationError = result.messages.isEmpty ? nil : result.messages.joined(separator: "\n")
+        isCalculating = false
+    }
 
-        startPassageWindowSearch(for: plan)
+    func selectDepartureWindow(_ window: PassageWindowScanner.Window) {
+        guard passageWindows.contains(window), var plan = routePlan else { return }
+        calculationTask?.cancel()
+        isApplyingDeparture = true
+        departure = window.recommendedDeparture
+        isApplyingDeparture = false
+        passageWindow = window
+        plan.plannedStartTime = departure
+        routePlan = plan
+        isCalculating = true
+        calculationResult = nil
+        invalidateRouteWeatherValidation()
+        calculationTask = Task { @MainActor [weak self] in await self?.calculateSelectedDeparture(plan) }
+    }
+
+    func refreshPassageWindow() {
+        guard let plan = routePlan else { return }
+        runCalculation(plan: plan)
     }
 
     func confirmComparisonGauge(localStationID: String, comparisonStationID: String) {
@@ -489,38 +631,6 @@ final class RoutePlannerViewModel {
         confirmedComparisonGaugeIDs.removeValue(forKey: localStationID)
         if let routePlan {
             runCalculation(plan: routePlan)
-        }
-    }
-
-    private func startPassageWindowSearch(for plan: RoutePlan) {
-        passageWindowTask?.cancel()
-        isSearchingWindow = true
-        passageWindow = nil
-        passageWindowMessage = nil
-
-        passageWindowTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            // The solver resolves the tide data only once per waypoint and
-            // returns the route-wide departure window.
-            let solution = await self.passageScanner.solve(
-                route: plan,
-                boatSettings: self.boatSettings,
-                tideDataProvider: self.tideDataProvider,
-                confirmedComparisonGaugeIDs: self.confirmedComparisonGaugeIDs
-            )
-            let window = solution.routeWindow
-
-            guard !Task.isCancelled else { return }
-            self.passageWindow = window
-            if window == nil {
-                self.passageWindowMessage = self.calculationResult?.tidalStatus == .incomplete
-                    ? "Kein provisorisches Passagefenster aus den verfügbaren astronomischen Daten ableitbar."
-                    : "Kein sicheres Abfahrtsfenster im Suchbereich gefunden."
-            } else {
-                self.passageWindowMessage = nil
-            }
-            self.isSearchingWindow = false
         }
     }
 

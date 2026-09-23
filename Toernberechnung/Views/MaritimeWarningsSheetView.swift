@@ -2,6 +2,7 @@ import SwiftUI
 import CoreLocation
 import SafariServices
 
+@MainActor
 public struct MaritimeWarningsSheetView: View {
     var service: MaritimeWarningsService
     var onSelectCoordinate: ((CLLocationCoordinate2D) -> Void)?
@@ -13,19 +14,19 @@ public struct MaritimeWarningsSheetView: View {
     @State private var expandedWarningID: String?
 
     public init(
-        service: MaritimeWarningsService = .shared,
+        service: MaritimeWarningsService? = nil,
         onSelectCoordinate: ((CLLocationCoordinate2D) -> Void)? = nil,
         onSelectWarning: ((MaritimeWarning) -> Void)? = nil
     ) {
-        self.service = service
+        self.service = service ?? .shared
         self.onSelectCoordinate = onSelectCoordinate
         self.onSelectWarning = onSelectWarning
     }
 
     enum WarningFilter: String, CaseIterable, Identifiable {
-        case all = "Alle Nordsee"
-        case hazards = "Gefahr / Sperrung"
-        case warnings = "Warnung / Tonnen"
+        case all = "Alle"
+        case hazards = "Gefahr"
+        case warnings = "Warnung"
         case notices = "Hinweise"
 
         var id: Self { self }

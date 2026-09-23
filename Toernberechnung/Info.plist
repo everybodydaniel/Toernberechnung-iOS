@@ -28,6 +28,10 @@
 	<string>Die App benötigt Hintergrund-Ortung, um die GPS-Route eines aktiven Törns zuverlässig weiter aufzuzeichnen.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Die App zeichnet während eines aktiven Törns die GPS-Route und den Fortschritt für das Logbuch auf.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>TideNode speichert geplante Törn- und Crew-Termine auf deinen Wunsch im Kalender.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>TideNode speichert geplante Törn- und Crew-Termine auf deinen Wunsch im Kalender.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>TideNode benötigt Zugriff auf das Mikrofon für lokale Nauti-Diktate.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

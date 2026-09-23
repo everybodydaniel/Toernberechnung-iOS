@@ -47,6 +47,9 @@ struct SourcedValue<T: Codable>: Codable where T: Equatable {
     var value: T
     var source: ValueSource
     var sourceNotes: String?
+    /// Date of the sounding; absent legacy catalog values remain provisional.
+    var surveyedAt: Date? = nil
+    var sourceURL: String? = nil
 }
 
 extension SourcedValue: Equatable {}
@@ -237,7 +240,10 @@ enum WeatherStatus: String, Codable, Equatable {
 /// Final status = combine(tidalStatus, weatherStatus):
 /// - No-Go if either is No-Go
 /// - Warning if either is Warning and neither is No-Go
-/// - Incomplete while critical tide or weather data is still unavailable
+/// - Incomplete while a core route/tide/depth calculation is unavailable
+///
+/// Missing weather is retained as an advisory in `WeatherStatus`, but does not
+/// hide a valid tidal result. A known weather hazard still always wins.
 enum CombinedRouteStatus: String, Equatable {
     case go
     case warning
@@ -246,8 +252,8 @@ enum CombinedRouteStatus: String, Equatable {
 
     static func combine(tidal: RouteStatus, weather: WeatherStatus) -> CombinedRouteStatus {
         if tidal == .noGo || weather == .noGo { return .noGo }
-        if tidal == .incomplete || weather == .incomplete { return .incomplete }
         if tidal == .warning || weather == .warning { return .warning }
+        if tidal == .incomplete { return .incomplete }
         return .go
     }
 }

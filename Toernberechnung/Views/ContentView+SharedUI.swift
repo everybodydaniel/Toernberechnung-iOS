@@ -235,8 +235,10 @@ struct SettingsSheet: View {
     @AppStorage("boatDraft") private var boatDraft = "1.1"
     @AppStorage("safetyMargin") private var safetyMargin = "0.0"
     @AppStorage("boatLength") private var boatLength = "10.5"
+    @AppStorage("boatSpeed") private var boatSpeed = "6.0"
     @AppStorage("appearanceMode") private var appearanceMode = AppAppearanceMode.light.rawValue
     @State private var introductionShown = false
+    @State private var privacyPolicyShown = false
 
     var body: some View {
         NavigationStack {
@@ -247,6 +249,7 @@ struct SettingsSheet: View {
                     appearanceSection
                     onboardingSection
                     sourcesSection
+                    privacySection
                     legalSection
                 }
                 .padding(16)
@@ -286,8 +289,14 @@ struct SettingsSheet: View {
                     .accessibilityLabel("Einführung schließen")
                 }
         }
+        .sheet(isPresented: $privacyPolicyShown) {
+            PrivacyPolicySheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .onChange(of: boatDraft) { _, _ in onBoatSettingsChanged() }
         .onChange(of: safetyMargin) { _, _ in onBoatSettingsChanged() }
+        .onChange(of: boatSpeed) { _, _ in onBoatSettingsChanged() }
     }
 
     private var settingsHero: some View {
@@ -319,6 +328,7 @@ struct SettingsSheet: View {
             settingsTextField("Rufzeichen", text: $boatCallsign, icon: "antenna.radiowaves.left.and.right")
             settingsMeasurementMenu("Tiefgang", storage: $boatDraft, tenths: Array(stride(from: 2, through: 20, by: 2)), icon: "arrow.down.to.line", identifier: "BoatDraftMenu")
             settingsMeasurementField("Länge", storage: $boatLength, icon: "ruler", identifier: "BoatLengthField")
+            settingsMeasurementField("Reisegeschwindigkeit", storage: $boatSpeed, unit: "kn", icon: "speedometer", identifier: "BoatSpeedField")
             settingsMeasurementField("Sicherheitsmarge", storage: $safetyMargin, icon: "shield.checkered", identifier: "SafetyMarginField")
         }
     }
@@ -387,6 +397,7 @@ struct SettingsSheet: View {
         settingsSection(title: "Datenquellen", icon: "network") {
             sourceRow(name: "BSH", detail: "Gezeiten, Hoch- und Niedrigwasser sowie nautische Warnnachrichten", icon: "water.waves")
             sourceRow(name: "WSV / ELWIS", detail: "Bekanntmachungen für Seefahrer", icon: "antenna.radiowaves.left.and.right")
+            sourceRow(name: "BrightSky / DWD", detail: "Offene Wetter- und Winddaten des Deutschen Wetterdienstes für die Routenberechnung", icon: "wind")
             sourceRow(name: "Apple Weather", detail: "WeatherKit-Prognosen, Wind und Böen", icon: "cloud.sun.rain.fill")
         }
     }
@@ -420,6 +431,32 @@ struct SettingsSheet: View {
             .contentShape(Rectangle())
             .appFieldSurface(cornerRadius: 16)
             .accessibilityIdentifier("ReplayIntroductionButton")
+        }
+    }
+
+    private var privacySection: some View {
+        settingsSection(title: "Datenschutz & Privatsphäre", icon: "hand.raised.fill") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("100% lokal: Deine Törns, Notizen, Crew-Daten und GPS-Aufzeichnungen verbleiben ausschließlich auf deinem Gerät.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.secondary)
+
+                Button {
+                    privacyPolicyShown = true
+                } label: {
+                    HStack {
+                        Label("Datenschutzerklärung lesen", systemImage: "doc.text.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -516,12 +553,14 @@ struct SettingsSheet: View {
     private func settingsMeasurementField(
         _ title: String,
         storage: Binding<String>,
+        unit: String = "m",
         icon: String,
         identifier: String
     ) -> some View {
         MeasurementTextField(
             title: title,
             storage: storage,
+            unit: unit,
             icon: icon,
             identifier: identifier
         )
@@ -664,3 +703,87 @@ extension View {
         }
     }
 }
+
+struct PrivacyPolicySheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Datenschutz bei TideNode")
+                            .font(.system(size: 22, weight: .heavy))
+                            .foregroundStyle(Color.appPrimary)
+                        Text("Der Schutz deiner Daten hat bei TideNode oberste Priorität. Die App ist nach dem Grundsatz „Privacy by Design“ konzipiert.")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.secondary)
+                    }
+                    .padding(.bottom, 6)
+
+                    privacyCard(
+                        icon: "person.crop.circle.badge.xmark",
+                        title: "Keine Benutzerkonten & kein Tracking",
+                        detail: "TideNode erfordert keine Registrierung und kein Benutzerkonto. Es werden keinerlei Werbetracker, Analytics oder Drittanbieter-Tracking-SDKs eingesetzt."
+                    )
+
+                    privacyCard(
+                        icon: "internaldrive",
+                        title: "100% Lokale Datenspeicherung",
+                        detail: "Alle Törnplanungen, Routen, Logbücher, Crewdaten und Kalendertermine werden ausschließlich lokal auf deinem Gerät gespeichert."
+                    )
+
+                    privacyCard(
+                        icon: "location.fill",
+                        title: "Standortdaten & Hintergrund-GPS",
+                        detail: "Standortdaten werden nur auf dem Gerät verarbeitet, um deine Position auf der Seekarte "
+                            + "anzuzeigen und während eines aktiven Törns die GPS-Spur im Logbuch aufzuzeichnen. "
+                            + "Es findet keine Übertragung an externe Server statt."
+                    )
+
+                    privacyCard(
+                        icon: "water.waves",
+                        title: "Wetter- und Gezeitendaten",
+                        detail: "Gezeiten- und Wasserstandsvorhersagen stammen aus den amtlichen Schnittstellen des BSH "
+                            + "(Bundesamt für Seeschifffahrt und Hydrographie). Wetter- und Winddaten werden über die "
+                            + "BrightSky-Schnittstelle (DWD – Deutscher Wetterdienst) sowie Apple WeatherKit bezogen. "
+                            + "Dabei werden keinerlei personenbezogene Daten übertragen."
+                    )
+                }
+                .padding(20)
+            }
+            .navigationTitle("Datenschutz")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Schließen") { dismiss() }
+                        .fontWeight(.bold)
+                }
+            }
+        }
+    }
+
+    private func privacyCard(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Color.appPrimary)
+                .frame(width: 28)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.primary)
+                Text(detail)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.secondary)
+                    .lineSpacing(2)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+

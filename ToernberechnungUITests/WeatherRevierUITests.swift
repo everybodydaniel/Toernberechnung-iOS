@@ -318,7 +318,8 @@ final class WeatherRevierUITests: XCTestCase {
         app.launch()
 
         let fileManager = FileManager.default
-        let targetDir = "/tmp/tagnode_screenshots"
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let targetDir = isPad ? "/tmp/tagnode_screenshots_ipad" : "/tmp/tagnode_screenshots"
         try? fileManager.createDirectory(atPath: targetDir, withIntermediateDirectories: true)
 
         func saveScreenshot(name: String) {
@@ -331,6 +332,18 @@ final class WeatherRevierUITests: XCTestCase {
             let data = screenshot.pngRepresentation
             let path = "\(targetDir)/\(name).png"
             try? data.write(to: URL(fileURLWithPath: path))
+        }
+
+        func selectTab(_ name: String) {
+            let tbBtn = app.tabBars.buttons[name]
+            if tbBtn.waitForExistence(timeout: 2) && tbBtn.isHittable {
+                tbBtn.tap()
+            } else {
+                let btn = app.buttons[name]
+                if btn.waitForExistence(timeout: 3) {
+                    btn.tap()
+                }
+            }
         }
 
         // 1. Map Tab with calculated route
@@ -360,7 +373,7 @@ final class WeatherRevierUITests: XCTestCase {
             if calcBtn.waitForExistence(timeout: 3) && calcBtn.isEnabled {
                 calcBtn.tap()
             } else {
-                let closeBtn = app.buttons["Törnplanung schließen"]
+                let closeBtn = app.buttons["Planung schließen"]
                 if closeBtn.exists { closeBtn.tap() }
             }
         }
@@ -369,36 +382,103 @@ final class WeatherRevierUITests: XCTestCase {
         saveScreenshot(name: "01_map_tab")
 
         // 2. Weather Tab
-        let weatherTab = app.tabBars.buttons["Wetter"]
-        if weatherTab.waitForExistence(timeout: 5) {
-            weatherTab.tap()
-            Thread.sleep(forTimeInterval: 2.0)
-            saveScreenshot(name: "02_weather_tab")
+        selectTab("Wetter")
+        Thread.sleep(forTimeInterval: 2.0)
+        saveScreenshot(name: "02_weather_tab")
 
-            // 3. Tides Sub-section
-            let tidesButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Gezeiten")).firstMatch
-            if tidesButton.waitForExistence(timeout: 5) {
-                tidesButton.tap()
-                Thread.sleep(forTimeInterval: 2.0)
-                saveScreenshot(name: "03_tides_tab")
+        // 3. Tides Sub-section
+        let tidesButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Gezeiten")).firstMatch
+        if tidesButton.waitForExistence(timeout: 5) {
+            tidesButton.tap()
+            Thread.sleep(forTimeInterval: 2.0)
+            saveScreenshot(name: "03_tides_tab")
+        }
+
+        // 4. Crew Tab & Terminkalender
+        selectTab("Crewspace")
+        Thread.sleep(forTimeInterval: 1.5)
+
+        // Switch to Terminkalender (Planung)
+        let planungBtn = app.buttons["CrewspaceSectionPlanung"]
+        if planungBtn.waitForExistence(timeout: 3) {
+            planungBtn.tap()
+            Thread.sleep(forTimeInterval: 1.5)
+
+            let addEvent = app.buttons["Termin"]
+            if addEvent.waitForExistence(timeout: 3) && addEvent.isHittable {
+                addEvent.tap()
+                let titleField = app.textFields["z. B. Ablegen Norderney"]
+                if titleField.waitForExistence(timeout: 4) {
+                    let toernstartBtn = app.buttons["Törnstart"]
+                    if toernstartBtn.exists { toernstartBtn.tap() }
+                    titleField.tap()
+                    titleField.typeText(" Norderney")
+
+                    let editorScroll = app.scrollViews["CrewEventEditorScroll"]
+                    if editorScroll.exists {
+                        editorScroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+                            .press(forDuration: 0.1, thenDragTo: editorScroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)))
+                    }
+                    let saveEvent = app.buttons["Termin hinzufügen"]
+                    if saveEvent.waitForExistence(timeout: 3) {
+                        if !saveEvent.isHittable, let editorScroll = app.scrollViews["CrewEventEditorScroll"].firstMatch as XCUIElement? {
+                            editorScroll.swipeUp()
+                        }
+                        if saveEvent.isHittable {
+                            saveEvent.tap()
+                            Thread.sleep(forTimeInterval: 1.5)
+                        }
+                    }
+                }
+            }
+            Thread.sleep(forTimeInterval: 2.0)
+            saveScreenshot(name: "04_calendar_tab")
+        }
+
+        // Switch to Crew section
+        let crewSectionBtn = app.buttons["CrewspaceSectionCrew"]
+        if crewSectionBtn.waitForExistence(timeout: 3) {
+            crewSectionBtn.tap()
+            Thread.sleep(forTimeInterval: 1.5)
+            saveScreenshot(name: "05_crew_tab")
+        }
+
+        // 6. Map Tab for Nauti KI & Maritime Warnings
+        selectTab("Karte")
+        Thread.sleep(forTimeInterval: 1.5)
+
+        // Nauti KI Assistant
+        let nautiBtn = app.buttons["Nauti Chat öffnen"]
+        if nautiBtn.waitForExistence(timeout: 4) {
+            nautiBtn.tap()
+            Thread.sleep(forTimeInterval: 2.5)
+            saveScreenshot(name: "06_nauti_tab")
+
+            let closeNauti = app.buttons["Nauti Chat einklappen"]
+            if closeNauti.waitForExistence(timeout: 2) {
+                closeNauti.tap()
+                Thread.sleep(forTimeInterval: 1.0)
             }
         }
 
-        // 4. Crew Tab
-        let crewTab = app.tabBars.buttons["Crewspace"]
-        if crewTab.waitForExistence(timeout: 5) {
-            crewTab.tap()
+        // Maritime Warnings
+        let bell = app.buttons["AppHeaderWarningsButton"]
+        if bell.waitForExistence(timeout: 3) {
+            bell.tap()
             Thread.sleep(forTimeInterval: 2.0)
-            saveScreenshot(name: "04_crew_tab")
+            saveScreenshot(name: "07_warnings_tab")
+
+            let doneBtn = app.buttons["Fertig"]
+            if doneBtn.waitForExistence(timeout: 2) {
+                doneBtn.tap()
+                Thread.sleep(forTimeInterval: 1.0)
+            }
         }
 
-        // 5. Logbook Tab
-        let logbookTab = app.tabBars.buttons["Logbuch"]
-        if logbookTab.waitForExistence(timeout: 5) {
-            logbookTab.tap()
-            Thread.sleep(forTimeInterval: 2.0)
-            saveScreenshot(name: "05_logbook_tab")
-        }
+        // 7. Logbook Tab
+        selectTab("Logbuch")
+        Thread.sleep(forTimeInterval: 2.0)
+        saveScreenshot(name: "08_logbook_tab")
     }
 
     func testMaritimeWarningsFlow() {

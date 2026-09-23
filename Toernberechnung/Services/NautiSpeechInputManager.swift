@@ -204,6 +204,7 @@ protocol NautiSpeechBackend: AnyObject {
 
 @MainActor
 final class AppleNautiSpeechInputClient: NautiSpeechInputClient {
+    private let usesSystemBackend: Bool
     private var activeBackend: (any NautiSpeechBackend)?
     private var generation = 0
     private let makePrimary: @MainActor () -> any NautiSpeechBackend
@@ -214,6 +215,7 @@ final class AppleNautiSpeechInputClient: NautiSpeechInputClient {
         primary: (@MainActor () -> any NautiSpeechBackend)? = nil,
         fallback: (@MainActor () -> any NautiSpeechBackend)? = nil
     ) {
+        usesSystemBackend = primary == nil
         if let primary {
             makePrimary = primary
             makeFallback = fallback
@@ -248,6 +250,11 @@ final class AppleNautiSpeechInputClient: NautiSpeechInputClient {
     }
 
     func startTranscription() async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error> {
+        #if targetEnvironment(simulator)
+        // Local dictation assets/capture are not supported by this simulator
+        // path. Do not enter framework code that can abort rather than throw.
+        if usesSystemBackend { throw NautiSpeechInputError.assetsUnavailable }
+        #endif
         generation += 1
         let attempt = generation
         let previous = activeBackend
@@ -329,23 +336,26 @@ final class AppleNautiSpeechInputClient: NautiSpeechInputClient {
 @available(iOS 26.0, *)
 @MainActor
 private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
-    private let audioEngine = AVAudioEngine()
+    private let capture = NautiAudioCapture()
+    private var cancelled = false
     private var analyzer: SpeechAnalyzer?
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     private var outputContinuation: AsyncThrowingStream<NautiSpeechTranscript, Error>.Continuation?
     private var analysisTask: Task<Void, Never>?
     private var resultTask: Task<Void, Never>?
-    private var tapInstalled = false
 
     func start() async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error> {
         let transcriber = try await makeTranscriber()
+        try checkCaptureAttempt()
 
         let context = AnalysisContext()
         context.contextualStrings[.general] = SpeechAnalyzerNautiVocabulary.values
         let analyzer = SpeechAnalyzer(modules: [transcriber], options: nil)
         try await analyzer.setContext(context)
 
-        try activateAudioSession()
+        try checkCaptureAttempt()
+        let naturalFormat = try await capture.prepare()
+        try checkCaptureAttempt()
 
         let (inputStream, inputContinuation) = AsyncStream<AnalyzerInput>.makeStream()
         let (outputStream, outputContinuation) = AsyncThrowingStream<NautiSpeechTranscript, Error>.makeStream()
@@ -354,7 +364,7 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
         self.outputContinuation = outputContinuation
 
         do {
-            try await startCapture(for: transcriber, yielding: inputContinuation)
+            try await startCapture(for: transcriber, naturalFormat: naturalFormat, yielding: inputContinuation)
         } catch {
             await cancel()
             throw error
@@ -392,63 +402,28 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
         return transcriber
     }
 
-    private func activateAudioSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            // `.duckOthers` is only valid for playback-capable categories; on
-            // `.record` it makes setCategory throw.
-            try session.setCategory(.record, mode: .measurement)
-            try session.setActive(true)
-        } catch {
-            throw NautiSpeechInputError.audioSessionUnavailable
-        }
+    private func checkCaptureAttempt() throws {
+        try Task.checkCancellation()
+        guard !cancelled else { throw CancellationError() }
     }
 
     private func startCapture(
         for transcriber: DictationTranscriber,
+        naturalFormat: AVAudioFormat,
         yielding inputContinuation: AsyncStream<AnalyzerInput>.Continuation
     ) async throws {
-        let inputNode = audioEngine.inputNode
-        let naturalFormat = inputNode.outputFormat(forBus: 0)
-        // A zero-rate/zero-channel format means the input route is not ready.
-        // Installing a tap on it would abort the process, so bail out with a
-        // recoverable error instead.
-        guard naturalFormat.sampleRate > 0, naturalFormat.channelCount > 0 else {
-            throw NautiSpeechInputError.audioSessionUnavailable
-        }
-
         guard let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
-            compatibleWith: [transcriber],
-            considering: naturalFormat
+            compatibleWith: [transcriber], considering: naturalFormat
         ) else {
             throw NautiSpeechInputError.assetsUnavailable
         }
-
-        // The tap MUST run at the hardware format — AVAudioEngine raises an
-        // uncatchable exception otherwise. Resampling to the analyzer format
-        // happens per buffer.
-        guard let converter = SpeechAudioFormatConverter(from: naturalFormat, to: analyzerFormat) else {
-            throw NautiSpeechInputError.audioSessionUnavailable
-        }
-
-        inputNode.installTap(
-            onBus: 0,
-            bufferSize: 4_096,
-            format: naturalFormat
-        ) { buffer, time in
-            guard let converted = converter.convert(buffer) else { return }
+        try checkCaptureAttempt()
+        try await capture.start(outputFormat: analyzerFormat) { buffer, time in
             inputContinuation.yield(
-                AnalyzerInput(buffer: converted, bufferStartTime: Self.startTime(for: time))
+                AnalyzerInput(buffer: buffer, bufferStartTime: Self.startTime(for: time))
             )
         }
-        tapInstalled = true
-
-        audioEngine.prepare()
-        do {
-            try audioEngine.start()
-        } catch {
-            throw NautiSpeechInputError.audioSessionUnavailable
-        }
+        try checkCaptureAttempt()
     }
 
     private func startResultPump(
@@ -489,7 +464,8 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
     }
 
     func stop() async {
-        stopAudioCapture()
+        cancelled = true
+        await capture.stop()
         inputContinuation?.finish()
         do {
             try await analyzer?.finalizeAndFinishThroughEndOfInput()
@@ -502,7 +478,8 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
     }
 
     func cancel() async {
-        stopAudioCapture()
+        cancelled = true
+        await capture.stop()
         inputContinuation?.finish()
         await analyzer?.cancelAndFinishNow()
         analysisTask?.cancel()
@@ -514,7 +491,7 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
     /// `AVAudioTime.sampleRate` is a `Double` straight from CoreAudio; feeding
     /// it to `CMTimeScale` unchecked traps on NaN or an out-of-range value —
     /// and this runs on the realtime audio thread.
-    private static func startTime(for time: AVAudioTime) -> CMTime? {
+    nonisolated private static func startTime(for time: AVAudioTime) -> CMTime? {
         guard time.isSampleTimeValid,
               time.sampleRate.isFinite,
               time.sampleRate > 0,
@@ -522,20 +499,6 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
             return nil
         }
         return CMTime(value: time.sampleTime, timescale: CMTimeScale(time.sampleRate))
-    }
-
-    private func stopAudioCapture() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
-        if tapInstalled {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            tapInstalled = false
-        }
-        try? AVAudioSession.sharedInstance().setActive(
-            false,
-            options: .notifyOthersOnDeactivation
-        )
     }
 
     private func cleanup() {
@@ -549,12 +512,12 @@ private final class SpeechAnalyzerNautiBackend: NautiSpeechBackend {
 
 @MainActor
 private final class LegacyNautiSpeechBackend: NautiSpeechBackend {
-    private let audioEngine = AVAudioEngine()
+    private let capture = NautiAudioCapture()
+    private var cancelled = false
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "de_DE"))
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var outputContinuation: AsyncThrowingStream<NautiSpeechTranscript, Error>.Continuation?
-    private var tapInstalled = false
 
     func start() async throws -> AsyncThrowingStream<NautiSpeechTranscript, Error> {
         guard let recognizer,
@@ -563,14 +526,11 @@ private final class LegacyNautiSpeechBackend: NautiSpeechBackend {
             throw NautiSpeechInputError.onDeviceRecognitionUnavailable
         }
 
-        let session = AVAudioSession.sharedInstance()
-        do {
-            // `.duckOthers` is only valid for playback-capable categories.
-            try session.setCategory(.record, mode: .measurement)
-            try session.setActive(true)
-        } catch {
-            throw NautiSpeechInputError.audioSessionUnavailable
-        }
+        try Task.checkCancellation()
+        guard !cancelled else { throw CancellationError() }
+        _ = try await capture.prepare()
+        try Task.checkCancellation()
+        guard !cancelled else { throw CancellationError() }
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -591,63 +551,42 @@ private final class LegacyNautiSpeechBackend: NautiSpeechBackend {
                     )
                     if result.isFinal {
                         continuation.finish()
-                        self?.cleanup()
+                        await self?.cleanup()
                     }
                 } else if let error {
                     continuation.finish(throwing: error)
-                    self?.cleanup()
+                    await self?.cleanup()
                 }
             }
         }
 
-        let inputNode = audioEngine.inputNode
-        let format = inputNode.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            await cancel()
-            throw NautiSpeechInputError.audioSessionUnavailable
-        }
-        inputNode.installTap(onBus: 0, bufferSize: 4_096, format: format) { buffer, _ in
-            request.append(buffer)
-        }
-        tapInstalled = true
-        audioEngine.prepare()
         do {
-            try audioEngine.start()
+            try await capture.start { buffer, _ in request.append(buffer) }
+            try Task.checkCancellation()
+            guard !cancelled else { throw CancellationError() }
         } catch {
             await cancel()
-            throw NautiSpeechInputError.audioSessionUnavailable
+            throw error
         }
         return stream
     }
 
     func stop() async {
-        stopAudioCapture()
+        cancelled = true
+        await capture.stop()
         request?.endAudio()
     }
 
     func cancel() async {
-        stopAudioCapture()
+        cancelled = true
+        await capture.stop()
         task?.cancel()
         outputContinuation?.finish()
-        cleanup()
+        await cleanup()
     }
 
-    private func stopAudioCapture() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
-        if tapInstalled {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            tapInstalled = false
-        }
-        try? AVAudioSession.sharedInstance().setActive(
-            false,
-            options: .notifyOthersOnDeactivation
-        )
-    }
-
-    private func cleanup() {
-        stopAudioCapture()
+    private func cleanup() async {
+        await capture.stop()
         request = nil
         task = nil
         outputContinuation = nil
@@ -662,4 +601,86 @@ private enum SpeechAnalyzerNautiVocabulary {
         "Steuerbord", "Knoten", "Böen", "BSH", "Crewspace", "Skipper-ID",
         "Co-Skipper", "Wachführung", "Sicherheit Medizin", "Termin", "Nachricht", "Gruppe"
     ]
+}
+
+/// Owns all blocking session/engine operations on its own executor. No engine
+/// or AVAudioSession lifecycle call runs on MainActor, and stop cannot race start.
+private actor NautiAudioCapture {
+    private var engine: AVAudioEngine?
+    private var tapInstalled = false
+    private var sessionActive = false
+
+    func prepare() throws -> AVAudioFormat {
+        try Task.checkCancellation()
+        guard engine == nil else { throw NautiSpeechInputError.audioSessionUnavailable }
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.record, mode: .measurement)
+            try session.setActive(true)
+            sessionActive = true
+            let engine = AVAudioEngine()
+            self.engine = engine
+            let format = engine.inputNode.outputFormat(forBus: 0)
+            guard format.sampleRate.isFinite, format.sampleRate > 0, format.channelCount > 0 else {
+                throw NautiSpeechInputError.audioSessionUnavailable
+            }
+            return format
+        } catch {
+            stop()
+            throw NautiSpeechInputError.audioSessionUnavailable
+        }
+    }
+
+    func start(
+        outputFormat: AVAudioFormat? = nil,
+        receive: @escaping @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void
+    ) throws {
+        try Task.checkCancellation()
+        guard let engine, sessionActive, !tapInstalled else {
+            throw NautiSpeechInputError.audioSessionUnavailable
+        }
+        // Re-read after asynchronous asset/format preparation: the input route
+        // may have changed. A nil tap format lets the engine choose its current
+        // hardware format, avoiding the uncatchable sample-rate assertion.
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate.isFinite, format.sampleRate > 0, format.channelCount > 0,
+              let converter = SpeechAudioFormatConverter(from: format, to: outputFormat ?? format) else {
+            throw NautiSpeechInputError.audioSessionUnavailable
+        }
+        input.installTap(onBus: 0, bufferSize: 4_096, format: nil,
+                         block: Self.makeTap(converter: converter, receive: receive))
+        tapInstalled = true
+        do {
+            engine.prepare()
+            try engine.start()
+        } catch {
+            stop()
+            throw NautiSpeechInputError.audioSessionUnavailable
+        }
+    }
+
+    // Explicitly nonisolated: audio callbacks must not inherit an actor executor.
+    nonisolated private static func makeTap(
+        converter: SpeechAudioFormatConverter,
+        receive: @escaping @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void
+    ) -> AVAudioNodeTapBlock {
+        { buffer, time in
+            guard let ownedBuffer = converter.convert(buffer) else { return }
+            receive(ownedBuffer, time)
+        }
+    }
+
+    func stop() {
+        if let engine {
+            if engine.isRunning { engine.stop() }
+            if tapInstalled { engine.inputNode.removeTap(onBus: 0) }
+        }
+        tapInstalled = false
+        engine = nil
+        if sessionActive {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            sessionActive = false
+        }
+    }
 }

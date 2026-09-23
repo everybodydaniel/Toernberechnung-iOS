@@ -1,30 +1,15 @@
 import Foundation
 
-// MARK: - Time-dependent water level correction
-
-/// The BSH meteorological correction (Windstau) sampled over time instead of
-/// pinned to the high-water peak.
-///
-/// The Excel reference tool has a single global cell `$AD$13` for the whole
-/// Törn. The app can do better: the BSH publishes a full forecast curve, so a
-/// waypoint passed four hours after high water gets the surge that is actually
-/// predicted for that moment rather than the peak value.
-///
-/// A `fallback` — exactly the previous peak scalar — is always carried. When no
-/// curve covers a time, the series returns it unchanged, so behaviour degrades
-/// to the old one instead of failing.
-///
-/// **Invariant:** the correction *quality* depends only on the source gauge,
-/// never on the sample time; `resolution(at:).quality == fallback.quality` for
-/// every input. That is what keeps `allowsGreenStatus` and every downgrade rule
-/// in `RouteCalculationService.applyCorrectionQuality` intact — a curve may
-/// change the number of metres, never how much the number can be trusted.
+/// Time-bounded meteorological corrections. Outside sampled coverage the
+/// calculation returns an explicitly provisional astronomical scenario (zero surge).
 struct WaterLevelCorrectionSeries: Equatable, Sendable {
 
     struct Sample: Equatable, Sendable {
         let time: Date
-        /// Already conservative: the forecast uncertainty has been subtracted.
+        /// Correction applied by the planner. Model samples are capped at zero
+        /// when no pointwise lower confidence bound is available.
         let meters: Double
+        var quality: WaterLevelCorrectionQuality? = nil
     }
 
     /// Ascending by time. May be empty, in which case only `fallback` applies.
@@ -42,35 +27,33 @@ struct WaterLevelCorrectionSeries: Equatable, Sendable {
         return first.time ... last.time
     }
 
-    /// Linear interpolation between the two bracketing samples.
-    /// Outside the covered span, or with fewer than two samples, the peak
-    /// scalar is returned unchanged.
     func resolution(at time: Date) -> WaterLevelCorrectionResolution {
-        guard let meters = interpolatedMeters(at: time) else { return fallback }
-        return WaterLevelCorrectionResolution(
-            meters: meters,
-            quality: fallback.quality,
-            localStationID: fallback.localStationID,
-            sourceStationID: fallback.sourceStationID,
-            sourceStationName: fallback.sourceStationName,
+        guard samples.count >= 2 else { return fallback }
+        func outside() -> WaterLevelCorrectionResolution {
+            .unavailable(stationID: fallback.localStationID, quality: .outsideForecastHorizon,
+                         detail: "Nur astronomisch: Für diese Ankunft fehlt eine zeitlich passende Wasserstandsprognose.")
+        }
+        if let exact = samples.first(where: { $0.time == time }) {
+            return resolved(exact.meters, quality: exact.quality ?? fallback.quality)
+        }
+        guard let upper = samples.firstIndex(where: { $0.time > time }), upper > 0 else { return outside() }
+        let left = samples[upper - 1], right = samples[upper]
+        let duration = right.time.timeIntervalSince(left.time)
+        guard duration > 0, duration <= 30 * 60 else { return outside() }
+        let fraction = time.timeIntervalSince(left.time) / duration
+        let quality = PassageWindowSolver.worstQuality(left.quality ?? fallback.quality, right.quality ?? fallback.quality)
+        return resolved(left.meters + (right.meters - left.meters) * fraction, quality: quality)
+    }
+
+    private func resolved(_ meters: Double, quality: WaterLevelCorrectionQuality) -> WaterLevelCorrectionResolution {
+        WaterLevelCorrectionResolution(
+            meters: meters, quality: quality, localStationID: fallback.localStationID,
+            sourceStationID: fallback.sourceStationID, sourceStationName: fallback.sourceStationName,
             issuedAt: fallback.issuedAt,
-            detail: fallback.detail
+            detail: (quality == fallback.quality ? fallback.detail : PassageWindowSolver.detail(for: quality)) ?? fallback.detail
         )
     }
 
-    private func interpolatedMeters(at time: Date) -> Double? {
-        guard samples.count >= 2, let span = coveredSpan, span.contains(time) else { return nil }
-
-        // The curve is short (a few dozen points per waypoint), so a linear
-        // scan is cheaper than the bookkeeping of a binary search.
-        for (earlier, later) in zip(samples, samples.dropFirst()) where time <= later.time {
-            let total = later.time.timeIntervalSince(earlier.time)
-            guard total > 0 else { return earlier.meters }
-            let fraction = time.timeIntervalSince(earlier.time) / total
-            return earlier.meters + (later.meters - earlier.meters) * fraction
-        }
-        return samples.last?.meters
-    }
 }
 
 // MARK: - Curve point correction
@@ -108,51 +91,47 @@ extension BSHWaterLevelForecastService {
         comparisonStationID: String? = nil,
         force: Bool = false
     ) async -> WaterLevelCorrectionSeries {
-        let peak = await correction(
-            for: localStationID,
-            at: anchorHighWaterTime,
-            comparisonStationID: comparisonStationID,
-            force: force
-        )
-        // An unusable peak means there is no trustworthy source at all; a curve
-        // from the same source would not be any better.
-        guard peak.quality.isUsable, let sourceID = peak.sourceStationID,
-              let source = BSHTideStationCatalog.station(id: sourceID) else {
-            return .constant(peak)
+        guard let local = BSHTideStationCatalog.station(id: localStationID) else {
+            return .constant(.unavailable(stationID: localStationID, detail: "Unbekannter BSH-Referenzpegel."))
         }
-
+        let effectiveComparisonID = comparisonStationID
+            ?? BSHTideStationCatalog.requiredComparisonStation(for: localStationID)?.id
+        let sourceStation: BSHTideStation?
+        if let effectiveComparisonID,
+                  let comp = BSHTideStationCatalog.station(id: effectiveComparisonID),
+                  comp.hasLocalWaterLevelForecast {
+            sourceStation = comp
+        } else if local.hasLocalWaterLevelForecast {
+            sourceStation = local
+        } else {
+            sourceStation = nil
+        }
+        guard let source = sourceStation, source.hasLocalWaterLevelForecast else {
+            return .constant(.unavailable(stationID: localStationID,
+                detail: "Keine BSH-Wasserstandsprognose verfügbar."))
+        }
         guard let forecast = try? await fetch(station: source, force: force) else {
-            return .constant(peak)
+            return .constant(.unavailable(stationID: localStationID, detail: "Wasserstandsprognose nicht abrufbar."))
         }
-
-        // The uncertainty is published per tidal event, not per curve point, so
-        // the band of the anchoring high water is applied across the series.
-        guard let uncertaintyMeters = forecast.events
-            .filter({ $0.type == "HW" })
-            .min(by: {
-                abs($0.time.timeIntervalSince(anchorHighWaterTime))
-                    < abs($1.time.timeIntervalSince(anchorHighWaterTime))
-            })?
-            .uncertaintyCentimeters
-            .map({ $0 / 100 })
-        else {
-            return .constant(peak)
+        let issued = forecast.curveIssuedAt ?? forecast.issuedAt
+        guard Date().timeIntervalSince(issued) <= 8 * 3_600 else {
+            return .constant(.unavailable(stationID: localStationID, quality: .stale,
+                detail: "Wasserstandsprognose veraltet. Nur astronomische Planung."))
         }
-
-        let padded = span.lowerBound.addingTimeInterval(-3_600)
-            ... span.upperBound.addingTimeInterval(3_600)
-        let samples = forecast.curve
-            .filter { padded.contains($0.time) }
-            .compactMap { point -> WaterLevelCorrectionSeries.Sample? in
-                guard let central = point.centralCorrectionMeters else { return nil }
-                return WaterLevelCorrectionSeries.Sample(
-                    time: point.time,
-                    meters: central - uncertaintyMeters
-                )
-            }
-            .sorted { $0.time < $1.time }
-
-        guard samples.count >= 2 else { return .constant(peak) }
-        return WaterLevelCorrectionSeries(samples: samples, fallback: peak)
+        let quality: WaterLevelCorrectionQuality = source.id == localStationID ? .modelForecast : .confirmedComparison
+        let padded = span.lowerBound.addingTimeInterval(-3_600) ... span.upperBound.addingTimeInterval(3_600)
+        let samples = forecast.curve.filter { padded.contains($0.time) }.compactMap { point -> WaterLevelCorrectionSeries.Sample? in
+            guard let central = point.centralCorrectionMeters, central.isFinite else { return nil }
+            // The automated curve is a central model estimate without a pointwise
+            // lower confidence bound. Positive setup must therefore not create
+            // additional calculated clearance. Negative setdown is retained.
+            return .init(time: point.time, meters: min(central, 0), quality: quality)
+        }.sorted { $0.time < $1.time }
+        let fallback = WaterLevelCorrectionResolution(
+            meters: 0, quality: .outsideForecastHorizon, localStationID: localStationID,
+            sourceStationID: source.id, sourceStationName: source.name, issuedAt: issued,
+            detail: "Vorläufige Modellkurve: negativer Windstau wird berücksichtigt; positiver Windstau wird ohne gesicherte Untergrenze nicht gutgeschrieben."
+        )
+        return WaterLevelCorrectionSeries(samples: samples, fallback: fallback)
     }
 }

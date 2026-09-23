@@ -82,6 +82,8 @@ struct TideEvent: Identifiable, Equatable, Sendable {
     let heightMeters: Double?
     let type: String
     let phase: String?
+    var androidCurrentTimestampIsISO8601: Bool = true
+    var usesAstronomicalPrediction: Bool = false
 
     var id: String { "\(time.timeIntervalSince1970)-\(type)" }
     var symbol: String { type == "HW" ? "arrow.up.circle.fill" : "arrow.down.circle.fill" }
@@ -215,6 +217,14 @@ actor BSHTideService {
         return allEvents.filter {
             $0.type == "HW" && $0.time >= windowStart && $0.time <= windowEnd
         }
+    }
+
+    func tidalEvents(for stationID: String, covering span: ClosedRange<Date>) async throws -> [TideEvent] {
+        let payload = try await payload(for: stationID, force: false)
+        let all = payload.events(around: span.lowerBound)
+        let padded = span.lowerBound.addingTimeInterval(-14 * 3_600)
+            ... span.upperBound.addingTimeInterval(14 * 3_600)
+        return all.filter { padded.contains($0.time) }
     }
 
     private func payload(for stationID: String, force: Bool) async throws -> BSHTidePayload {
@@ -407,10 +417,22 @@ enum BSHDateParser {
     }()
 
     static func date(from raw: String) -> Date? {
+        let raw = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if let value = formatter.date(from: raw) { return value }
         if let value = isoFormatter.date(from: raw.replacingOccurrences(of: " ", with: "T")) { return value }
         let fallback = ISO8601DateFormatter()
-        return fallback.date(from: raw.replacingOccurrences(of: " ", with: "T"))
+        if let value = fallback.date(from: raw.replacingOccurrences(of: " ", with: "T")) { return value }
+        // Android TideTimes: timestamps without an offset are Berlin local time.
+        let local = DateFormatter()
+        local.locale = Locale(identifier: "en_US_POSIX")
+        local.calendar = Calendar(identifier: .gregorian)
+        local.timeZone = AppDateFormatters.berlinTimeZone
+        local.isLenient = false
+        for format in ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm"] {
+            local.dateFormat = format
+            if let value = local.date(from: raw.replacingOccurrences(of: "T", with: " ")) { return value }
+        }
+        return nil
     }
 }
 

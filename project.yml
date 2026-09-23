@@ -4,11 +4,6 @@ options:
   minimumXcodeGenVersion: "2.30"
   groupSortPosition: top
 
-packages:
-  MapLibre:
-    url: https://github.com/maplibre/maplibre-gl-native-distribution
-    from: 6.26.0
-
 targets:
   Toernberechnung:
     type: application
@@ -49,6 +44,8 @@ targets:
       - path: Toernberechnung/Engine/NautiDeterministicIntentRouter.swift
       - path: Toernberechnung/Engine/NautiChatViewModel.swift
       - path: Toernberechnung/Engine/RoutePlanModels.swift
+      - path: Toernberechnung/Engine/AstronomicalTideCurve.swift
+      - path: Toernberechnung/Engine/SurveyedDepthCatalog.swift
       - path: Toernberechnung/Engine/TidalHeightStrategy.swift
       - path: Toernberechnung/Engine/WaypointDepthSolver.swift
       - path: Toernberechnung/Engine/RouteCalculationService.swift
@@ -76,6 +73,7 @@ targets:
       - path: Toernberechnung/Services/WaterLevelCorrectionSeries.swift
       - path: Toernberechnung/Services/TideDataProvider.swift
       - path: Toernberechnung/Services/MaritimeWarningsService.swift
+      - path: Toernberechnung/Services/BSHNauticalWarningsParser.swift
       - path: Toernberechnung/Resources/wadden_sea_catalog.json
         type: file
         buildPhase: resources
@@ -101,10 +99,18 @@ targets:
         type: file
         buildPhase: none
       - path: Toernberechnung/Toernberechnung.docc
-    dependencies:
-      - package: MapLibre
-        product: MapLibre
+    preBuildScripts:
+      - name: CleanSourceAttributes
+        script: |
+          xattr -cr "${SRCROOT}/Toernberechnung" 2>/dev/null || true
+          xattr -cr "${SRCROOT}/ToernberechnungTests" 2>/dev/null || true
+        basedOnDependencyAnalysis: false
     postCompileScripts:
+      - name: CleanExtendedAttributes
+        script: |
+          xattr -cr "${BUILT_PRODUCTS_DIR}" 2>/dev/null || true
+          xattr -cr "${TARGET_BUILD_DIR}" 2>/dev/null || true
+        basedOnDependencyAnalysis: false
       - name: SwiftLint
         inputFiles:
           - $(SRCROOT)/.swiftlint.yml
@@ -118,9 +124,10 @@ targets:
           fi
         basedOnDependencyAnalysis: false
     postBuildScripts:
-      - name: CleanExtendedAttributes
+      - name: CleanAppBundleAttributes
         script: |
-          xattr -cr "${TARGET_BUILD_DIR}" 2>/dev/null || true
+          xattr -cr "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}" 2>/dev/null || true
+          xattr -cr "${TARGET_BUILD_DIR}/${WRAPPER_NAME}" 2>/dev/null || true
         basedOnDependencyAnalysis: false
     settings:
       base:
@@ -130,7 +137,7 @@ targets:
         DEVELOPMENT_TEAM: L9T7RPMW5H
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.9"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "3"
         MARKETING_VERSION: "1.1.0"
     scheme:
       gatherCoverageData: true
@@ -154,9 +161,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.toernberechnung.tests
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
-    postBuildScripts:
+    postCompileScripts:
       - name: CleanExtendedAttributes
         script: |
+          xattr -cr "${BUILT_PRODUCTS_DIR}" 2>/dev/null || true
           xattr -cr "${TARGET_BUILD_DIR}" 2>/dev/null || true
         basedOnDependencyAnalysis: false
     scheme:

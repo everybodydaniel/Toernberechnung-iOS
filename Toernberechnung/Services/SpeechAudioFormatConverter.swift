@@ -22,8 +22,8 @@ final class SpeechAudioFormatConverter: @unchecked Sendable {
     /// Returns `nil` when the two formats cannot be bridged at all — the
     /// caller should then surface a recoverable error instead of recording.
     init?(from inputFormat: AVAudioFormat, to outputFormat: AVAudioFormat) {
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0,
-              outputFormat.sampleRate > 0, outputFormat.channelCount > 0 else {
+        guard inputFormat.sampleRate.isFinite, inputFormat.sampleRate > 0, inputFormat.channelCount > 0,
+              outputFormat.sampleRate.isFinite, outputFormat.sampleRate > 0, outputFormat.channelCount > 0 else {
             return nil
         }
 
@@ -50,11 +50,24 @@ final class SpeechAudioFormatConverter: @unchecked Sendable {
     /// Must be called from a single thread — in practice the audio tap's
     /// realtime callback, which is already serialised.
     func convert(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
-        guard buffer.frameLength > 0 else { return nil }
-        guard let converter else { return buffer }
+        guard buffer.frameLength > 0, buffer.format == inputFormat else { return nil }
+        guard let converter else {
+            // The engine reuses tap storage after the callback returns. Async
+            // consumers need their own buffer even when no resampling is needed.
+            guard let copy = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: buffer.frameLength) else { return nil }
+            copy.frameLength = buffer.frameLength
+            let source = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: buffer.audioBufferList))
+            let destination = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
+            for index in source.indices {
+                guard let from = source[index].mData, let to = destination[index].mData else { return nil }
+                memcpy(to, from, Int(source[index].mDataByteSize))
+            }
+            return copy
+        }
 
         let ratio = outputFormat.sampleRate / inputFormat.sampleRate
         let scaled = (Double(buffer.frameLength) * ratio).rounded(.up)
+        guard scaled.isFinite, scaled < Double(UInt32.max - 1_024) else { return nil }
         // A little headroom: resamplers may emit slightly more frames than the
         // plain ratio suggests while their filter delay line drains.
         let capacity = AVAudioFrameCount(max(scaled, 1)) + 1_024

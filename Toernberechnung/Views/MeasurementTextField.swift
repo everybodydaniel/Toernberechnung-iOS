@@ -17,6 +17,7 @@ import UIKit
 struct MeasurementTextField: View {
     let title: String
     @Binding var storage: String
+    var unit: String = "m"
     let icon: String
     let identifier: String
 
@@ -48,7 +49,7 @@ struct MeasurementTextField: View {
             .frame(width: 80, height: 36)
             .multilineTextAlignment(.trailing)
 
-            Text("m")
+            Text(unit)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.secondary)
         }

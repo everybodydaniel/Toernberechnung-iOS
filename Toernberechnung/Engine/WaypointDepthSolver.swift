@@ -40,6 +40,7 @@ enum WaypointDepthSolver {
         let waterLevelCorrectionMeters: Double
         /// Excel `M55` — boat draft.
         let draftMeters: Double
+        var missingWaterOverrideMeters: Double? = nil
     }
 
     /// Every intermediate the Excel sheet shows, so the UI can render the chain
@@ -64,14 +65,31 @@ enum WaypointDepthSolver {
         case missingChartDepth
     }
 
+    /// Android AndroidRouteAssessmentProvider / RuleOfTwelfths.calculateUKC.
+    /// Preserve operation order as well as units: correction, chart depth, draft.
+    static func solveTideHeight(_ height: Double, chartDepth: Double, correction: Double,
+                                draft: Double, meanHighWater: Double, meanRange: Double) -> Output {
+        let correctedHeight = height + correction
+        let available = chartDepth + correctedHeight
+        return Output(oneTwelfthMeters: meanRange / 12,
+                      missingWaterMeters: meanHighWater - height,
+                      baseMeters: height, tideHeightHGMeters: correctedHeight,
+                      chartDepthApplied: chartDepth, availableWaterDepthMeters: available,
+                      clearanceUnderKeelMeters: available - draft)
+    }
+
     static func solve(
         _ inputs: Inputs,
         strategy: TidalHeightStrategy = TwelfthsRuleStrategy()
     ) -> Result<Output, Failure> {
-        let tidal = strategy.missingWater(
+        let approximation = strategy.missingWater(
             deviationHours: inputs.deviationHours,
             meanTidalRangeMeters: inputs.meanTidalRangeMeters
         )
+        let tidal = inputs.missingWaterOverrideMeters.map {
+            TidalHeightResult(fmwMeters: $0, oneTwelfthMeters: inputs.meanTidalRangeMeters / 12,
+                              isValid: $0.isFinite, messages: [])
+        } ?? approximation
         guard tidal.isValid else {
             return .failure(.deviationExceedsTidalCycle(messages: tidal.messages))
         }

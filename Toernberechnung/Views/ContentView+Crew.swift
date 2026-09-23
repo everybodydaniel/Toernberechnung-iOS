@@ -94,7 +94,14 @@ enum CrewspaceSection: String, CaseIterable, Identifiable {
 struct CrewspaceView: View {
     let topContentInset: CGFloat
     @Binding var headerVisible: Bool
-    @State private var section: CrewspaceSection = .crew
+    @State private var section: CrewspaceSection
+
+    init(topContentInset: CGFloat, headerVisible: Binding<Bool>) {
+        self.topContentInset = topContentInset
+        self._headerVisible = headerVisible
+        let isPlanning = ProcessInfo.processInfo.environment["LAUNCH_TAB"] == "crew_planning"
+        self._section = State(initialValue: isPlanning ? .planning : .crew)
+    }
 
     var body: some View {
         Group {

@@ -6,8 +6,8 @@ import XCTest
 /// These tests guard the two properties that make that safe:
 ///
 /// 1. Missing or unusable curve data degrades to exactly the previous scalar.
-/// 2. The correction *quality* never changes with the sample time, so no
-///    downgrade rule in `applyCorrectionQuality` can be bypassed.
+/// 2. The correction *quality* never changes with the sample time, so the
+///    provenance advisory remains stable throughout the sampled curve.
 final class WaterLevelCorrectionSeriesTests: XCTestCase {
 
     private let accuracy = 1e-9
@@ -57,16 +57,15 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         )
     }
 
-    func testFallsBackToPeakScalarOutsideTheCoveredSpan() {
+    func testFallsBackToAstronomicalZeroOutsideTheCoveredSpan() {
         let series = slopingSeries()
-        XCTAssertEqual(
-            series.resolution(at: base.addingTimeInterval(-60)).meters,
-            peak().meters, accuracy: accuracy
-        )
-        XCTAssertEqual(
-            series.resolution(at: base.addingTimeInterval(3_600)).meters,
-            peak().meters, accuracy: accuracy
-        )
+        let before = series.resolution(at: base.addingTimeInterval(-60))
+        XCTAssertEqual(before.meters, 0, accuracy: accuracy)
+        XCTAssertEqual(before.quality, .outsideForecastHorizon)
+
+        let after = series.resolution(at: base.addingTimeInterval(3_600))
+        XCTAssertEqual(after.meters, 0, accuracy: accuracy)
+        XCTAssertEqual(after.quality, .outsideForecastHorizon)
     }
 
     func testEmptyAndSingleSampleSeriesReturnThePeakScalar() {
@@ -83,34 +82,41 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
 
     // MARK: - The safety invariant
 
-    /// A curve may move the number of metres — never how much it can be trusted.
-    func testQualityIsIndependentOfTheSampleTime() {
+    /// A curve preserves quality within its sampled coverage and degrades outside.
+    func testQualityIsTimeBoundedToForecastCoverage() {
         for quality in [
             WaterLevelCorrectionQuality.localOfficial,
             .confirmedComparison,
             .manual
         ] {
             let series = slopingSeries(quality: quality)
-            for offset in [-3_600.0, 0, 900, 1_800, 7_200] {
+            for offset in [0.0, 900, 1_800] {
                 XCTAssertEqual(
                     series.resolution(at: base.addingTimeInterval(offset)).quality,
                     quality,
-                    "Qualität darf sich mit dem Abtastzeitpunkt nicht ändern"
+                    "Qualität innerhalb der Kurve muss erhalten bleiben"
+                )
+            }
+            for offset in [-3_600.0, 7_200] {
+                XCTAssertEqual(
+                    series.resolution(at: base.addingTimeInterval(offset)).quality,
+                    .outsideForecastHorizon,
+                    "Außerhalb der Kurve muss die Güte outsideForecastHorizon sein"
                 )
             }
         }
     }
 
-    /// End to end: a comparison gauge still cannot produce a green status, no
-    /// matter which point of the curve was sampled.
-    func testComparisonGaugeStillCannotTurnGreenAfterCurveSampling() {
+    /// End to end: a comparison gauge remains visibly provisional, but source
+    /// provenance does not overwrite the calculated clearance status.
+    func testComparisonGaugeRemainsAdvisoryAfterCurveSampling() {
         let sampled = slopingSeries(quality: .confirmedComparison)
             .resolution(at: base.addingTimeInterval(900))
         XCTAssertEqual(sampled.quality, .confirmedComparison)
         XCTAssertFalse(sampled.quality.allowsGreenStatus)
         XCTAssertEqual(
             RouteCalculationService.applyCorrectionQuality(sampled.quality, to: .go),
-            .warning
+            .go
         )
         XCTAssertEqual(
             RouteCalculationService.applyCorrectionQuality(sampled.quality, to: .noGo),

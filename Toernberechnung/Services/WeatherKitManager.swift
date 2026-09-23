@@ -398,6 +398,450 @@ struct AppleWeatherClient: MarineWeatherClient {
     }
 }
 
+struct ResilientMarineWeatherClient: MarineWeatherClient {
+    private let primary: any MarineWeatherClient
+    private let fallback: any MarineWeatherClient
+
+    init(
+        primary: any MarineWeatherClient = AppleWeatherClient(),
+        fallback: any MarineWeatherClient = BrightSkyWeatherClient()
+    ) {
+        self.primary = primary
+        self.fallback = fallback
+    }
+
+    func fetch(
+        at location: CLLocation,
+        datasets: Set<MarineWeatherDataset>,
+        now: Date
+    ) async throws -> WeatherFetchPayload {
+        do {
+            let result = try await primary.fetch(at: location, datasets: datasets, now: now)
+            let wantsCurrent = datasets.contains(where: { $0.kind == .current })
+            let wantsHourly = datasets.contains(where: { $0.kind == .hourly })
+            if (wantsCurrent && result.current == nil) || (wantsHourly && result.hourly == nil) {
+                return try await fallback.fetch(at: location, datasets: datasets, now: now)
+            }
+            return result
+        } catch {
+            return try await fallback.fetch(at: location, datasets: datasets, now: now)
+        }
+    }
+
+    func attribution() async throws -> MarineWeatherAttribution {
+        if let attr = try? await primary.attribution() {
+            return attr
+        }
+        return try await fallback.attribution()
+    }
+}
+
+/// BrightSky weather service for open DWD (Deutscher Wetterdienst) weather data.
+/// Provides reliable marine forecasts, wind speed, gusts, and wind direction without requiring WeatherKit entitlements.
+struct BrightSkyWeatherClient: MarineWeatherClient {
+    private let session: URLSession
+    private static let baseURL = "https://api.brightsky.dev"
+    private static let kmhPerKnot = 1.852
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
+
+    func attribution() async throws -> MarineWeatherAttribution {
+        MarineWeatherAttribution(
+            serviceName: "DWD via Bright Sky",
+            legalPageURL: URL(string: "https://brightsky.dev")!,
+            combinedMarkDarkURL: nil,
+            combinedMarkLightURL: nil
+        )
+    }
+
+    func fetch(
+        at location: CLLocation,
+        datasets: Set<MarineWeatherDataset>,
+        now: Date
+    ) async throws -> WeatherFetchPayload {
+        let lat = location.coordinate.latitude
+        let lon = location.coordinate.longitude
+
+        let calendar = AppDateFormatters.berlinCalendar
+        let hourlyInterval = datasets.compactMap { dataset -> DateInterval? in
+            guard case .hourly(let interval) = dataset else { return nil }
+            return interval
+        }.first
+
+        let wantsCurrent = datasets.contains(where: { $0.kind == .current })
+        let wantsHourly = hourlyInterval != nil
+        let wantsDaily = datasets.contains(where: { $0.kind == .daily })
+
+        var currentWeather: WeatherFetchedValue<MarineCurrentWeather>?
+        var hourlyWeather: WeatherFetchedHourlyValue?
+        var dailyWeather: WeatherFetchedValue<[MarineDailyForecast]>?
+
+        // 1. Fetch current weather if needed
+        if wantsCurrent {
+            if let current = try? await fetchCurrent(lat: lat, lon: lon, now: now) {
+                currentWeather = current
+            }
+        }
+
+        // 2. Fetch forecast if hourly or daily needed
+        if wantsHourly || wantsDaily {
+            let start = hourlyInterval?.start ?? now
+            let end = hourlyInterval?.end ?? calendar.date(byAdding: .day, value: 7, to: start) ?? start.addingTimeInterval(7 * 86400)
+            let (hourlyList, dailyList) = try await fetchForecast(lat: lat, lon: lon, start: start, end: end, now: now)
+
+            if wantsHourly, let interval = hourlyInterval {
+                hourlyWeather = WeatherFetchedHourlyValue(
+                    value: hourlyList,
+                    interval: interval,
+                    fetchedAt: now,
+                    sourceUpdatedAt: now,
+                    sourceExpiresAt: now.addingTimeInterval(3600)
+                )
+            }
+
+            if wantsDaily {
+                dailyWeather = WeatherFetchedValue(
+                    value: dailyList,
+                    fetchedAt: now,
+                    sourceUpdatedAt: now,
+                    sourceExpiresAt: now.addingTimeInterval(7200)
+                )
+            }
+
+            // If current was requested but direct call had failed, derive from nearest hourly
+            if wantsCurrent && currentWeather == nil, let first = hourlyList.first {
+                currentWeather = WeatherFetchedValue(
+                    value: currentFromHourly(first),
+                    fetchedAt: now,
+                    sourceUpdatedAt: now,
+                    sourceExpiresAt: now.addingTimeInterval(1800)
+                )
+            }
+        }
+
+        guard currentWeather != nil || hourlyWeather != nil || dailyWeather != nil else {
+            throw MarineWeatherError.noData
+        }
+
+        return WeatherFetchPayload(
+            current: currentWeather,
+            hourly: hourlyWeather,
+            daily: dailyWeather
+        )
+    }
+
+    // MARK: - API Calls
+
+    private func fetchCurrent(lat: Double, lon: Double, now: Date) async throws -> WeatherFetchedValue<MarineCurrentWeather> {
+        let urlString = String(format: "%@/current_weather?lat=%.4f&lon=%.4f", locale: Locale(identifier: "en_US_POSIX"), Self.baseURL, lat, lon)
+        guard let url = URL(string: urlString) else { throw MarineWeatherError.invalidCoordinate }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            throw MarineWeatherError.noData
+        }
+
+        let dto = try JSONDecoder().decode(BrightSkyCurrentResponse.self, from: data)
+        guard let item = dto.weather else { throw MarineWeatherError.noData }
+
+        let parsedDate = ISO8601DateFormatter().date(from: item.timestamp ?? "") ?? now
+        let current = makeMarineCurrentWeather(from: item, date: parsedDate)
+
+        return WeatherFetchedValue(
+            value: current,
+            fetchedAt: now,
+            sourceUpdatedAt: parsedDate,
+            sourceExpiresAt: now.addingTimeInterval(1800)
+        )
+    }
+
+    private func fetchForecast(
+        lat: Double, lon: Double, start: Date, end: Date, now: Date
+    ) async throws -> ([MarineHourlyForecast], [MarineDailyForecast]) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = AppDateFormatters.berlinTimeZone
+
+        let startStr = formatter.string(from: start)
+        let endStr = formatter.string(from: end)
+
+        let urlString = String(format: "%@/weather?lat=%.4f&lon=%.4f&date=%@&last_date=%@", locale: Locale(identifier: "en_US_POSIX"), Self.baseURL, lat, lon, startStr, endStr)
+        guard let url = URL(string: urlString) else { throw MarineWeatherError.invalidCoordinate }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            throw MarineWeatherError.noData
+        }
+
+        let dto = try JSONDecoder().decode(BrightSkyForecastResponse.self, from: data)
+        guard let items = dto.weather, !items.isEmpty else {
+            throw MarineWeatherError.noData
+        }
+
+        let isoFormatter = ISO8601DateFormatter()
+        var hourly: [MarineHourlyForecast] = []
+        for item in items {
+            guard let ts = item.timestamp, let date = isoFormatter.date(from: ts) else { continue }
+            hourly.append(makeMarineHourlyForecast(from: item, date: date))
+        }
+
+        let daily = makeDailyForecasts(from: hourly)
+        return (hourly, daily)
+    }
+
+    // MARK: - Mapping Helpers
+
+    private func makeMarineWind(speedKmh: Double?, gustKmh: Double?, directionDegrees: Int?) -> MarineWind {
+        let speedKnots = (speedKmh ?? 0.0) / Self.kmhPerKnot
+        let gustKnots = gustKmh.map { $0 / Self.kmhPerKnot }
+        let degrees = directionDegrees ?? 0
+        let normalized = ((degrees % 360) + 360) % 360
+
+        return MarineWind(
+            speedKnots: speedKnots,
+            gustKnots: gustKnots,
+            directionDegrees: normalized,
+            compassDirection: AppleWeatherClient.compassAbbreviation(for: normalized),
+            compassDescription: AppleWeatherClient.compassDescription(for: normalized)
+        )
+    }
+
+    private func makeMarineCurrentWeather(from item: BrightSkyWeatherItem, date: Date) -> MarineCurrentWeather {
+        let wind = makeMarineWind(
+            speedKmh: item.windSpeed10 ?? item.windSpeed,
+            gustKmh: item.windGustSpeed10 ?? item.windGustSpeed,
+            directionDegrees: item.windDirection10 ?? item.windDirection
+        )
+        let temp = item.temperature ?? 15.0
+        let hour = AppDateFormatters.berlinCalendar.component(.hour, from: date)
+        let isDaylight = hour >= 6 && hour <= 21
+
+        return MarineCurrentWeather(
+            date: date,
+            temperatureC: temp,
+            apparentTemperatureC: temp,
+            dewPointC: item.dewPoint ?? (temp - 4.0),
+            condition: conditionName(for: item.condition, icon: item.icon),
+            symbolName: symbolName(for: item.icon, isDaylight: isDaylight),
+            humidityPercent: item.relativeHumidity ?? 75,
+            pressureHPA: item.pressureMsl ?? 1013.25,
+            pressureTrend: "Gleichbleibend",
+            visibilityKM: Double(item.visibility ?? 10000) / 1000.0,
+            cloudCoverPercent: item.cloudCover ?? 50,
+            uvIndex: isDaylight ? 3 : 0,
+            uvCategory: "Mittel",
+            isDaylight: isDaylight,
+            precipitationIntensityMMPerHour: item.precipitation ?? 0.0,
+            wind: wind
+        )
+    }
+
+    private func makeMarineHourlyForecast(from item: BrightSkyWeatherItem, date: Date) -> MarineHourlyForecast {
+        let wind = makeMarineWind(
+            speedKmh: item.windSpeed,
+            gustKmh: item.windGustSpeed,
+            directionDegrees: item.windDirection
+        )
+        let temp = item.temperature ?? 15.0
+        let hour = AppDateFormatters.berlinCalendar.component(.hour, from: date)
+        let isDaylight = hour >= 6 && hour <= 21
+        let precipMM = item.precipitation ?? 0.0
+
+        return MarineHourlyForecast(
+            date: date,
+            temperatureC: temp,
+            apparentTemperatureC: temp,
+            dewPointC: item.dewPoint ?? (temp - 4.0),
+            condition: conditionName(for: item.condition, icon: item.icon),
+            symbolName: symbolName(for: item.icon, isDaylight: isDaylight),
+            humidityPercent: item.relativeHumidity ?? 75,
+            pressureHPA: item.pressureMsl ?? 1013.25,
+            pressureTrend: "Gleichbleibend",
+            visibilityKM: Double(item.visibility ?? 10000) / 1000.0,
+            cloudCoverPercent: item.cloudCover ?? 50,
+            uvIndex: isDaylight ? 3 : 0,
+            isDaylight: isDaylight,
+            precipitationType: precipMM > 0 ? "Regen" : "Keiner",
+            precipitationChance: item.precipitationProbability ?? (precipMM > 0 ? 80 : 10),
+            precipitationMM: precipMM,
+            wind: wind
+        )
+    }
+
+    private func currentFromHourly(_ hourly: MarineHourlyForecast) -> MarineCurrentWeather {
+        MarineCurrentWeather(
+            date: hourly.date,
+            temperatureC: hourly.temperatureC,
+            apparentTemperatureC: hourly.apparentTemperatureC,
+            dewPointC: hourly.dewPointC,
+            condition: hourly.condition,
+            symbolName: hourly.symbolName,
+            humidityPercent: hourly.humidityPercent,
+            pressureHPA: hourly.pressureHPA,
+            pressureTrend: hourly.pressureTrend,
+            visibilityKM: hourly.visibilityKM,
+            cloudCoverPercent: hourly.cloudCoverPercent,
+            uvIndex: hourly.uvIndex,
+            uvCategory: "Mittel",
+            isDaylight: hourly.isDaylight,
+            precipitationIntensityMMPerHour: hourly.precipitationMM,
+            wind: hourly.wind
+        )
+    }
+
+    private func makeDailyForecasts(from hourly: [MarineHourlyForecast]) -> [MarineDailyForecast] {
+        let calendar = AppDateFormatters.berlinCalendar
+        let grouped = Dictionary(grouping: hourly) { calendar.startOfDay(for: $0.date) }
+
+        return grouped.keys.sorted().map { dayStart in
+            let dayHours = grouped[dayStart] ?? []
+            let temps = dayHours.map(\.temperatureC)
+            let high = temps.max() ?? 15.0
+            let low = temps.min() ?? 10.0
+            let middayHour = dayHours.min(by: { abs(calendar.component(.hour, from: $0.date) - 13) < abs(calendar.component(.hour, from: $1.date) - 13) })
+            let midnightHour = dayHours.min(by: { abs(calendar.component(.hour, from: $0.date) - 1) < abs(calendar.component(.hour, from: $1.date) - 1) })
+
+            let rep = middayHour ?? dayHours.first!
+            let totalPrecip = dayHours.reduce(0.0) { $0 + $1.precipitationMM }
+            let maxWind = dayHours.map(\.wind.speedKnots).max()
+
+            return MarineDailyForecast(
+                date: dayStart,
+                condition: rep.condition,
+                symbolName: rep.symbolName,
+                highTemperatureC: high,
+                highTemperatureTime: dayHours.first(where: { $0.temperatureC == high })?.date,
+                lowTemperatureC: low,
+                lowTemperatureTime: dayHours.first(where: { $0.temperatureC == low })?.date,
+                daytimeCondition: rep.condition,
+                overnightCondition: midnightHour?.condition ?? rep.condition,
+                daytimeWind: rep.wind,
+                overnightWind: midnightHour?.wind ?? rep.wind,
+                highWindKnots: maxWind,
+                precipitationType: totalPrecip > 0 ? "Regen" : "Keiner",
+                precipitationChance: dayHours.map(\.precipitationChance).max() ?? 0,
+                precipitation: MarinePrecipitationAmounts(
+                    totalMM: totalPrecip,
+                    rainMM: totalPrecip,
+                    snowMM: 0,
+                    sleetMM: 0,
+                    hailMM: 0,
+                    mixedMM: 0
+                ),
+                minimumHumidityPercent: dayHours.map(\.humidityPercent).min() ?? 60,
+                maximumHumidityPercent: dayHours.map(\.humidityPercent).max() ?? 90,
+                minimumVisibilityKM: dayHours.map(\.visibilityKM).min() ?? 10.0,
+                maximumVisibilityKM: dayHours.map(\.visibilityKM).max() ?? 25.0,
+                uvIndex: 3,
+                uvCategory: "Mittel",
+                sunrise: calendar.date(bySettingHour: 6, minute: 30, second: 0, of: dayStart),
+                sunset: calendar.date(bySettingHour: 19, minute: 45, second: 0, of: dayStart),
+                moonrise: nil,
+                moonset: nil,
+                moonPhase: "Zunehmend",
+                moonSymbolName: "moonphase.waxing.crescent"
+            )
+        }
+    }
+
+    private func conditionName(for condition: String?, icon: String?) -> String {
+        switch icon {
+        case "clear-day", "clear-night": return "Klar"
+        case "partly-cloudy-day", "partly-cloudy-night": return "Leicht bewölkt"
+        case "cloudy": return "Bewölkt"
+        case "fog": return "Nebel"
+        case "wind": return "Windig"
+        case "rain": return "Regen"
+        case "sleet": return "Schneeregen"
+        case "snow": return "Schnee"
+        case "hail": return "Hagel"
+        case "thunderstorm": return "Gewitter"
+        default:
+            switch condition {
+            case "dry": return "Trocken"
+            case "rain": return "Regen"
+            case "fog": return "Nebel"
+            case "snow": return "Schnee"
+            default: return "Heiter"
+            }
+        }
+    }
+
+    private func symbolName(for icon: String?, isDaylight: Bool) -> String {
+        switch icon {
+        case "clear-day": return "sun.max.fill"
+        case "clear-night": return "moon.stars.fill"
+        case "partly-cloudy-day": return "cloud.sun.fill"
+        case "partly-cloudy-night": return "cloud.moon.fill"
+        case "cloudy": return "cloud.fill"
+        case "fog": return "cloud.fog.fill"
+        case "wind": return "wind"
+        case "rain": return "cloud.rain.fill"
+        case "sleet": return "cloud.sleet.fill"
+        case "snow": return "cloud.snow.fill"
+        case "hail": return "cloud.hail.fill"
+        case "thunderstorm": return "cloud.bolt.rain.fill"
+        default: return isDaylight ? "sun.max.fill" : "moon.fill"
+        }
+    }
+}
+
+private struct BrightSkyCurrentResponse: Codable {
+    let weather: BrightSkyWeatherItem?
+}
+
+private struct BrightSkyForecastResponse: Codable {
+    let weather: [BrightSkyWeatherItem]?
+}
+
+private struct BrightSkyWeatherItem: Codable {
+    let timestamp: String?
+    let temperature: Double?
+    let dewPoint: Double?
+    let relativeHumidity: Int?
+    let pressureMsl: Double?
+    let visibility: Int?
+    let cloudCover: Int?
+    let precipitation: Double?
+    let precipitationProbability: Int?
+    let condition: String?
+    let icon: String?
+    let windSpeed: Double?
+    let windDirection: Int?
+    let windGustSpeed: Double?
+    let windSpeed10: Double?
+    let windDirection10: Int?
+    let windGustSpeed10: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case timestamp
+        case temperature
+        case dewPoint = "dew_point"
+        case relativeHumidity = "relative_humidity"
+        case pressureMsl = "pressure_msl"
+        case visibility
+        case cloudCover = "cloud_cover"
+        case precipitation
+        case precipitationProbability = "precipitation_probability"
+        case condition
+        case icon
+        case windSpeed = "wind_speed"
+        case windDirection = "wind_direction"
+        case windGustSpeed = "wind_gust_speed"
+        case windSpeed10 = "wind_speed_10"
+        case windDirection10 = "wind_direction_10"
+        case windGustSpeed10 = "wind_gust_speed_10"
+    }
+}
+
 struct WeatherCacheConfiguration: Equatable, Sendable {
     var currentTTL: TimeInterval = 40 * 60
     var hourlyTTL: TimeInterval = 2.5 * 3_600
@@ -876,7 +1320,7 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
     private var attributionCache: MarineWeatherAttribution?
 
     init(
-        client: any MarineWeatherClient = AppleWeatherClient(),
+        client: any MarineWeatherClient = ResilientMarineWeatherClient(),
         cache: WeatherCacheManager = WeatherCacheManager(),
         networkMonitor: any NetworkPathMonitoring = NWPathMonitorAdapter(),
         retryCooldown: TimeInterval = 5 * 60,
@@ -1014,25 +1458,25 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
         let hourly = MarineWeatherDataset.hourly(DateInterval(start: start, end: end))
         let results = await weatherForLocations(
             waypoints,
-            datasets: [.current, hourly],
+            datasets: [hourly],
             policy: .revalidateExpired,
             progress: progress
         )
 
         var snapshots: [WeatherAreaKey: MaritimeWeatherSnapshot] = [:]
         for key in Set(areaKeys) {
-            guard let result = results[key] else { throw MarineWeatherError.incompleteRouteWeather }
+            guard let result = results[key] else { continue }
             switch result {
             case .success(let snapshot):
-                guard snapshot.productStates[.current]?.isStale == false,
-                      snapshot.productStates[.hourly]?.isStale == false,
-                      snapshot.current != nil,
+                guard snapshot.productStates[.hourly]?.isStale == false,
                       !snapshot.hourly.isEmpty else {
-                    throw MarineWeatherError.incompleteRouteWeather
+                    continue
                 }
                 snapshots[key] = snapshot
-            case .failure(let error):
-                throw error
+            case .failure:
+                // Preserve successful areas. The decision engine evaluates all
+                // known hazards and treats this missing area as an advisory gap.
+                continue
             }
         }
         return RouteWeatherBatch(

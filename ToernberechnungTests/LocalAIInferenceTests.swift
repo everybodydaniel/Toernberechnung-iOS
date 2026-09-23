@@ -6,7 +6,12 @@ final class LocalAIInferenceTests: XCTestCase {
         for text in ["Ich möchte ein Crewmitglied hinzufügen", "Füge ein Crewmitglied an Bord hinzu", "Crewmitglied anlegen"] {
             XCTAssertEqual(NautiDeterministicIntentRouter.crewspaceEditor(in: text), .crewMember, text)
         }
-        for text in ["Ich möchte einen Termin hinzufügen", "Trage einen Termin ein", "Neuer Termin", "Erstelle ein Event", "Ich möchte ein Termin planen", "Ich möchte einen Termin planen", "Plane einen Termin für morgen", "Termin vereinbaren", "Ein Event organisieren"] {
+        let eventTexts = [
+            "Ich möchte einen Termin hinzufügen", "Trage einen Termin ein", "Neuer Termin",
+            "Erstelle ein Event", "Ich möchte ein Termin planen", "Ich möchte einen Termin planen",
+            "Plane einen Termin für morgen", "Termin vereinbaren", "Ein Event organisieren"
+        ]
+        for text in eventTexts {
             XCTAssertEqual(NautiDeterministicIntentRouter.crewspaceEditor(in: text), .event, text)
         }
         for text in ["Kein Crewmitglied hinzufügen", "Termin nicht anlegen", "Ich möchte keinen Termin planen", "Termin löschen", "Welche Termine habe ich?", "Wie wird das Wetter?"] {
@@ -100,11 +105,13 @@ final class LocalAIInferenceTests: XCTestCase {
             "Welche Wetterzeichen muss ich beachten?",
             "Warum kentert der Strom nicht immer bei Hochwasser?",
             "Erläutere den Einfluss von Wind auf den Wasserstand.",
-            "Was bedeutet Niedrigwasser für das Trockenfallen bei Juist?"
+            "Was bedeutet Niedrigwasser für das Trockenfallen bei Juist?",
+            "Was macht das Wattenmeer so besonders?"
         ]
         for question in questions {
             let request = NautiInferenceRequest(messages: [.init(role: .user, text: question)])
             XCTAssertNil(NautiDeterministicIntentRouter.route(request), question)
+            XCTAssertTrue(NautiDeterministicIntentRouter.asksForAdvice(question), question)
         }
     }
 
@@ -241,7 +248,7 @@ final class LocalAIInferenceTests: XCTestCase {
 
         for _ in 0..<200 {
             if await backend.didStart() { break }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(5))
         }
         let didStart = await backend.didStart()
         XCTAssertTrue(didStart)
@@ -343,6 +350,7 @@ final class LocalAIInferenceTests: XCTestCase {
         ])
     }
 }
+
 
 private struct StaticLocalAIClient: LocalAIInferenceClient {
     let availabilityValue: LocalAIAvailability

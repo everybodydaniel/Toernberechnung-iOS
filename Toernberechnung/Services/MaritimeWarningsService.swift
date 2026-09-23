@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import CoreLocation
 import Observation
+import PDFKit
 
 @MainActor
 @Observable
@@ -127,53 +128,50 @@ public final class MaritimeWarningsService {
         isLoading = true
         errorMessage = nil
 
-        let endpoint = "https://nautiskinformation.soefartsstyrelsen.dk/rest/messages/search?lang=en"
-        guard let url = URL(string: endpoint) else {
+        let bshEndpoint = "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"
+        guard let url = URL(string: bshEndpoint) else {
             isLoading = false
             return
         }
 
         do {
             var request = URLRequest(url: url)
-            request.timeoutInterval = 12
+            request.timeoutInterval = 15
             request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
 
             let (data, response) = try await URLSession.shared.data(for: request)
 
-            if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
-                let decoder = JSONDecoder()
-                let items = try decoder.decode([NiordSearchResponseItem].self, from: data)
+            if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200,
+               let pdfDoc = PDFDocument(data: data) {
+                let liveWarnings = BSHNauticalWarningsParser.parse(pdfDocument: pdfDoc)
 
-                // Filter strictly to North Sea / German Bight
-                let northSeaLive = items.compactMap { $0.toMaritimeWarning() }.filter { $0.isNorthSeaOrGermanBight }
-
-                // Combine curated BSH/ELWIS notices with live DMA notices (avoid duplicate IDs)
-                var existingMap: [String: MaritimeWarning] = [:]
-                for item in Self.defaultCuratedWarnings {
-                    existingMap[item.id] = item
-                }
-                for item in northSeaLive {
-                    existingMap[item.id] = item
-                }
-
-                // Sort: Hazards first, then warnings, then newest
-                let sorted = Array(existingMap.values).sorted { first, second in
-                    if first.severity != second.severity {
-                        return severityRank(first.severity) < severityRank(second.severity)
+                if !liveWarnings.isEmpty {
+                    // Sort: Hazards first, then warnings, then newest
+                    let sorted = liveWarnings.sorted { first, second in
+                        if first.severity != second.severity {
+                            return severityRank(first.severity) < severityRank(second.severity)
+                        }
+                        return first.publishDate > second.publishDate
                     }
-                    return first.publishDate > second.publishDate
-                }
 
-                self.warnings = sorted
-                self.lastRefreshDate = Date()
-                self.updateUnreadCount()
-                saveCachedWarnings(sorted)
-            } else {
-                self.errorMessage = "Warnungsdienst vorübergehend nicht erreichbar."
+                    self.warnings = sorted
+                    self.lastRefreshDate = Date()
+                    self.updateUnreadCount()
+                    saveCachedWarnings(sorted)
+                    isLoading = false
+                    return
+                }
+            }
+
+            // If BSH live parsing returned no items, maintain cached data
+            if self.warnings.isEmpty {
+                loadCachedWarnings()
             }
         } catch {
-            self.errorMessage = "Fehler beim Laden: \(error.localizedDescription)"
+            self.errorMessage = "BSH Seewarndienst nicht erreichbar. Zuletzt gespeicherte Meldungen aktiv."
+            if self.warnings.isEmpty {
+                loadCachedWarnings()
+            }
         }
 
         isLoading = false
@@ -254,6 +252,16 @@ public final class MaritimeWarningsService {
         self.updateUnreadCount()
     }
 
+    private static func fixedDate(year: Int, month: Int, day: Int, hour: Int) -> Date {
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = day
+        comps.hour = hour
+        comps.timeZone = TimeZone(identifier: "UTC")
+        return Calendar(identifier: .gregorian).date(from: comps) ?? Date(timeIntervalSince1970: 1787224547)
+    }
+
     public static let defaultCuratedWarnings: [MaritimeWarning] = [
         MaritimeWarning(
             id: "bsh-nwn-2026-08",
@@ -266,7 +274,7 @@ public final class MaritimeWarningsService {
             Schifffahrt wird um erhöhte Aufmerksamkeit und weite Umfahrung gebeten.
             """,
             areaName: "Deutsche Bucht · Wangerooge Ansteuerung",
-            publishDate: Date().addingTimeInterval(-3600 * 5),
+            publishDate: fixedDate(year: 2026, month: 9, day: 1, hour: 14),
             latitude: 53.9233,
             longitude: 7.7017,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
@@ -283,7 +291,7 @@ public final class MaritimeWarningsService {
             Das Befahren außerhalb des Fahrwassers ist lebensgefährlich.
             """,
             areaName: "Norderney · Dovetief",
-            publishDate: Date().addingTimeInterval(-3600 * 18),
+            publishDate: fixedDate(year: 2026, month: 8, day: 28, hour: 10),
             latitude: 53.7250,
             longitude: 7.1520,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
@@ -300,7 +308,7 @@ public final class MaritimeWarningsService {
             Sicherungsfahrzeuge führen die vorgeschriebenen Signale und halten UKW-Kanal 16 abhörbereit.
             """,
             areaName: "Deutsche Bucht · Helgoland",
-            publishDate: Date().addingTimeInterval(-3600 * 24),
+            publishDate: fixedDate(year: 2026, month: 8, day: 25, hour: 8),
             latitude: 54.1800,
             longitude: 7.8900,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
@@ -317,7 +325,7 @@ public final class MaritimeWarningsService {
             UKW-Kanal 16 bzw. 74 für Passierabsprachen abzuhören.
             """,
             areaName: "Außenweser · Alte Weser",
-            publishDate: Date().addingTimeInterval(-3600 * 48),
+            publishDate: fixedDate(year: 2026, month: 8, day: 20, hour: 12),
             latitude: 53.8400,
             longitude: 8.1200,
             webUrl: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/")
@@ -332,7 +340,7 @@ public final class MaritimeWarningsService {
             ist wegen Wartungsarbeiten vorübergehend verloschen. Das Radar- und AIS-Signal arbeitet einwandfrei.
             """,
             areaName: "Elbemündung · Deutsche Bucht",
-            publishDate: Date().addingTimeInterval(-3600 * 72),
+            publishDate: fixedDate(year: 2026, month: 8, day: 15, hour: 16),
             latitude: 54.0000,
             longitude: 8.1083,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
@@ -348,7 +356,7 @@ public final class MaritimeWarningsService {
             Tonnen H2 bis H4 bei mittlerem Niedrigwasser örtlich nur noch 1,80 m. Tiefgang beachten.
             """,
             areaName: "Borkum · Hubertgat",
-            publishDate: Date().addingTimeInterval(-3600 * 96),
+            publishDate: fixedDate(year: 2026, month: 8, day: 10, hour: 9),
             latitude: 53.6200,
             longitude: 6.6400,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
@@ -364,7 +372,7 @@ public final class MaritimeWarningsService {
             haben sich gegenüber dem Vorjahr um bis zu 80 m verlagert. Der Prickung ist strikt zu folgen.
             """,
             areaName: "Juist · Wattfahrwasser",
-            publishDate: Date().addingTimeInterval(-3600 * 120),
+            publishDate: fixedDate(year: 2026, month: 8, day: 5, hour: 11),
             latitude: 53.6800,
             longitude: 7.0500,
             webUrl: URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf"),
@@ -381,7 +389,7 @@ public final class MaritimeWarningsService {
             Passieren mit reduzierter Geschwindigkeit.
             """,
             areaName: "Jade · Wilhelmshaven",
-            publishDate: Date().addingTimeInterval(-3600 * 140),
+            publishDate: fixedDate(year: 2026, month: 8, day: 1, hour: 7),
             latitude: 53.5800,
             longitude: 8.1600,
             webUrl: URL(string: "https://www.elwis.de/DE/dynamisch/Bfs/")

@@ -118,12 +118,12 @@ enum NautiDeterministicIntentRouter {
         return NautiActionValidator.validate(action, reply: reply)
     }
 
-    private static func asksForAdvice(_ text: String) -> Bool {
+    static func asksForAdvice(_ text: String) -> Bool {
         let text = folded(text)
         let patterns = [
-            #"\b(erkl[aä]r\w*|erlaut\w*|warum|weshalb|wieso|bedeut\w*|versteh\w*)\b"#,
-            #"\b(was (ist|sind)|wie (entsteh\w*|funktionier\w*|bereit\w*|plan\w*|erkenne|verhalt\w*))\b"#,
-            #"\b(beacht\w*|berat\w*|rat(?:schlag|schlage)|tipps?|zusammenhang|unterschied\w*)\b"#
+            #"\b(erkl[aä]r\w*|erlaut\w*|warum|weshalb|wieso|bedeut\w*|versteh\w*|beschreib\w*|erz[aä]hl\w*)\b"#,
+            #"\b(was (ist|sind|macht|kann|gibt|bedeut\w*)|wie (entsteh\w*|funktionier\w*|bereit\w*|plan\w*|erkenne|verhalt\w*|lauft|geht))\b"#,
+            #"\b(beacht\w*|berat\w*|rat(?:schlag|schlage)|tipps?|zusammenhang|unterschied\w*|besonder\w*)\b"#
         ]
         return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
     }

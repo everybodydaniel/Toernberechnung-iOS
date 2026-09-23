@@ -253,7 +253,8 @@ struct CompactMapView: UIViewRepresentable {
             let reuseID = "pin-\(pin.kind.rawValue)"
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseID)
                 ?? MKAnnotationView(annotation: pin, reuseIdentifier: reuseID)
-            view.image = Self.markerImage(for: pin.kind, status: pin.status)
+            view.annotation = pin
+            view.image = Self.markerImage(for: pin.kind, status: pin.status, wukText: pin.wukText)
             view.canShowCallout = true
             view.centerOffset = CGPoint(x: 0, y: -view.image!.size.height / 2)
             return view
@@ -534,32 +535,79 @@ struct CompactMapView: UIViewRepresentable {
             waypointResults: [WaypointCalculationResult]?
         ) -> [RoutePinAnnotation] {
             var pins: [RoutePinAnnotation] = []
+            let resultsByWPID = Dictionary(
+                uniqueKeysWithValues: (waypointResults ?? []).map { ($0.waypoint.id, $0) }
+            )
+
+            // 1. Start pin
+            let startSub: String? = {
+                if let plan = routePlan {
+                    return "Abfahrt: \(AppDateFormatters.hourMinute.string(from: plan.plannedStartTime)) Uhr"
+                }
+                return nil
+            }()
             pins.append(RoutePinAnnotation(
                 coordinate: CLLocationCoordinate2D(latitude: start.latitude, longitude: start.longitude),
                 title: "Start: \(start.name)",
-                kind: .start, status: .go
+                subtitle: startSub,
+                kind: .start,
+                status: .go
             ))
+
+            // 2. Destination pin
+            let destResult = routePlan?.waypoints.last.flatMap { resultsByWPID[$0.id] }
+            let destSub: String? = {
+                var parts: [String] = []
+                if let eta = destResult?.arrivalTime {
+                    parts.append("Ankunft: \(AppDateFormatters.hourMinute.string(from: eta)) Uhr")
+                }
+                if let wuk = destResult?.clearanceUnderKeelWuKMeters {
+                    parts.append(String(format: "WuK: %+.2f m", wuk))
+                }
+                return parts.isEmpty ? nil : parts.joined(separator: " · ")
+            }()
             pins.append(RoutePinAnnotation(
                 coordinate: CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude),
                 title: "Ziel: \(destination.name)",
-                kind: .destination, status: .go
+                subtitle: destSub,
+                kind: .destination,
+                status: destResult?.status ?? .go
             ))
 
             guard let routePlan, routePlan.waypoints.count > 2 else { return pins }
-            // Drop start + destination + auto-inserted fairway WPs.
-            let intermediates = routePlan.waypoints.dropFirst().dropLast().filter {
-                $0.category != "Fahrwasser"
-            }
-            let statusByID = Dictionary(
-                uniqueKeysWithValues: (waypointResults ?? []).map { ($0.waypoint.id, $0.status) }
-            )
+
+            // 3. Intermediate waypoints & bottlenecks along route
+            let intermediates = routePlan.waypoints.dropFirst().dropLast()
             for wp in intermediates {
                 guard let lat = wp.latitude, let lon = wp.longitude else { continue }
+                let result = resultsByWPID[wp.id]
+                let wuk = result?.clearanceUnderKeelWuKMeters
+                let depth = result?.availableWaterDepthWTMeters
+                let eta = result?.arrivalTime
+                let isBottleneck = (wp.category == "Fahrwasser" && (wp.chartDepthMeters?.value ?? 10) < 2.5)
+                    || wp.name.localizedCaseInsensitiveContains("watt")
+                    || wp.category == "Wattenhoch"
+
+                var parts: [String] = []
+                if let wuk {
+                    parts.append(String(format: "WuK: %+.2f m", wuk))
+                }
+                if let depth {
+                    parts.append(String(format: "Tiefe: %.2f m", depth))
+                }
+                if let eta {
+                    parts.append(AppDateFormatters.hourMinute.string(from: eta) + " Uhr")
+                }
+
+                let wukBadge: String? = wuk.map { String(format: "%+.1fm", $0) }
+
                 pins.append(RoutePinAnnotation(
                     coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
                     title: wp.name,
-                    kind: .stop,
-                    status: statusByID[wp.id] ?? .incomplete
+                    subtitle: parts.isEmpty ? nil : parts.joined(separator: " · "),
+                    kind: isBottleneck ? .bottleneck : .stop,
+                    status: result?.status ?? .incomplete,
+                    wukText: isBottleneck ? wukBadge : nil
                 ))
             }
             return pins
@@ -585,13 +633,52 @@ struct CompactMapView: UIViewRepresentable {
             }
         }
 
-        private static func markerImage(for kind: RoutePinAnnotation.Kind, status: WaypointStatus) -> UIImage {
+        private static func markerImage(
+            for kind: RoutePinAnnotation.Kind,
+            status: WaypointStatus,
+            wukText: String? = nil
+        ) -> UIImage {
             let baseColor: UIColor
             switch kind {
             case .start:       baseColor = .systemGreen
             case .destination: baseColor = .systemBlue
             case .stop:        baseColor = routeUIColor(for: status)
+            case .bottleneck:  baseColor = routeUIColor(for: status)
             }
+
+            if kind == .bottleneck, let wukText {
+                let font = UIFont.systemFont(ofSize: 10, weight: .heavy)
+                let textAttr: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: UIColor.white
+                ]
+                let textSize = (wukText as NSString).size(withAttributes: textAttr)
+                let badgeWidth = max(textSize.width + 12, 38)
+                let badgeHeight: CGFloat = 20
+                let totalHeight: CGFloat = badgeHeight + 6
+                let size = CGSize(width: badgeWidth, height: totalHeight)
+                let renderer = UIGraphicsImageRenderer(size: size)
+                return renderer.image { _ in
+                    baseColor.setFill()
+                    let rect = CGRect(x: 0, y: 0, width: badgeWidth, height: badgeHeight)
+                    let path = UIBezierPath(roundedRect: rect, cornerRadius: badgeHeight / 2)
+                    path.fill()
+                    let arrow = UIBezierPath()
+                    arrow.move(to: CGPoint(x: badgeWidth / 2 - 4, y: badgeHeight - 1))
+                    arrow.addLine(to: CGPoint(x: badgeWidth / 2, y: totalHeight))
+                    arrow.addLine(to: CGPoint(x: badgeWidth / 2 + 4, y: badgeHeight - 1))
+                    arrow.close()
+                    arrow.fill()
+                    let textRect = CGRect(
+                        x: (badgeWidth - textSize.width) / 2,
+                        y: (badgeHeight - textSize.height) / 2,
+                        width: textSize.width,
+                        height: textSize.height
+                    )
+                    (wukText as NSString).draw(in: textRect, withAttributes: textAttr)
+                }
+            }
+
             let size = kind == .stop
                 ? CGSize(width: 20, height: 24)
                 : CGSize(width: 28, height: 34)
@@ -625,18 +712,29 @@ struct CompactMapView: UIViewRepresentable {
 // MARK: - Route Pin Annotation
 
 final class RoutePinAnnotation: NSObject, MKAnnotation {
-    enum Kind: String { case start, destination, stop }
+    enum Kind: String { case start, destination, stop, bottleneck }
 
     let coordinate: CLLocationCoordinate2D
     let title: String?
+    let subtitle: String?
     let kind: Kind
     let status: WaypointStatus
+    let wukText: String?
 
-    init(coordinate: CLLocationCoordinate2D, title: String?, kind: Kind, status: WaypointStatus) {
+    init(
+        coordinate: CLLocationCoordinate2D,
+        title: String?,
+        subtitle: String? = nil,
+        kind: Kind,
+        status: WaypointStatus,
+        wukText: String? = nil
+    ) {
         self.coordinate = coordinate
         self.title = title
+        self.subtitle = subtitle
         self.kind = kind
         self.status = status
+        self.wukText = wukText
     }
 }
 

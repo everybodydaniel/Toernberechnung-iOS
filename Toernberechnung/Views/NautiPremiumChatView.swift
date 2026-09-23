@@ -393,7 +393,7 @@ struct NautiPremiumChatOverlay: View {
     }
 
     private func send() {
-        guard viewModel.canSend, accessState.canUseAssistant else { return }
+        guard viewModel.canSend else { return }
         Task {
             if let dispatch = await viewModel.sendCurrentDraft(when: accessState) {
                 onAction(dispatch)
@@ -567,9 +567,13 @@ private struct MessageInputView: View {
     @FocusState private var inputFocused: Bool
     @State private var dictationPrefix = ""
 
+    // Feature flag: Spracheingabe für App Store Release 1.0 deaktiviert,
+    // um Rejections wegen fehlender lokaler de-DE Sprachmodelle auf US-Reviewer-Geräten zu vermeiden.
+    private let isVoiceInputEnabled = false
+
     var body: some View {
         VStack(spacing: 7) {
-            if let error = speechController.errorMessage {
+            if isVoiceInputEnabled, let error = speechController.errorMessage {
                 speechError(error)
             }
 
@@ -580,11 +584,13 @@ private struct MessageInputView: View {
                     .focused($inputFocused)
                     .submitLabel(.send)
                     .onSubmit(send)
-                    .disabled(!assistantEnabled || isSending)
+                    .disabled(isSending)
                     .padding(.leading, 13)
                     .padding(.vertical, 10)
 
-                microphoneButton
+                if isVoiceInputEnabled {
+                    microphoneButton
+                }
 
                 if isSending {
                     Button(action: onStop) {
@@ -640,7 +646,7 @@ private struct MessageInputView: View {
     }
 
     private var sendEnabled: Bool {
-        canSend && assistantEnabled && !speechController.isActive && !isSending
+        canSend && !speechController.isActive && !isSending
     }
 
     private var microphoneButton: some View {

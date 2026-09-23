@@ -2,6 +2,9 @@ import Foundation
 
 enum WaterLevelCorrectionQuality: String, Codable, Equatable, Sendable {
     case localOfficial
+    case modelForecast
+    case estimatedTide
+    case unverifiedDepth
     case confirmedComparison
     case manual
     case stale
@@ -10,7 +13,7 @@ enum WaterLevelCorrectionQuality: String, Codable, Equatable, Sendable {
 
     var allowsGreenStatus: Bool { self == .localOfficial }
     var isUsable: Bool {
-        self == .localOfficial || self == .confirmedComparison || self == .manual
+        self == .localOfficial || self == .modelForecast || self == .confirmedComparison || self == .manual
     }
 }
 
@@ -209,20 +212,23 @@ actor BSHWaterLevelForecastService {
             return .unavailable(stationID: localStationID, detail: "Unbekannter BSH-Referenzpegel.")
         }
 
+        let effectiveComparisonID = comparisonStationID
+            ?? BSHTideStationCatalog.requiredComparisonStation(for: localStationID)?.id
+            ?? BSHTideStationCatalog.nearestComparisonStation(for: localStationID)?.id
         let source: BSHTideStation
         let quality: WaterLevelCorrectionQuality
-        if local.hasLocalWaterLevelForecast {
-            source = local
-            quality = .localOfficial
-        } else if let comparisonStationID,
-                  let comparison = BSHTideStationCatalog.station(id: comparisonStationID),
+        if let effectiveComparisonID,
+                  let comparison = BSHTideStationCatalog.station(id: effectiveComparisonID),
                   comparison.hasLocalWaterLevelForecast {
             source = comparison
             quality = .confirmedComparison
+        } else if local.hasLocalWaterLevelForecast {
+            source = local
+            quality = .localOfficial
         } else {
             return .unavailable(
                 stationID: localStationID,
-                detail: "Für \(local.name) ist keine lokale BSH-Wasserstandsvorhersage verfügbar."
+                detail: "Für \(local.name) ist keine BSH-Wasserstandsvorhersage verfügbar."
             )
         }
 

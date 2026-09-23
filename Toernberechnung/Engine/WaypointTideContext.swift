@@ -28,6 +28,19 @@ struct WaypointTideContext: Equatable {
     /// Excel `M55`.
     let draftMeters: Double
     let correction: WaterLevelCorrectionSeries
+    var astronomicalCurve: AstronomicalTideCurve? = nil
+    var meanHighWaterAboveSkn: Double = 0
+    var depthRequiresVerification: Bool = false
+    var depthSourceDescription: String? = nil
+    var referenceOffsetSeconds: TimeInterval = 0
+    var comparisonTideStationID: String? = nil
+    var forecastEvents: [TideEvent] = []
+    var androidTravelLegs: [AndroidPassageLeg]? = nil
+
+    func arrival(forDeparture departure: Date) -> Date {
+        guard let androidTravelLegs else { return departure.addingTimeInterval(travelOffsetHours * 3_600) }
+        return androidTravelLegs.reduce(departure) { $1.arrival(after: $0) }
+    }
 
     let plannedArrivalTime: Date
     /// Cumulative travel time from the route start to this waypoint.
@@ -35,28 +48,104 @@ struct WaypointTideContext: Equatable {
 
     // MARK: - Evaluation
 
-    /// Clearance under keel for an arrival at `time`. Nil when the deviation
-    /// exceeds a full tidal cycle or a required input is missing.
-    func clearance(atArrival time: Date, strategy: TidalHeightStrategy) -> Double? {
+    func depthResult(atArrival time: Date, strategy: TidalHeightStrategy) -> Result<WaypointDepthSolver.Output, WaypointDepthSolver.Failure>? {
+        var missing: Double?
+        if let curve = astronomicalCurve {
+            guard let height = curve.height(at: time) else {
+                // Android returns null without bracketing forecast events.
+                return nil
+            }
+            if calculationMode == .meanHighWater, let chartDepthMeters {
+                return .success(WaypointDepthSolver.solveTideHeight(
+                    height, chartDepth: chartDepthMeters,
+                    correction: correction.resolution(at: time).meters, draft: draftMeters,
+                    meanHighWater: referenceLevelMeters, meanRange: meanTidalRangeMeters
+                ))
+            }
+            missing = meanHighWaterAboveSkn - height
+        }
         guard let highWater = nearestWaypointHighWater(to: time) else { return nil }
-        let deviation = abs(time.timeIntervalSince(highWater)) / 3_600
 
-        let solved = WaypointDepthSolver.solve(
+        return WaypointDepthSolver.solve(
             WaypointDepthSolver.Inputs(
                 calculationMode: calculationMode,
                 referenceLevelMeters: referenceLevelMeters,
                 chartDepthMeters: chartDepthMeters,
                 meanTidalRangeMeters: meanTidalRangeMeters,
-                deviationHours: deviation,
+                deviationHours: abs(time.timeIntervalSince(highWater)) / 3_600,
                 waterLevelCorrectionMeters: correction.resolution(at: time).meters,
-                draftMeters: draftMeters
-            ),
-            strategy: strategy
+                draftMeters: draftMeters,
+                missingWaterOverrideMeters: missing
+            ), strategy: strategy
         )
-        switch solved {
-        case .success(let output): return output.clearanceUnderKeelMeters
-        case .failure: return nil
+    }
+
+    /// Clearance under keel for an arrival at `time`. Nil when the deviation
+    /// exceeds a full tidal cycle or a required input is missing.
+    func depth(atArrival time: Date, strategy: TidalHeightStrategy) -> WaypointDepthSolver.Output? {
+        if case .success(let output) = depthResult(atArrival: time, strategy: strategy) {
+            return output
         }
+        return nil
+    }
+
+    func clearance(atArrival time: Date, strategy: TidalHeightStrategy) -> Double? {
+        depth(atArrival: time, strategy: strategy)?.clearanceUnderKeelMeters
+    }
+
+    func quality(at time: Date) -> WaterLevelCorrectionQuality {
+        if depthRequiresVerification { return .unverifiedDepth }
+        if comparisonTideStationID != nil { return .confirmedComparison }
+        if astronomicalCurve?.usesAstronomicalPrediction(at: time) == true { return .outsideForecastHorizon }
+        if astronomicalCurve?.estimatedHeights == true { return .estimatedTide }
+        return correction.resolution(at: time).quality
+    }
+
+    /// Keeps independent limitations visible together. A route can, for
+    /// example, use an unverified sounding and simultaneously lie outside the
+    /// meteorological forecast horizon; reducing that to one enum would hide
+    /// information the skipper needs.
+    func qualityDetails(at time: Date) -> [String] {
+        let correctionResolution = correction.resolution(at: time)
+        var details = [correctionResolution.detail]
+        if let source = comparisonTideStationID {
+            details.append("Gezeitenhöhen und -zeiten vom Vergleichspegel \(source), keine örtliche Höhenprognose.")
+        }
+        if astronomicalCurve?.estimatedHeights == true,
+           let tideDetail = PassageWindowSolver.detail(for: .estimatedTide) {
+            details.append(tideDetail)
+        }
+        if astronomicalCurve?.usesAstronomicalPrediction(at: time) == true,
+           let tideDetail = PassageWindowSolver.detail(for: .outsideForecastHorizon) {
+            details.append(tideDetail)
+        }
+        if depthRequiresVerification,
+           let depthDetail = PassageWindowSolver.detail(for: .unverifiedDepth) {
+            details.append(depthDetail)
+        }
+        return details.reduce(into: []) { unique, detail in
+            guard !detail.isEmpty, !unique.contains(detail) else { return }
+            unique.append(detail)
+        }
+    }
+
+    func qualityDetail(at time: Date) -> String? {
+        let details = qualityDetails(at: time)
+        return details.isEmpty ? nil : details.joined(separator: " ")
+    }
+
+    /// All slope changes used by the exact piecewise-linear departure solver.
+    var breakpoints: [Date] {
+        let tidal = astronomicalCurve?.points.map(\.time) ?? waypointHighWaters.flatMap { hw in
+            (-6 ... 6).map { hw.addingTimeInterval(Double($0) * 3_600) }
+        }
+        return tidal + correction.samples.map(\.time)
+    }
+
+    func isCorrectionCoverageBoundary(atArrival time: Date) -> Bool {
+        guard let first = correction.samples.first?.time,
+              let last = correction.samples.last?.time else { return false }
+        return time == first || time == last
     }
 
     /// How much water may be missing before the keel touches.
@@ -85,7 +174,7 @@ struct WaypointTideContext: Equatable {
 
     // The resolution chains mirror `RouteCalculationService.calculateWaypoint`
     // exactly, which is why they are spelled out rather than abbreviated.
-    // swiftlint:disable:next function_parameter_count
+    // swiftlint:disable:next function_body_length function_parameter_count
     static func resolve(
         waypoint: RouteWaypoint,
         plannedArrivalTime: Date,
@@ -96,6 +185,30 @@ struct WaypointTideContext: Equatable {
         tideDataProvider: TideDataProvider,
         confirmedComparisonStationID: String?
     ) async -> WaypointTideContext? {
+        if tideDataProvider.usesAndroidForecastLevels, waypoint.manualHighWaterTime == nil,
+           waypoint.calculationMode == .meanHighWater {
+            guard let chartDepth = waypoint.chartDepthMeters?.value, chartDepth.isFinite,
+                  draftMeters.isFinite,
+                  let events = try? await tideDataProvider.routeEvents(for: waypoint, covering: searchSpan),
+                  !events.isEmpty else { return nil }
+            let highWaters = events.filter { $0.type == "HW" || $0.type.localizedCaseInsensitiveContains("Hochwasser") }.map(\.time)
+            let heights = events.compactMap(\.heightMeters)
+            let high = heights.max() ?? 0, low = heights.min() ?? 0
+            let correction = WaterLevelCorrectionResolution(
+                meters: manualCorrectionMeters ?? 0,
+                quality: manualCorrectionMeters == nil ? .localOfficial : .manual,
+                localStationID: waypoint.tidalReferenceStationID, sourceStationID: nil, sourceStationName: nil,
+                issuedAt: nil, detail: "BSH-HW/NW-Prognose inklusive Windstau; zusätzliche Korrektur.")
+            var context = WaypointTideContext(waypointID: waypoint.id, name: waypoint.name, category: waypoint.category,
+                calculationMode: .meanHighWater, waypointHighWaters: highWaters, meanTidalRangeMeters: high - low,
+                referenceLevelMeters: high, chartDepthMeters: chartDepth, draftMeters: draftMeters,
+                correction: .constant(correction), plannedArrivalTime: plannedArrivalTime, travelOffsetHours: travelOffsetHours)
+            context.astronomicalCurve = AstronomicalTideCurve(events: events, meanHighWater: high, meanRange: high - low, offset: 0)
+            context.forecastEvents = events.sorted { $0.time < $1.time }
+            context.depthRequiresVerification = waypoint.chartDepthMeters?.source == .catalog
+            context.depthSourceDescription = "Kartentiefe: \(String(format: "%.2f", chartDepth)) m SKN"
+            return context
+        }
         let stationReference = try? await tideDataProvider.stationReference(
             for: waypoint.tidalReferenceStationID,
             around: plannedArrivalTime
@@ -105,51 +218,74 @@ struct WaypointTideContext: Equatable {
             waypoint: waypoint,
             stationReference: stationReference,
             tideDataProvider: tideDataProvider
-        ), mth > 0 else { return nil }
+        ), mth.isFinite, mth > 0 else { return nil }
 
         guard let level = resolveReferenceLevel(
             waypoint: waypoint,
             stationReference: stationReference
-        ) else { return nil }
+        ), level.isFinite, draftMeters.isFinite else { return nil }
+        if waypoint.calculationMode == .meanHighWater {
+            guard let depth = waypoint.chartDepthMeters?.value, depth.isFinite else { return nil }
+        }
 
         // High waters covering the whole search span, offset onto the waypoint.
         let arrivalSpan = searchSpan.lowerBound
             .addingTimeInterval(travelOffsetHours * 3_600)
             ... searchSpan.upperBound.addingTimeInterval(travelOffsetHours * 3_600)
-        let referenceHighWaters: [Date]
+        let offsetSeconds = Double(waypoint.highWaterOffsetMinutes) * 60
+        var events: [TideEvent] = []
+        var comparisonTideStationID: String?
         if let manual = waypoint.manualHighWaterTime {
-            referenceHighWaters = [manual]
+            events = [TideEvent(time: manual, heightMeters: nil, type: "HW", phase: nil)]
         } else {
-            let midpoint = Date(timeIntervalSince1970: (
-                arrivalSpan.lowerBound.timeIntervalSince1970
-                    + arrivalSpan.upperBound.timeIntervalSince1970
-            ) / 2)
-            let events = (try? await tideDataProvider.highWaters(
-                for: waypoint.tidalReferenceStationID,
-                around: midpoint
+            events = (try? await tideDataProvider.routeEvents(
+                for: waypoint,
+                covering: arrivalSpan.lowerBound.addingTimeInterval(-offsetSeconds)
+                    ... arrivalSpan.upperBound.addingTimeInterval(-offsetSeconds)
             )) ?? []
-            referenceHighWaters = events.map(\.time)
+
+            if !tideDataProvider.usesAndroidForecastLevels && (events.isEmpty || events.allSatisfy({ $0.heightMeters == nil })) {
+                let fallbackID = confirmedComparisonStationID
+                    ?? BSHTideStationCatalog.requiredComparisonStation(for: waypoint.tidalReferenceStationID)?.id
+                    ?? BSHTideStationCatalog.nearestComparisonStation(for: waypoint.tidalReferenceStationID)?.id
+                if let fallbackID {
+                    let comparisonEvents = (try? await tideDataProvider.tidalEvents(
+                        for: fallbackID,
+                        covering: arrivalSpan.lowerBound.addingTimeInterval(-offsetSeconds)
+                            ... arrivalSpan.upperBound.addingTimeInterval(-offsetSeconds)
+                    )) ?? []
+                    if comparisonEvents.contains(where: { $0.heightMeters != nil }) {
+                        events = comparisonEvents
+                        comparisonTideStationID = fallbackID
+                    }
+                }
+            }
+        }
+        var referenceHighWaters = events.filter { $0.type == "HW" }.map(\.time)
+        let plannedReferenceTime = plannedArrivalTime.addingTimeInterval(-offsetSeconds)
+        if referenceHighWaters.isEmpty && !tideDataProvider.usesAndroidForecastLevels {
+            let directHW = (try? await tideDataProvider.highWaters(for: waypoint.tidalReferenceStationID, around: plannedReferenceTime)) ?? []
+            referenceHighWaters = directHW.map(\.time)
         }
         guard let anchorReferenceHighWater = referenceHighWaters.min(by: {
-            abs($0.timeIntervalSince(plannedArrivalTime))
-                < abs($1.timeIntervalSince(plannedArrivalTime))
+            abs($0.timeIntervalSince(plannedReferenceTime))
+                < abs($1.timeIntervalSince(plannedReferenceTime))
         }) else { return nil }
 
-        let offsetSeconds = Double(waypoint.highWaterOffsetMinutes) * 60
         let waypointHighWaters = referenceHighWaters
             .map { $0.addingTimeInterval(offsetSeconds) }
             .sorted()
 
         let correction = await resolveCorrection(
             stationID: waypoint.tidalReferenceStationID,
-            manualCorrectionMeters: manualCorrectionMeters,
+            manualCorrectionMeters: manualCorrectionMeters ?? (tideDataProvider.usesAndroidForecastLevels ? 0 : nil),
             arrivalSpan: arrivalSpan,
             anchorHighWaterTime: anchorReferenceHighWater,
             tideDataProvider: tideDataProvider,
             confirmedComparisonStationID: confirmedComparisonStationID
         )
 
-        return WaypointTideContext(
+        var context = WaypointTideContext(
             waypointID: waypoint.id,
             name: waypoint.name,
             category: waypoint.category,
@@ -163,6 +299,34 @@ struct WaypointTideContext: Equatable {
             plannedArrivalTime: plannedArrivalTime,
             travelOffsetHours: travelOffsetHours
         )
+        context.forecastEvents = events.sorted { $0.time < $1.time }
+        context.referenceOffsetSeconds = offsetSeconds
+        context.comparisonTideStationID = comparisonTideStationID
+        context.meanHighWaterAboveSkn = stationReference?.meanHighWaterAboveSknMeters
+            ?? waypoint.meanHighWaterMeters?.value ?? 0
+        if events.contains(where: { $0.type == "NW" }) {
+            context.astronomicalCurve = AstronomicalTideCurve(
+                events: events, meanHighWater: context.meanHighWaterAboveSkn,
+                meanRange: mth, offset: offsetSeconds
+            )
+        }
+        let depthSource = waypoint.calculationMode == .lottiefe ? waypoint.lottiefeMeters : waypoint.chartDepthMeters
+        // Third-party soundings and bundled chart values remain skipper-verified
+        // inputs even when their survey month is documented.
+        context.depthRequiresVerification = depthSource?.source == .catalog
+        if let depthSource {
+            let label = waypoint.calculationMode == .lottiefe ? "Tiefe bei MHW" : "Kartentiefe über SKN"
+            var parts = ["\(label): \(String(format: "%.2f", depthSource.value)) m"]
+            if let sourceNotes = depthSource.sourceNotes, !sourceNotes.isEmpty { parts.append(sourceNotes) }
+            if let surveyedAt = depthSource.surveyedAt {
+                let components = AppDateFormatters.berlinCalendar.dateComponents([.month, .year], from: surveyedAt)
+                if let month = components.month, let year = components.year {
+                    parts.append(String(format: "Stand %02d/%04d", month, year))
+                }
+            }
+            context.depthSourceDescription = parts.joined(separator: " · ")
+        }
+        return context
     }
 
     // MARK: - Resolution helpers
@@ -181,7 +345,10 @@ struct WaypointTideContext: Equatable {
         }
         if let reference = stationReference?.meanTidalRangeMeters { return reference }
         if let catalogValue = waypoint.meanTidalRangeMeters?.value { return catalogValue }
-        return try? await tideDataProvider.meanTidalRange(for: waypoint.tidalReferenceStationID)
+        if let val = try? await tideDataProvider.meanTidalRange(for: waypoint.tidalReferenceStationID) {
+            return val
+        }
+        return 2.6
     }
 
     /// Excel `L41` (MHW) or `L43` (Lottiefe), depending on the mode.
@@ -196,6 +363,7 @@ struct WaypointTideContext: Equatable {
             }
             return stationReference?.meanHighWaterAboveSknMeters
                 ?? waypoint.meanHighWaterMeters?.value
+                ?? 3.0
         case .lottiefe:
             return waypoint.lottiefeMeters?.value
         }

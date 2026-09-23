@@ -33,8 +33,8 @@ final class ExcelParityDepthChainTests: XCTestCase {
     /// `deviationHours`.
     ///
     /// The water level correction is supplied through the provider with
-    /// `.localOfficial` quality, because any other quality would downgrade the
-    /// status in `applyCorrectionQuality` and mask the depth result.
+    /// `.localOfficial` quality so this parity fixture isolates the Excel depth
+    /// chain from separate data-provenance advisories.
     private func makeRoute(
         mode: WaypointCalculationMode,
         meanHighWaterMeters: Double? = nil,
@@ -99,8 +99,8 @@ final class ExcelParityDepthChainTests: XCTestCase {
         )
     }
 
-    /// Excel `$AD$13` delivered as an official local forecast, so the status is
-    /// not downgraded by `applyCorrectionQuality`.
+    /// Excel `$AD$13` delivered as an official local forecast; this fixture
+    /// intentionally carries no separate data-provenance advisory.
     private func makeProvider(waterLevelCorrectionMeters: Double) -> MockTideDataProvider {
         let provider = MockTideDataProvider()
         provider.correctionsByStation[stationID] = WaterLevelCorrectionResolution(
@@ -309,6 +309,7 @@ final class ExcelParityDepthChainTests: XCTestCase {
         XCTAssertEqual(Service.determineRouteStatus(waypointStatuses: [.go, .incomplete]), .incomplete)
         XCTAssertEqual(Service.determineRouteStatus(waypointStatuses: [.warning, .incomplete]), .incomplete)
         XCTAssertEqual(Service.determineRouteStatus(waypointStatuses: [.warning, .noGo]), .noGo)
-        XCTAssertEqual(Service.determineRouteStatus(waypointStatuses: [.invalid, .go]), .noGo)
+        XCTAssertEqual(Service.determineRouteStatus(waypointStatuses: [.invalid, .go]), .incomplete)
+        XCTAssertEqual(Service.determineRouteStatus(waypointStatuses: [.invalid, .noGo]), .noGo)
     }
 }

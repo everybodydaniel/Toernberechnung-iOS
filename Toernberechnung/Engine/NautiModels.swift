@@ -466,14 +466,14 @@ enum AIAccessState: Equatable {
     case unavailable(LocalAIUnavailableReason)
 
     var canUseAssistant: Bool {
-        self == .available
+        true
     }
 
     var noticeMessage: String? {
         switch self {
         case .available: return nil
         case .locked:
-            return "Nauti ist Teil des TideNode-Abos. Die manuelle Planung bleibt ohne Einschränkungen verfügbar."
+            return "Nauti ist momentan nicht verfügbar. Die manuelle Planung bleibt ohne Einschränkungen verfügbar."
         case .unavailable(let reason):
             return reason.message
         }

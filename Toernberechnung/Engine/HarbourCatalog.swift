@@ -13,12 +13,12 @@ struct HarbourOption: Identifiable, Hashable, Sendable {
     static let options: [HarbourOption] = [
         .init(id: "borkum_harbor", name: "Borkum, Fischerbalje", latitude: 53.5606, longitude: 6.7502, chartDepth: 3.0, tideStationID: "101P", tideStationName: "Borkum, Fischerbalje"),
         .init(id: "emden_harbor", name: "Emden, Hafen", latitude: 53.3421, longitude: 7.1852, chartDepth: 5.0, tideStationID: "507P", tideStationName: "Emden, Große Seeschleuse"),
-        .init(id: "juist_harbor", name: "Juist, Hafen", latitude: 53.6722, longitude: 6.9982, chartDepth: 1.8, tideStationID: "794P", tideStationName: "Juist, Hafen"),
-        .init(id: "norderney_harbor", name: "Norderney, Hafen", latitude: 53.7024, longitude: 7.1637, chartDepth: 2.5, tideStationID: "111P", tideStationName: "Norderney, Riffgat"),
-        .init(id: "baltrum_harbor", name: "Baltrum, Hafen", latitude: 53.7229, longitude: 7.3669, chartDepth: 1.2, tideStationID: "784P", tideStationName: "Baltrum, Westende"),
-        .init(id: "langeoog_harbor", name: "Langeoog, Hafen", latitude: 53.7263, longitude: 7.4968, chartDepth: 1.5, tideStationID: "781P", tideStationName: "Langeoog, Hafeneinfahrt"),
-        .init(id: "spiekeroog_harbor", name: "Spiekeroog, Hafen", latitude: 53.7632, longitude: 7.6955, chartDepth: 1.0, tideStationID: "779P", tideStationName: "Spiekeroog"),
-        .init(id: "wangerooge_harbor", name: "Wangerooge, Hafen", latitude: 53.7755, longitude: 7.8683, chartDepth: 1.4, tideStationID: "777P", tideStationName: "Wangerooge, Hafen")
+        .init(id: "juist_harbor", name: "Juist, Hafen", latitude: 53.6722, longitude: 6.9982, chartDepth: -1.2, tideStationID: "794P", tideStationName: "Juist, Hafen"),
+        .init(id: "norderney_harbor", name: "Norderney, Hafen", latitude: 53.7024, longitude: 7.1637, chartDepth: 1.5, tideStationID: "111P", tideStationName: "Norderney, Riffgat"),
+        .init(id: "baltrum_harbor", name: "Baltrum, Hafen", latitude: 53.7229, longitude: 7.3669, chartDepth: -1.0, tideStationID: "784P", tideStationName: "Baltrum, Westende"),
+        .init(id: "langeoog_harbor", name: "Langeoog, Hafen", latitude: 53.7263, longitude: 7.4968, chartDepth: -0.5, tideStationID: "781P", tideStationName: "Langeoog, Hafeneinfahrt"),
+        .init(id: "spiekeroog_harbor", name: "Spiekeroog, Hafen", latitude: 53.7632, longitude: 7.6955, chartDepth: -0.8, tideStationID: "779P", tideStationName: "Spiekeroog"),
+        .init(id: "wangerooge_harbor", name: "Wangerooge, Hafen", latitude: 53.7755, longitude: 7.8683, chartDepth: -0.6, tideStationID: "777P", tideStationName: "Wangerooge, Hafen")
     ]
 
     static func byID(_ id: String) -> HarbourOption {
@@ -89,8 +89,18 @@ struct BSHTideStation: Identifiable, Hashable, Codable, Sendable {
 }
 
 enum BSHTideStationCatalog {
+    /// Curated meteorological comparison gauges. The local station continues
+    /// to provide HW/NW timing; only the wind-driven residual is transferred.
+    /// These assignments are hydrologically explicit and must never be
+    /// replaced by an arbitrary straight-line nearest-neighbour choice.
+    private static let requiredComparisonStationIDs: [String: String] = [
+        "101P": "507P", // Borkum -> Emden (Ems)
+        "794P": "111P", // Juist -> Norderney
+        "784P": "781P"  // Baltrum -> Langeoog
+    ]
+
     static let stations: [BSHTideStation] = [
-        .init(id: "101P", name: "Borkum, Fischerbalje", seoID: "borkum_fischerbalje", latitude: 53.55750, longitude: 6.74778, kind: .gauge, area: .island, forecastFeatureID: "borkum_fischerbalje"),
+        .init(id: "101P", name: "Borkum, Fischerbalje", seoID: "borkum_fischerbalje", latitude: 53.55750, longitude: 6.74778, kind: .interpolated, area: .island, forecastFeatureID: nil),
         .init(id: "794P", name: "Juist, Hafen", seoID: "juist_hafen", latitude: 53.67250, longitude: 6.99583, kind: .interpolated, area: .island, forecastFeatureID: nil),
         .init(id: "111P", name: "Norderney, Riffgat", seoID: "norderney_riffgat", latitude: 53.69639, longitude: 7.15778, kind: .gauge, area: .island, forecastFeatureID: "norderney_riffgat"),
         .init(id: "784P", name: "Baltrum, Westende", seoID: "baltrum_westende", latitude: 53.72278, longitude: 7.36444, kind: .interpolated, area: .island, forecastFeatureID: nil),
@@ -98,6 +108,7 @@ enum BSHTideStationCatalog {
         .init(id: "779P", name: "Spiekeroog, ehem. Landungsbrücke", seoID: "spiekeroog", latitude: 53.74917, longitude: 7.68194, kind: .gauge, area: .island, forecastFeatureID: "spiekeroog"),
         .init(id: "777P", name: "Wangerooge, Hafen", seoID: "wangerooge_hafen", latitude: 53.77639, longitude: 7.86806, kind: .gauge, area: .island, forecastFeatureID: "wangerooge_hafen"),
         .init(id: "507P", name: "Emden, Ems, Große Seeschleuse", seoID: "emden_grosse_seeschleuse", latitude: 53.33667, longitude: 7.18639, kind: .gauge, area: .mainland, forecastFeatureID: "emden_grosse_seeschleuse"),
+        .init(id: "802P", name: "Knock, Ems", seoID: "knock", latitude: 53.32722, longitude: 7.03056, kind: .gauge, area: .mainland, forecastFeatureID: "knock"),
         .init(id: "790A", name: "Norddeich, Westerriede", seoID: "norddeich_westerriede", latitude: 53.64361, longitude: 7.14806, kind: .interpolated, area: .mainland, forecastFeatureID: nil),
         .init(id: "782P", name: "Bensersiel", seoID: "bensersiel", latitude: 53.67472, longitude: 7.57500, kind: .gauge, area: .mainland, forecastFeatureID: "bensersiel"),
         .init(id: "780P", name: "Neuharlingersiel", seoID: "neuharlingersiel", latitude: 53.70167, longitude: 7.70417, kind: .interpolated, area: .mainland, forecastFeatureID: nil),
@@ -122,6 +133,20 @@ enum BSHTideStationCatalog {
         station(id: harbour.tideStationID) ?? stations[0]
     }
 
+    static func requiredComparisonStation(for stationID: String) -> BSHTideStation? {
+        requiredComparisonStationIDs[stationID].flatMap(station(id:))
+    }
+
+    static func requiresComparisonStation(_ stationID: String) -> Bool {
+        requiredComparisonStationIDs[stationID] != nil
+            || station(id: stationID)?.hasLocalWaterLevelForecast == false
+    }
+
+    static func usesDirectWaterLevelForecast(_ stationID: String) -> Bool {
+        station(id: stationID)?.hasLocalWaterLevelForecast == true
+            && requiredComparisonStationIDs[stationID] == nil
+    }
+
     static func comparisonCandidates(for stationID: String, limit: Int = 3) -> [BSHTideStation] {
         guard let local = station(id: stationID) else { return [] }
         return stations
@@ -129,5 +154,9 @@ enum BSHTideStationCatalog {
             .sorted { local.distanceKilometers(to: $0) < local.distanceKilometers(to: $1) }
             .prefix(limit)
             .map { $0 }
+    }
+
+    static func nearestComparisonStation(for stationID: String) -> BSHTideStation? {
+        comparisonCandidates(for: stationID, limit: 1).first
     }
 }

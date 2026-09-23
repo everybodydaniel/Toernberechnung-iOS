@@ -141,7 +141,7 @@ extension ContentView {
             VStack(alignment: .leading, spacing: 14) {
                 tideSectionHeader("Wasserstandsvorhersage", icon: "waveform.path.ecg")
 
-                if tideStation.hasLocalWaterLevelForecast {
+                if BSHTideStationCatalog.usesDirectWaterLevelForecast(tideStation.id) {
                     localWaterLevelForecastContent
                 } else {
                     missingLocalForecastContent
@@ -182,29 +182,24 @@ extension ContentView {
         .foregroundStyle(.white.opacity(0.82))
         .fixedSize(horizontal: false, vertical: true)
 
-        if let comparisonID = viewModel.confirmedComparisonGaugeIDs[tideStationID],
-           let comparison = BSHTideStationCatalog.station(id: comparisonID) {
+        let comparison = BSHTideStationCatalog.station(id: viewModel.confirmedComparisonGaugeIDs[tideStationID] ?? "")
+            ?? BSHTideStationCatalog.requiredComparisonStation(for: tideStationID)
+            ?? BSHTideStationCatalog.nearestComparisonStation(for: tideStationID)
+
+        if let comparison {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("BESTÄTIGTER VERGLEICHSPEGEL")
+                        Text("ZUGEORDNETER VERGLEICHSPEGEL")
                             .font(.system(size: 10, weight: .heavy))
                             .foregroundStyle(.white.opacity(0.92))
                         Text(comparison.name)
                             .font(.system(size: 16, weight: .bold))
-                        Text("\(String(format: "%.1f", tideStation.distanceKilometers(to: comparison))) km entfernt · nicht lokaler Pegel")
+                        Text("\(String(format: "%.1f", tideStation.distanceKilometers(to: comparison))) km entfernt · meteorologische Übertragung")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.66))
                     }
                     Spacer()
-                    Button {
-                        viewModel.clearComparisonGauge(localStationID: tideStationID)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22, weight: .semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Vergleichspegel entfernen")
                 }
 
                 if let forecast = waterLevelForecasts[comparison.id] {
@@ -224,32 +219,11 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(Color.white.opacity(0.32), lineWidth: 0.8)
             }
-        } else {
-            Menu {
-                ForEach(BSHTideStationCatalog.comparisonCandidates(for: tideStationID)) { candidate in
-                    Button {
-                        viewModel.confirmComparisonGauge(
-                            localStationID: tideStationID,
-                            comparisonStationID: candidate.id
-                        )
-                        Task { await loadWaterLevelForecast(for: candidate.id, force: false) }
-                    } label: {
-                        Text("\(candidate.name) · \(String(format: "%.1f", tideStation.distanceKilometers(to: candidate))) km")
-                    }
+            .onAppear {
+                if waterLevelForecasts[comparison.id] == nil {
+                    Task { await loadWaterLevelForecast(for: comparison.id, force: false) }
                 }
-            } label: {
-                Label("Vergleichspegel für diesen Törn bestätigen", systemImage: "checkmark.shield.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(hex: 0x2B63B8))
-
-            Text("Ein Vergleichspegel überträgt nur die meteorologische Abweichung. Ein rechnerisch sicheres Ergebnis bleibt gelb und wird nie als lokaler Messwert dargestellt.")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.66))
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -505,7 +479,9 @@ extension ContentView {
     }
 
     func loadWaterLevelForecast(for harbour: HarbourOption, force: Bool) async {
-        await loadWaterLevelForecast(for: harbour.tideStationID, force: force)
+        let stationID = BSHTideStationCatalog.requiredComparisonStation(for: harbour.tideStationID)?.id
+            ?? harbour.tideStationID
+        await loadWaterLevelForecast(for: stationID, force: force)
     }
 }
 
@@ -557,7 +533,7 @@ struct TideStationPickerSheet: View {
                                                     .foregroundStyle(Color.secondary)
                                             }
                                             Spacer()
-                                            if station.hasLocalWaterLevelForecast {
+                                            if BSHTideStationCatalog.usesDirectWaterLevelForecast(station.id) {
                                                 Image(systemName: "waveform.path.ecg")
                                                     .font(.system(size: 12, weight: .bold))
                                                     .foregroundStyle(Color.green)

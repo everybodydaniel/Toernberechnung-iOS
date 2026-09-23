@@ -152,17 +152,6 @@ final class NautiChatViewModel {
     func sendCurrentDraft(when accessState: AIAccessState = .available) async -> NautiActionDispatch? {
         let conversationID = activeConversationID
 
-        guard accessState.canUseAssistant else {
-            let message = accessState.noticeMessage
-                ?? "Nauti ist auf diesem Gerät nicht verfügbar. Die manuelle Planung bleibt vollständig nutzbar."
-            errorMessage = message
-            appendMessage(
-                NautiChatMessage(role: .assistant, text: message),
-                conversationID: conversationID
-            )
-            return nil
-        }
-
         let userText = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty, !isSending else { return nil }
 
@@ -185,13 +174,6 @@ final class NautiChatViewModel {
             return nil
         }
 
-        isSending = true
-        generatingConversationID = conversationID
-        defer {
-            isSending = false
-            generatingConversationID = nil
-        }
-
         let request = NautiInferenceRequest(
             messages: messages(in: conversationID).map {
                 NautiConversationMessage(
@@ -200,6 +182,33 @@ final class NautiChatViewModel {
                 )
             }
         )
+
+        // Deterministische nautische Kommandos (Törnplanung, Wetter, Gezeiten, Wasserstand, Warnungen)
+        if let deterministicResult = NautiDeterministicIntentRouter.route(request) {
+            appendMessage(
+                NautiChatMessage(role: .assistant, text: deterministicResult.text),
+                conversationID: conversationID
+            )
+            guard let action = deterministicResult.action else { return nil }
+            return NautiActionDispatch(conversationID: conversationID, action: action)
+        }
+
+        // Wenn lokale generative KI nicht aktiv ist, freundliche Anleitung statt Fehler
+        guard accessState == .available else {
+            let message = "Ich unterstütze dich bei der Törnplanung (z. B. „Plane Törn von Borkum nach Norderney“), Gezeiten, Wetter und Warnmeldungen. Für freie KI-Konversationen ist auf diesem Gerät Apple Intelligence erforderlich."
+            appendMessage(
+                NautiChatMessage(role: .assistant, text: message),
+                conversationID: conversationID
+            )
+            return nil
+        }
+
+        isSending = true
+        generatingConversationID = conversationID
+        defer {
+            isSending = false
+            generatingConversationID = nil
+        }
 
         do {
             let result = try await inferenceClient.infer(request)

@@ -2,6 +2,19 @@ import XCTest
 @testable import Toernberechnung
 
 final class NautiSpeechInputTests: XCTestCase {
+    #if targetEnvironment(simulator)
+    @MainActor
+    func testSystemSpeechInSimulatorFailsWithoutStartingAudio() async {
+        let client = AppleNautiSpeechInputClient()
+        do {
+            _ = try await client.startTranscription()
+            XCTFail("Simulator must not enter the unsupported on-device capture path")
+        } catch {
+            XCTAssertEqual(error as? NautiSpeechInputError, .assetsUnavailable)
+        }
+        await client.cancelTranscription()
+    }
+    #endif
     @MainActor
     func testDeniedPermissionNeverStartsRecognition() async {
         let client = FakeNautiSpeechInputClient(permission: .denied)

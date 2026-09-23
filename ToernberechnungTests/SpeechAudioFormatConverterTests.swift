@@ -21,7 +21,7 @@ final class SpeechAudioFormatConverterTests: XCTestCase {
         return buffer
     }
 
-    func testIdenticalFormatsPassBufferThroughUnchanged() throws {
+    func testIdenticalFormatsCopyBufferForAsynchronousConsumption() throws {
         let hardware = try format(48_000)
         let converter = try XCTUnwrap(SpeechAudioFormatConverter(from: hardware, to: hardware))
 
@@ -29,7 +29,11 @@ final class SpeechAudioFormatConverterTests: XCTestCase {
 
         let input = try toneBuffer(format: hardware, frames: 1_024)
         let output = try XCTUnwrap(converter.convert(input))
-        XCTAssertTrue(output === input)
+        XCTAssertFalse(output === input)
+        XCTAssertEqual(output.frameLength, input.frameLength)
+        let original = output.floatChannelData![0][10]
+        input.floatChannelData![0][10] = 0
+        XCTAssertEqual(output.floatChannelData![0][10], original)
     }
 
     func testDownsamplesHardwareBufferToAnalyzerFormat() throws {

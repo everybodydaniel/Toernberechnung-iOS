@@ -221,7 +221,7 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
             )
         }
 
-        return await RouteCalculationService().calculate(
+        return await RouteCalculationService(tidalHeightStrategy: TwelfthsRuleStrategy()).calculate(
             route: route,
             boatSettings: BoatSettings(draftMeters: 1.1, safetyMarginMeters: 0),
             tideDataProvider: provider

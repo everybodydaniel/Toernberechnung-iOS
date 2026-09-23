@@ -1,401 +1,273 @@
 import Foundation
 
-// MARK: - Passage Window Solver
-
-/// Answers the question the Excel tool cannot: **when is a passage open?**
-///
-/// For every waypoint it derives the time span in which the boat still floats,
-/// converts it into a departure span, and intersects all of them into one
-/// route-wide window. The per-waypoint spans survive as `BottleneckWindow`s, so
-/// the UI can name the constriction that closes the route and say by how many
-/// centimetres it misses.
-///
-/// ## Why this is not a scan
-///
-/// The previous implementation shifted the departure time in ten-minute steps
-/// and recalculated the whole route for each candidate — up to 217 full
-/// recalculations, each awaiting the tide provider per waypoint. The expensive
-/// part was never the arithmetic; it was resolving the same tide data over and
-/// over.
-///
-/// Here the tide data is resolved **once per waypoint**, and the passable span
-/// then follows from `TidalHeightStrategy.maxDeviationHours` in closed form.
-/// Only when the water level correction actually varies over time does the
-/// solver fall back to sampling — and even then it samples synchronously,
-/// without touching the network.
+/// Swift port of Android PassageWindowScanner: sample every ten minutes,
+/// join consecutive safe candidates, then select the current/next/last window.
+/// Tide inputs are resolved once; every candidate checks every route waypoint.
 struct PassageWindowSolver {
-
-    // MARK: - Types
-
-    /// One waypoint's passability, expressed both as arrival and as departure
-    /// times so the UI can show either.
     struct BottleneckWindow: Identifiable, Equatable {
         let id: UUID
         let waypointName: String
-        /// "Wattenhoch", "Hafen", "Fahrwasser" — nil when the catalog has none.
         let category: String?
-        /// When the boat may **arrive** here. Nil when never passable in range.
         let arrivalWindow: ClosedRange<Date>?
-        /// The same span shifted back by the travel time, i.e. when the boat
-        /// must **leave the start** for this waypoint to be passable.
         let departureWindow: ClosedRange<Date>?
-        /// Cumulative travel time from the start to this waypoint.
         let travelOffsetHours: Double
         let plannedArrivalTime: Date
         let plannedClearanceMeters: Double?
-        /// How much water is missing at the planned time. Zero when passable.
         let shortfallMeters: Double
         let quality: WaterLevelCorrectionQuality
-
-        var isPassableAtPlannedTime: Bool {
-            shortfallMeters <= 0
-        }
+        var isPassableAtPlannedTime: Bool { plannedClearanceMeters != nil && shortfallMeters <= 0 }
     }
 
     struct Solution: Equatable {
-        /// Route-wide departure window — the intersection of all bottlenecks.
         let routeWindow: PassageWindowScanner.Window?
-        /// Every evaluated waypoint, in route order.
         let bottlenecks: [BottleneckWindow]
-        /// True when a leg has SOG ≤ 0, which makes timing meaningless.
         let hasInvalidLeg: Bool
-
-        /// The waypoint with the least water at the planned time — the one that
-        /// decides whether the route goes.
+        var routeWindows: [PassageWindowScanner.Window] = []
+        var missingWaypointNames: [String] = []
+        var hasCoverageGaps: Bool = false
         var limiting: BottleneckWindow? {
-            bottlenecks.min { lhs, rhs in
-                let left = lhs.plannedClearanceMeters ?? .greatestFiniteMagnitude
-                let right = rhs.plannedClearanceMeters ?? .greatestFiniteMagnitude
-                return left < right
-            }
+            bottlenecks.min { ($0.plannedClearanceMeters ?? -.infinity) < ($1.plannedClearanceMeters ?? -.infinity) }
         }
     }
 
     struct Configuration: Equatable {
+        // Retained for callers that explicitly request a relative search.
         var searchBackwardHours: Double = 12
         var searchForwardHours: Double = 24
-        /// Only used when the correction varies over time.
-        var sweepIncrementSeconds: TimeInterval = 60
-        var boundaryToleranceSeconds: TimeInterval = 30
+        var sweepIncrementSeconds: TimeInterval = 600
+        var boundaryToleranceSeconds: TimeInterval = 1
+        var dayBased: Bool = false
+        var notBefore: Date? = nil
     }
-
-    // MARK: - Init
 
     var configuration: Configuration
     private let tidalHeightStrategy: TidalHeightStrategy
 
-    init(
-        configuration: Configuration = Configuration(),
-        tidalHeightStrategy: TidalHeightStrategy = TwelfthsRuleStrategy()
-    ) {
+    init(configuration: Configuration = Configuration(), tidalHeightStrategy: TidalHeightStrategy = ContinuousTwelfthsStrategy()) {
         self.configuration = configuration
         self.tidalHeightStrategy = tidalHeightStrategy
     }
 
-    // MARK: - Entry point
-
-    func solve(
-        route: RoutePlan,
-        boatSettings: BoatSettings,
-        tideDataProvider: TideDataProvider,
-        confirmedComparisonGaugeIDs: [String: String] = [:]
-    ) async -> Solution {
-        guard route.waypoints.count >= 2,
-              route.legs.count == route.waypoints.count - 1,
-              boatSettings.draftMeters > 0 else {
-            return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: false)
-        }
-
-        // The travel times are independent of the departure time, because
-        // SOG = speed + current has no time dependency. That is what allows the
-        // arrival spans to be shifted into departure spans further down.
-        let legResults = RouteCalculationService.calculateLegResults(
-            startTime: route.plannedStartTime,
-            legs: route.legs
-        )
-        guard legResults.allSatisfy(\.isValid) else {
+    func solve(route: RoutePlan, boatSettings: BoatSettings, tideDataProvider: TideDataProvider,
+               confirmedComparisonGaugeIDs: [String: String] = [:]) async -> Solution {
+        guard configuration.sweepIncrementSeconds.isFinite, configuration.sweepIncrementSeconds > 0,
+              configuration.searchBackwardHours.isFinite, configuration.searchBackwardHours >= 0,
+              configuration.searchForwardHours.isFinite, configuration.searchForwardHours >= 0,
+              route.waypoints.count >= 2, route.legs.count == route.waypoints.count - 1,
+              boatSettings.draftMeters.isFinite, boatSettings.draftMeters > 0,
+              boatSettings.safetyMarginMeters.isFinite, boatSettings.safetyMarginMeters >= 0 else {
             return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: true)
         }
-
-        var travelOffsets: [Double] = [0]
-        for leg in legResults { travelOffsets.append(leg.cumulativeTravelTimeHours) }
-
-        let searchSpan = route.plannedStartTime
-            .addingTimeInterval(-configuration.searchBackwardHours * 3_600)
-            ... route.plannedStartTime
-            .addingTimeInterval(configuration.searchForwardHours * 3_600)
-
-        let contexts = await resolveContexts(
-            route: route,
-            boatSettings: boatSettings,
-            travelOffsets: travelOffsets,
-            searchSpan: searchSpan,
-            tideDataProvider: tideDataProvider,
-            confirmedComparisonGaugeIDs: confirmedComparisonGaugeIDs
-        )
-        guard !contexts.isEmpty else {
-            return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: false)
+        let legs = RouteCalculationService.calculateLegResults(startTime: route.plannedStartTime, legs: route.legs)
+        let validLegs = tideDataProvider.usesAndroidForecastLevels
+            ? route.legs.allSatisfy { $0.distanceNm.isFinite && $0.distanceNm >= 0 &&
+                $0.speedThroughWaterKnots.isFinite && $0.speedThroughWaterKnots > 0 }
+            : legs.allSatisfy(\.isValid)
+        guard validLegs else {
+            return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: true)
         }
-
-        let bottlenecks = contexts.map { context in
-            makeBottleneck(
-                context: context,
-                searchSpan: searchSpan,
-                safetyMarginMeters: boatSettings.safetyMarginMeters
+        let calendar = AppDateFormatters.berlinCalendar
+        let dayStart = calendar.startOfDay(for: route.date)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart)!
+        let lower = configuration.dayBased ? dayStart : route.plannedStartTime.addingTimeInterval(-configuration.searchBackwardHours * 3_600)
+        let upper = configuration.dayBased ? dayEnd.addingTimeInterval(-1) : route.plannedStartTime.addingTimeInterval(configuration.searchForwardHours * 3_600)
+        let start = max(lower, configuration.notBefore ?? lower)
+        guard start <= upper else { return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: false) }
+        let span = start ... upper
+        let offsets: [Double]
+        if tideDataProvider.usesAndroidForecastLevels {
+            var elapsed = 0.0
+            offsets = [0] + route.legs.map { leg in
+                elapsed += leg.distanceNm / leg.speedThroughWaterKnots
+                return elapsed
+            }
+        } else {
+            offsets = [0] + legs.map(\.cumulativeTravelTimeHours)
+        }
+        let resolved = await resolveContexts(route, boatSettings, offsets, span, tideDataProvider, confirmedComparisonGaugeIDs)
+        let missing = route.waypoints.indices.filter { resolved[$0] == nil }.map { route.waypoints[$0].name }
+        guard missing.isEmpty else {
+            return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: false, missingWaypointNames: missing)
+        }
+        var contexts = resolved.compactMap { $0 }
+        if tideDataProvider.usesAndroidForecastLevels {
+            let models = route.legs.indices.map { index in
+                AndroidPassageLeg(distanceNm: route.legs[index].distanceNm,
+                    speedKnots: route.legs[index].speedThroughWaterKnots,
+                    courseDegrees: AndroidPassageLeg.course(from: route.waypoints[index], to: route.waypoints[index + 1]),
+                    events: contexts[index].forecastEvents)
+            }
+            for index in contexts.indices { contexts[index].androidTravelLegs = Array(models.prefix(index)) }
+        }
+        let (pieces, hasGaps) = findPieces(for: contexts, span: span, margin: boatSettings.safetyMarginMeters)
+        // Preserve every connected safe interval. Selection is independent of
+        // the list returned to the UI, as in Android findSafeWindows/findSafeWindow.
+        let clampedSelected = selectRelevantWindow(from: pieces, around: route.plannedStartTime)
+        let anchor = clampedSelected?.recommendedDeparture ?? route.plannedStartTime
+        let bottlenecks = contexts.map { context -> BottleneckWindow in
+            let arrival = context.arrival(forDeparture: anchor)
+            let clearance = context.clearance(atArrival: arrival, strategy: tidalHeightStrategy)
+            let (waypointPieces, _) = findPieces(for: [context], span: span, margin: boatSettings.safetyMarginMeters)
+            let matchingPiece = waypointPieces.first { $0.contains(anchor) }
+                ?? waypointPieces.min(by: {
+                    abs($0.recommendedDeparture.timeIntervalSince(anchor))
+                        < abs($1.recommendedDeparture.timeIntervalSince(anchor))
+                })
+            let departureWin = matchingPiece.map { $0.start ... $0.end }
+            let arrivalWin = departureWin.flatMap { window -> ClosedRange<Date>? in
+                let first = context.arrival(forDeparture: window.lowerBound)
+                let last = context.arrival(forDeparture: window.upperBound)
+                return first <= last ? first ... last : nil
+            }
+            return BottleneckWindow(
+                id: context.waypointID, waypointName: context.name, category: context.category,
+                arrivalWindow: arrivalWin, departureWindow: departureWin,
+                travelOffsetHours: arrival.timeIntervalSince(anchor) / 3_600, plannedArrivalTime: arrival,
+                plannedClearanceMeters: clearance,
+                shortfallMeters: clearance.map { max(0, boatSettings.safetyMarginMeters - $0) } ?? .infinity,
+                quality: context.quality(at: arrival)
             )
         }
-
-        return Solution(
-            routeWindow: routeWindow(
-                from: bottlenecks,
-                plannedStart: route.plannedStartTime,
-                contexts: contexts
-            ),
-            bottlenecks: bottlenecks,
-            hasInvalidLeg: false
-        )
+        return Solution(routeWindow: clampedSelected, bottlenecks: bottlenecks, hasInvalidLeg: false,
+                        routeWindows: pieces, hasCoverageGaps: hasGaps)
     }
 
-    // MARK: - Context resolution (the only async part)
-
-    private func resolveContexts(
-        route: RoutePlan,
-        boatSettings: BoatSettings,
-        travelOffsets: [Double],
-        searchSpan: ClosedRange<Date>,
-        tideDataProvider: TideDataProvider,
-        confirmedComparisonGaugeIDs: [String: String]
-    ) async -> [WaypointTideContext] {
-        await withTaskGroup(of: (Int, WaypointTideContext?).self) { group in
-            for (index, waypoint) in route.waypoints.enumerated() {
-                let offsetHours = travelOffsets[index]
-                let plannedArrival = route.plannedStartTime
-                    .addingTimeInterval(offsetHours * 3_600)
-                group.addTask {
-                    let context = await WaypointTideContext.resolve(
-                        waypoint: waypoint,
-                        plannedArrivalTime: plannedArrival,
-                        travelOffsetHours: offsetHours,
-                        draftMeters: boatSettings.draftMeters,
-                        manualCorrectionMeters: waypoint.bshWaterLevelCorrectionOverride
-                            ?? route.bshWaterLevelCorrectionMeters,
-                        searchSpan: searchSpan,
-                        tideDataProvider: tideDataProvider,
-                        confirmedComparisonStationID:
-                            confirmedComparisonGaugeIDs[waypoint.tidalReferenceStationID]
-                    )
-                    return (index, context)
-                }
-            }
-
-            var resolved: [(Int, WaypointTideContext)] = []
-            for await (index, context) in group {
-                if let context { resolved.append((index, context)) }
-            }
-            return resolved.sorted { $0.0 < $1.0 }.map(\.1)
-        }
-    }
-
-    // MARK: - Per-waypoint window
-
-    private func makeBottleneck(
-        context: WaypointTideContext,
-        searchSpan: ClosedRange<Date>,
-        safetyMarginMeters: Double
-    ) -> BottleneckWindow {
-        let arrivalSpan = context.searchSpanShiftedToArrival(searchSpan)
-        let arrivalWindow = passableArrivalWindow(
-            context: context,
-            within: arrivalSpan,
-            containing: context.plannedArrivalTime
-        )
-        let plannedClearance = context.clearance(
-            atArrival: context.plannedArrivalTime,
-            strategy: tidalHeightStrategy
-        )
-        let shortfall = plannedClearance.map { max(0, -$0) } ?? 0
-
-        return BottleneckWindow(
-            id: context.waypointID,
-            waypointName: context.name,
-            category: context.category,
-            arrivalWindow: arrivalWindow,
-            departureWindow: arrivalWindow.map { window in
-                let shift = -context.travelOffsetHours * 3_600
-                return window.lowerBound.addingTimeInterval(shift)
-                    ... window.upperBound.addingTimeInterval(shift)
-            },
-            travelOffsetHours: context.travelOffsetHours,
-            plannedArrivalTime: context.plannedArrivalTime,
-            plannedClearanceMeters: plannedClearance,
-            shortfallMeters: shortfall,
-            quality: context.correction.fallback.quality
-        )
-    }
-
-    /// The passable span around the high water nearest `preferred`.
-    ///
-    /// With a constant correction the answer is exact: the budget of spare
-    /// water converts straight into a maximum deviation. With a time-varying
-    /// correction the boundaries are found by sweeping and then refined by
-    /// bisection — always inwards, so the reported edge is the last instant
-    /// verified as passable and never an optimistic extrapolation.
-    private func passableArrivalWindow(
-        context: WaypointTideContext,
-        within span: ClosedRange<Date>,
-        containing preferred: Date
-    ) -> ClosedRange<Date>? {
-        guard let highWater = context.nearestWaypointHighWater(to: preferred) else { return nil }
-
-        // Constant correction: the budget of spare water converts straight into
-        // a maximum deviation, and because `clearance(atArrival:)` anchors on
-        // the same high water, a passable arrival is always inside the result.
-        if context.correction.samples.isEmpty {
-            guard let maxDeviation = tidalHeightStrategy.maxDeviationHours(
-                forMaxMissingWaterMeters: context.missingWaterBudgetMeters(
-                    correctionMeters: context.correction.fallback.meters
-                ),
-                meanTidalRangeMeters: context.meanTidalRangeMeters
-            ) else { return nil }
-
-            let lower = highWater.addingTimeInterval(-maxDeviation * 3_600)
-            let upper = highWater.addingTimeInterval(maxDeviation * 3_600)
-            return clamp(lower ... upper, to: span)
-        }
-
-        // Time-varying correction: passability is no longer strictly monotonic
-        // around high water, so a sweep outwards from the peak can stop at a
-        // gap while the planned arrival sits in a later pocket. Growing the
-        // window from the arrival itself — when that floats — keeps the
-        // reported span and the reported clearance consistent.
-        let sweepAnchor: Date
-        if (context.clearance(atArrival: preferred, strategy: tidalHeightStrategy) ?? -1) >= 0 {
-            sweepAnchor = preferred
-        } else {
-            sweepAnchor = highWater
-        }
-        return sweptWindow(context: context, within: span, around: sweepAnchor)
-    }
-
-    private func sweptWindow(
-        context: WaypointTideContext,
-        within span: ClosedRange<Date>,
-        around highWater: Date
-    ) -> ClosedRange<Date>? {
-        func isPassable(_ time: Date) -> Bool {
-            (context.clearance(atArrival: time, strategy: tidalHeightStrategy) ?? -1) >= 0
-        }
-        guard isPassable(highWater) else { return nil }
-
-        let step = configuration.sweepIncrementSeconds
-        let tolerance = configuration.boundaryToleranceSeconds
-
-        /// Walks outwards while passable, then bisects the last passable
-        /// instant. The returned edge is always verified, never extrapolated.
-        func edge(direction: Double) -> Date {
-            var lastPassable = highWater
-            var candidate = highWater.addingTimeInterval(direction * step)
-            while span.contains(candidate), isPassable(candidate) {
-                lastPassable = candidate
-                candidate = candidate.addingTimeInterval(direction * step)
-            }
-            guard span.contains(candidate) else { return lastPassable }
-
-            var low = lastPassable
-            var high = candidate
-            while abs(high.timeIntervalSince(low)) > tolerance {
-                let middle = low.addingTimeInterval(high.timeIntervalSince(low) / 2)
-                if isPassable(middle) { low = middle } else { high = middle }
-            }
-            return low
-        }
-
-        return clamp(edge(direction: -1) ... edge(direction: 1), to: span)
-    }
-
-    private func clamp(
-        _ window: ClosedRange<Date>,
-        to span: ClosedRange<Date>
-    ) -> ClosedRange<Date>? {
-        let lower = max(window.lowerBound, span.lowerBound)
-        let upper = min(window.upperBound, span.upperBound)
-        return lower <= upper ? lower ... upper : nil
-    }
-
-    // MARK: - Route-wide intersection
-
-    private func routeWindow(
-        from bottlenecks: [BottleneckWindow],
-        plannedStart: Date,
-        contexts: [WaypointTideContext]
+    private func selectRelevantWindow(
+        from windows: [PassageWindowScanner.Window],
+        around departure: Date
     ) -> PassageWindowScanner.Window? {
-        var intersection: ClosedRange<Date>?
-        for bottleneck in bottlenecks {
-            guard let window = bottleneck.departureWindow else { return nil }
-            guard let current = intersection else {
-                intersection = window
-                continue
+        if let current = windows
+            .filter({ $0.contains(departure) })
+            .max(by: { $0.recommendedClearanceMeters < $1.recommendedClearanceMeters }) {
+            return current
+        }
+        if let next = windows
+            .filter({ $0.start > departure })
+            .min(by: { $0.start < $1.start }) {
+            return next
+        }
+        return windows
+            .filter({ $0.end < departure })
+            .max(by: { $0.end < $1.end })
+    }
+
+    private func findPieces(
+        for contexts: [WaypointTideContext],
+        span: ClosedRange<Date>,
+        margin: Double
+    ) -> (pieces: [PassageWindowScanner.Window], hasGaps: Bool) {
+        var pieces: [PassageWindowScanner.Window] = []
+        var openWindow: PassageWindowScanner.Window?
+        var hasGaps = false
+        var candidate = span.lowerBound
+
+        // Matches Android's inclusive scan, 1 cm tolerance, strict missing-data
+        // rule, and first-best tie handling. Never interpolate between samples.
+        while candidate <= span.upperBound {
+            guard !Task.isCancelled else { return ([], true) }
+            if let values = clearances(contexts, at: candidate) {
+                if values.allSatisfy({ $0 >= margin - 0.01 }) {
+                    let sample = windowSample(contexts, values: values, at: candidate)
+                    openWindow = openWindow.map { merge($0, sample) } ?? sample
+                } else {
+                    if let window = openWindow { pieces.append(window) }
+                    openWindow = nil
+                }
+            } else {
+                hasGaps = true
+                if let window = openWindow { pieces.append(window) }
+                openWindow = nil
             }
-            let lower = max(current.lowerBound, window.lowerBound)
-            let upper = min(current.upperBound, window.upperBound)
-            guard lower <= upper else { return nil }
-            intersection = lower ... upper
+            candidate = candidate.addingTimeInterval(configuration.sweepIncrementSeconds)
         }
-        guard let window = intersection else { return nil }
+        if let window = openWindow { pieces.append(window) }
+        return (pieces, hasGaps)
+    }
 
-        let limiting = bottlenecks.min { lhs, rhs in
-            let left = lhs.plannedClearanceMeters ?? .greatestFiniteMagnitude
-            let right = rhs.plannedClearanceMeters ?? .greatestFiniteMagnitude
-            return left < right
+    private func resolveContexts(_ route: RoutePlan, _ boat: BoatSettings, _ offsets: [Double],
+                                 _ span: ClosedRange<Date>, _ provider: TideDataProvider,
+                                 _ comparisons: [String: String]) async -> [WaypointTideContext?] {
+        // Sequential resolution intentionally reuses the actor's station cache and avoids request storms.
+        var result: [WaypointTideContext?] = []
+        for (index, waypoint) in route.waypoints.enumerated() {
+            let context = await WaypointTideContext.resolve(
+                waypoint: waypoint, plannedArrivalTime: route.plannedStartTime.addingTimeInterval(offsets[index] * 3_600),
+                travelOffsetHours: offsets[index], draftMeters: boat.draftMeters,
+                manualCorrectionMeters: waypoint.bshWaterLevelCorrectionOverride ?? route.bshWaterLevelCorrectionMeters,
+                searchSpan: span, tideDataProvider: provider,
+                confirmedComparisonStationID: comparisons[waypoint.tidalReferenceStationID]
+            )
+            result.append(context)
         }
-        // The worst quality across the route governs the whole window — one
-        // waypoint without a local forecast makes the entire window provisional.
-        let quality = bottlenecks
-            .map(\.quality)
-            .max(by: { Self.qualityRank($0) < Self.qualityRank($1) })
-            ?? .unavailable
+        return result
+    }
 
-        return PassageWindowScanner.Window(
-            start: window.lowerBound,
-            end: window.upperBound,
-            anchoredHighWater: limiting.flatMap { limitingBottleneck in
-                contexts
-                    .first { $0.waypointID == limitingBottleneck.id }?
-                    .nearestWaypointHighWater(to: limitingBottleneck.plannedArrivalTime)
-            },
-            bottleneckName: limiting?.waypointName,
-            waterLevelQuality: quality,
-            waterLevelDetail: Self.detail(for: quality)
+    private func clearances(_ contexts: [WaypointTideContext], at departure: Date) -> [Double]? {
+        let values = contexts.compactMap {
+            $0.clearance(atArrival: $0.arrival(forDeparture: departure), strategy: tidalHeightStrategy)
+        }
+        return values.count == contexts.count && values.allSatisfy(\.isFinite) ? values : nil
+    }
+
+    private func windowSample(
+        _ contexts: [WaypointTideContext], values: [Double], at departure: Date
+    ) -> PassageWindowScanner.Window {
+        let limiting = values.indices.min { values[$0] < values[$1] }!
+        let context = contexts[limiting]
+        let arrival = context.arrival(forDeparture: departure)
+        let quality = contexts.reduce(WaterLevelCorrectionQuality.localOfficial) {
+            Self.worstQuality($0, $1.quality(at: $1.arrival(forDeparture: departure)))
+        }
+        let highWater = context.nearestWaypointHighWater(to: arrival)
+        return .init(
+            start: departure, end: departure,
+            anchoredHighWater: highWater.flatMap { abs($0.timeIntervalSince(arrival)) < 400 * 60 ? $0 : nil },
+            bottleneckName: context.name, waterLevelQuality: quality,
+            waterLevelDetail: Self.detail(for: quality),
+            recommendedDeparture: departure, recommendedClearanceMeters: values[limiting],
+            bottleneckArrival: arrival, bottleneckDepthDetail: context.depthSourceDescription
         )
     }
 
-    // MARK: - Quality presentation
+    private func merge(_ first: PassageWindowScanner.Window, _ second: PassageWindowScanner.Window) -> PassageWindowScanner.Window {
+        let best = first.recommendedClearanceMeters >= second.recommendedClearanceMeters ? first : second
+        let quality = Self.worstQuality(first.waterLevelQuality, second.waterLevelQuality)
+        return .init(start: first.start, end: second.end, anchoredHighWater: best.anchoredHighWater,
+                     bottleneckName: best.bottleneckName, waterLevelQuality: quality,
+                     waterLevelDetail: Self.detail(for: quality),
+                     recommendedDeparture: best.recommendedDeparture, recommendedClearanceMeters: best.recommendedClearanceMeters,
+                     bottleneckArrival: best.bottleneckArrival, bottleneckDepthDetail: best.bottleneckDepthDetail)
+    }
+
+    static func worstQuality(_ first: WaterLevelCorrectionQuality, _ second: WaterLevelCorrectionQuality) -> WaterLevelCorrectionQuality {
+        qualityRank(first) >= qualityRank(second) ? first : second
+    }
 
     static func qualityRank(_ quality: WaterLevelCorrectionQuality) -> Int {
         switch quality {
         case .localOfficial: return 0
         case .manual: return 1
-        case .confirmedComparison: return 2
-        case .stale: return 3
+        case .modelForecast: return 2
+        case .confirmedComparison: return 3
         case .outsideForecastHorizon: return 4
-        case .unavailable: return 5
+        case .estimatedTide: return 5
+        case .stale: return 6
+        case .unavailable: return 7
+        case .unverifiedDepth: return 8
         }
     }
 
     static func detail(for quality: WaterLevelCorrectionQuality) -> String? {
         switch quality {
-        case .localOfficial:
-            return nil
-        case .manual:
-            return "Das Passagefenster verwendet eine manuelle Wasserstandskorrektur."
-        case .confirmedComparison:
-            return "Das Passagefenster verwendet einen bestätigten Vergleichspegel."
-        case .stale:
-            return "Die Wasserstandsprognose für das Passagefenster ist veraltet."
-        case .outsideForecastHorizon:
-            return "Das Passagefenster basiert auf astronomischen Gezeitendaten."
-        case .unavailable:
-            return "Für das Passagefenster liegt keine aktuelle lokale Wasserstandsprognose vor."
+        case .localOfficial: return "Mit lokaler Wasserstandsprognose."
+        case .manual: return "Manuelle Wasserstandskorrektur."
+        case .modelForecast: return "Vorläufig: automatische Wasserstandsprognose, ohne gesicherte Untergrenze."
+        case .confirmedComparison: return "Vorläufig: bestätigter Vergleichspegel."
+        case .outsideForecastHorizon: return "Vorläufig: nur astronomisch, Windstau noch nicht vorhergesagt."
+        case .estimatedTide: return "Vorläufig: örtliche HW/NW-Zeiten mit mittleren Tidehöhen."
+        case .stale: return "Vorläufig: Prognose veraltet, Berechnung ohne Windstau."
+        case .unavailable: return "Vorläufig: keine lokale Wasserstandsprognose, Berechnung ohne Windstau."
+        case .unverifiedDepth: return "Vorläufig: unbestätigte Katalogtiefen auf der Strecke. Aktuelle Lotungen prüfen."
         }
     }
 }

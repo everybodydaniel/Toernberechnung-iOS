@@ -41,6 +41,13 @@ enum RouteExpander {
 
             // Dijkstra fairway path between the two harbours.
             let fairwayPath = NauticalRouter.route(from: fromCoord, to: toCoord)
+            guard !fairwayPath.isEmpty else {
+                // Do not silently evaluate only the two harbours when the
+                // connecting fairway cannot be resolved.
+                var incomplete = plan
+                incomplete.legs = []
+                return incomplete
+            }
 
             // Drop bookend fairway WPs that are essentially identical to the
             // user-supplied endpoints (avoid doubling start/end markers).
@@ -114,23 +121,27 @@ enum RouteExpander {
     }
 
     /// Convert a fairway waypoint into a fully-formed RouteWaypoint suitable
-    /// for the calculation engine. MHW / MTH are inherited from the nearest
-    /// user waypoint so the same BSH gauge governs the calculation.
+    /// for the calculation engine. Sourced from the geographically closest BSH station (1:1 with Android).
     private static func synthesizeFairwayWaypoint(
         fairway: NauticalRouter.Waypoint,
         inheritFrom anchor: RouteWaypoint,
         bshCorrectionOverride: Double?
     ) -> RouteWaypoint {
-        // Apply HW offset (minutes) on top of the anchor's offset.
-        let totalOffset = anchor.highWaterOffsetMinutes + fairway.hwOffsetMinutes
+        let fwCoord = CLLocationCoordinate2D(latitude: fairway.lat, longitude: fairway.lon)
+        let closestStation = BSHTideStationCatalog.stations.min { s1, s2 in
+            NauticalRouter.haversineNm(fwCoord, s1.coordinate) < NauticalRouter.haversineNm(fwCoord, s2.coordinate)
+        }
+        let stationID = fairway.tideStationID ?? closestStation?.id ?? anchor.tidalReferenceStationID
+        let stationName = closestStation?.name ?? anchor.tidalReferenceStation
+        let totalOffset = fairway.hwOffsetMinutes
 
         return RouteWaypoint(
             id: UUID(),
             name: fairway.id,
             latitude: fairway.lat,
             longitude: fairway.lon,
-            tidalReferenceStation: anchor.tidalReferenceStation,
-            tidalReferenceStationID: fairway.tideStationID ?? anchor.tidalReferenceStationID,
+            tidalReferenceStation: stationName,
+            tidalReferenceStationID: stationID,
             highWaterOffsetMinutes: totalOffset,
             meanTidalRangeMeters: anchor.meanTidalRangeMeters,
             meanHighWaterMeters: anchor.meanHighWaterMeters,
@@ -138,12 +149,12 @@ enum RouteExpander {
             chartDepthMeters: SourcedValue(
                 value: fairway.chartDepth,
                 source: .catalog,
-                sourceNotes: "NauticalRouter Fahrwasser-Knoten"
+                sourceNotes: "NauticalRouter LAT Kartentiefe"
             ),
             calculationMode: .meanHighWater,
             bshWaterLevelCorrectionOverride: bshCorrectionOverride,
             manualHighWaterTime: nil,
-            notes: "Automatisch eingefügter Fahrwasser-Punkt (Dijkstra)",
+            notes: "Fahrwasser-Knoten",
             category: "Fahrwasser",
             island: nil
         )
