@@ -208,7 +208,7 @@ final class BSHTideMigrationTests: XCTestCase {
         XCTAssertEqual(winter, ISO8601DateFormatter().date(from: "2026-12-12T22:42:46Z"))
     }
 
-    func testRouteWidePassageWindowRestoresOriginalTenMinuteScan() async throws {
+    func testRouteWidePassageWindowUsesTenMinuteScan() async throws {
         let highWater = Date(timeIntervalSince1970: 1_768_500_000)
         let stationID = "TEST"
         let start = RouteWaypoint(
@@ -305,7 +305,7 @@ final class BSHTideMigrationTests: XCTestCase {
 
 
 extension BSHTideMigrationTests {
-    func testAndroidTimestampFormatsResolveToSameInstant() throws {
+    func testTimestampFormatsResolveToSameInstant() throws {
         for (local, utc) in [("2026-07-12 23:42:46", "2026-07-12T21:42:46Z"),
                              ("2026-12-12T23:42:46", "2026-12-12T22:42:46Z")] {
             XCTAssertEqual(try XCTUnwrap(BSHDateParser.date(from: local)),
@@ -323,7 +323,7 @@ extension BSHTideMigrationTests {
             {"event_timestamp":"2026-09-23 10:10:00+02:00","event":"HW","forecast_value":620}
           ]}}]}
         """#
-        let station = try XCTUnwrap(AndroidPassageForecastStore.decode(Data(json.utf8))
+        let station = try XCTUnwrap(BSHPassageForecastStore.decode(Data(json.utf8))
             .first { $0.name == "Termunterzijl" })
         XCTAssertEqual(station.gaugeName, "Knock, Ems")
         XCTAssertNil(station.chartDatumAboveGaugeZeroMeters)
@@ -333,7 +333,7 @@ extension BSHTideMigrationTests {
         })?.id, "802P")
     }
 
-    func testAndroidForecastMappingUsesForecastInsteadOfAstronomyAndKeepsMissingCoverage() throws {
+    func testForecastMappingUsesForecastInsteadOfAstronomyAndKeepsMissingCoverage() throws {
         let json = #"""
         {"features":[{"properties":{"latitude":53.69639,"longitude":7.15778,"gauge_label":"Norderney",
           "chartdatum_relative_to_gaugezero":"315",
@@ -343,12 +343,12 @@ extension BSHTideMigrationTests {
             {"event_timestamp":"2026-09-22 21:00:00+02:00","event":"HW","forecast_value":null,"tidal_prediction_value":"590"}
           ]}}]}
         """#
-        let stations = try AndroidPassageForecastStore.decode(Data(json.utf8))
+        let stations = try BSHPassageForecastStore.decode(Data(json.utf8))
         let juist = try XCTUnwrap(stations.first { $0.name == "Juist" })
         XCTAssertEqual(juist.events.count, 3)
         XCTAssertEqual(try XCTUnwrap(juist.events.first?.heightMeters), 2.8, accuracy: 1e-9)
         XCTAssertTrue(try XCTUnwrap(juist.events.last).usesAstronomicalPrediction)
-        XCTAssertFalse(try XCTUnwrap(juist.events.first).androidCurrentTimestampIsISO8601)
+        XCTAssertFalse(try XCTUnwrap(juist.events.first).currentTimestampIsISO8601)
         XCTAssertTrue(try XCTUnwrap(stations.first { $0.name == "Borkum" }).events.isEmpty,
                       "No station within 20 km: do not invent heights or transfer a distant gauge")
     }
@@ -361,7 +361,7 @@ extension BSHTideMigrationTests {
             {"event_timestamp":"2026-09-23 16:42:00+02:00","event":"NW","tidal_prediction_value":387}
           ]}}]}
         """#
-        let station = try XCTUnwrap(AndroidPassageForecastStore.decode(Data(json.utf8))
+        let station = try XCTUnwrap(BSHPassageForecastStore.decode(Data(json.utf8))
             .first { $0.name == "Langeoog" })
         XCTAssertNil(station.chartDatumAboveGaugeZeroMeters,
                      "Gauge-zero centimetres must not be mistaken for chart-datum heights")
@@ -370,7 +370,7 @@ extension BSHTideMigrationTests {
 
         let preceding = TideEvent(time: try XCTUnwrap(BSHDateParser.date(from: "2026-09-23 03:55:00+02:00")),
                                   heightMeters: 0.70, type: "NW", phase: nil)
-        let combined = AndroidPassageForecastStore.combined(forecast: station.events, calendar: [preceding])
+        let combined = BSHPassageForecastStore.combined(forecast: station.events, calendar: [preceding])
         XCTAssertEqual(combined.count, 3)
         XCTAssertEqual(combined.first?.time, preceding.time)
         XCTAssertTrue(try XCTUnwrap(combined.first).usesAstronomicalPrediction)

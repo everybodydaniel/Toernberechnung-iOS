@@ -78,8 +78,8 @@ struct CrewEventShareView: View {
     }
 }
 
-/// EventKitUI asks the user to choose a calendar and confirm saving. On iOS 17+
-/// this editor needs no calendar-access permission and does not expose existing events.
+/// EventKitUI lässt den Nutzer Kalender und Speicherung wählen. Ab iOS 17
+/// braucht dieser Editor keine Kalenderleseberechtigung und legt vorhandene Termine nicht offen.
 private struct CrewNativeCalendarEditor: UIViewControllerRepresentable {
     let event: CrewCalendarExport
     let onComplete: (Bool) -> Void

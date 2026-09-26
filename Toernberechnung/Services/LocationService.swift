@@ -2,62 +2,59 @@ import Foundation
 import CoreLocation
 import Observation
 
-// MARK: - Location Service
+// MARK: - Standortdienst
 //
-// Single source of truth for hardware GPS. Designed to support an
-// active sailing voyage that keeps recording while the app is in the
-// background:
+// Zentraler Zugriff auf GPS für die Aufzeichnung eines Törns,
+// auch während die App im Hintergrund läuft:
 //
-//   • `requestAlwaysAuthorization()` — needed for background updates.
-//   • `allowsBackgroundLocationUpdates = true` — when always-authorized.
-//   • `showsBackgroundLocationIndicator = true` — Apple-required UI hint.
-//   • `desiredAccuracy = kCLLocationAccuracyBestForNavigation` — high-rate
-//      fixes appropriate for marine navigation.
-//   • `pausesLocationUpdatesAutomatically = false` — never pause; a sailor
-//      drifting in calm wind still needs a fix.
-//   • `activityType = .otherNavigation` — Core Location heuristics that suit
-//      a vessel rather than a car.
+//   • `requestAlwaysAuthorization()` — fordert dauerhaften Standortzugriff an.
+//   • `allowsBackgroundLocationUpdates = true` — bei dauerhaftem Zugriff.
+//   • `showsBackgroundLocationIndicator = true` — sichtbarer Hinweis auf Hintergrundmessungen.
+//   • `desiredAccuracy = kCLLocationAccuracyBestForNavigation` — hohe Genauigkeit
+//      für die Navigation.
+//   • `pausesLocationUpdatesAutomatically = false` — keine automatische Pause,
+//      da auch ein langsam treibendes Boot aktuelle Positionen benötigt.
+//   • `activityType = .otherNavigation` — Standortverarbeitung für Navigation
+//      außerhalb des Straßenverkehrs.
 //
-// Speed (m/s) is converted to knots and course is reported in degrees
-// true.  Heading is taken from the magnetometer to drive map rotation.
+// Geschwindigkeit wird von m/s in Knoten umgerechnet, Kurs rechtweisend in Grad
+// angegeben. Die Kompassrichtung aus dem Magnetometer dreht die Karte.
 //
-// Updates are pushed to listeners via a `onLocationUpdate` closure so
-// the `ActiveVoyageManager` can accumulate breadcrumbs in real time —
-// background-friendly because the closure runs from the CL delegate
-// even while the SwiftUI scene is suspended.
+// `onLocationUpdate` meldet jede Position direkt aus dem Core-Location-Delegate
+// an die Empfänger. `ActiveVoyageManager` kann den Fahrtverlauf so auch bei
+// unterbrochener SwiftUI-Oberfläche im Hintergrund weiter erfassen.
 
 @Observable
 @MainActor
 final class LocationService: NSObject {
 
-    // MARK: - Published state
+    // MARK: - Veröffentlichter Zustand
 
-    /// Most recent valid CLLocation. `nil` until the first fix.
+    /// Neueste gültige CLLocation. Bis zur ersten Messung `nil`.
     private(set) var currentLocation: CLLocation?
-    /// Speed over Ground in knots (1 m/s ≈ 1.94384 kn). Clamped to ≥ 0.
+    /// Fahrt über Grund in Knoten (1 m/s ≈ 1,94384 kn), auf mindestens 0 begrenzt.
     private(set) var speedKnots: Double = 0
-    /// Course over Ground in degrees true.  `nil` while stationary
-    /// because CLLocation publishes `course = -1` in that case.
+    /// Rechtweisender Kurs über Grund in Grad. Im Stillstand `nil`,
+    /// da CLLocation dann `course = -1` liefert.
     private(set) var courseDegrees: Double?
-    /// True heading from the magnetometer for map rotation.  Falls back
-    /// to magnetic heading when true heading is unavailable.
+    /// Rechtweisende Kompassrichtung für die Kartendrehung.
+    /// Falls sie fehlt, wird die magnetische Richtung verwendet.
     private(set) var headingDegrees: Double?
-    /// Current authorization status. UI shows a hint when this is
-    /// anything other than `.authorizedAlways` / `.authorizedWhenInUse`.
+    /// Aktueller Berechtigungsstatus. Die Oberfläche zeigt einen Hinweis,
+    /// wenn weder `.authorizedAlways` noch `.authorizedWhenInUse` vorliegt.
     private(set) var authorizationStatus: CLAuthorizationStatus
-    /// `true` while CLLocationManager is actively delivering fixes.
+    /// `true`, solange CLLocationManager aktiv Positionsmessungen liefert.
     private(set) var isTracking: Bool = false
 
-    // MARK: - Fan-out for listeners
+    // MARK: - Weitergabe an Empfänger
     //
-    // `ActiveVoyageManager` installs a closure here to receive every
-    // delegate update. This pattern is preferred over Combine observation
-    // because it works identically when the app is suspended in the
-    // background — the closure is invoked directly from the CL delegate.
+    // `ActiveVoyageManager` registriert hier eine Rückruffunktion für jede
+    // Standortmeldung. Der direkte Aufruf aus dem Core-Location-Delegate
+    // funktioniert auch bei unterbrochener Oberfläche im Hintergrund.
 
     var onLocationUpdate: ((CLLocation) -> Void)?
 
-    // MARK: - Init
+    // MARK: - Initialisierung
 
     private let manager: CLLocationManager
 
@@ -68,17 +65,16 @@ final class LocationService: NSObject {
         super.init()
         mgr.delegate = self
         mgr.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        mgr.distanceFilter = 5.0      // metres — balances battery vs. fidelity
+        mgr.distanceFilter = 5.0      // Meter; Kompromiss zwischen Stromverbrauch und Messdichte
         mgr.activityType = .otherNavigation
         mgr.pausesLocationUpdatesAutomatically = false
     }
 
-    // MARK: - Authorization
+    // MARK: - Berechtigungen
 
-    /// Request Always authorization so background tracking works.
-    /// If the user has previously granted only When-In-Use, iOS will
-    /// silently keep the current grant; the second `request…Always` call
-    /// will surface the prompt.
+    /// Fordert dauerhaften Standortzugriff für die Hintergrundaufzeichnung an.
+    /// Wenn zuvor nur Zugriff während der Nutzung erlaubt war, kann iOS zunächst
+    /// diese Berechtigung beibehalten und die weitere Abfrage später anzeigen.
     func requestAuthorization() {
         switch manager.authorizationStatus {
         case .notDetermined:
@@ -90,14 +86,14 @@ final class LocationService: NSObject {
         }
     }
 
-    // MARK: - Lifecycle
+    // MARK: - Start und Ende der Messungen
 
-    /// Start delivering high-rate fixes plus heading. Safe to call
-    /// repeatedly — CoreLocation ignores duplicate `start` calls.
+    /// Startet Positions- und Richtungsmessungen. Wiederholte Aufrufe sind möglich,
+    /// da CoreLocation doppelte Startaufrufe auslässt.
     func startUpdates() {
-        // Enable background updates only if we hold "Always" — iOS will
-        // reject `allowsBackgroundLocationUpdates = true` with anything
-        // less.
+        // Hintergrundmessungen nur bei dauerhaftem Standortzugriff aktivieren.
+        // Für `allowsBackgroundLocationUpdates = true` muss die passende
+        // Berechtigung vorliegen.
         let status = manager.authorizationStatus
         if status == .authorizedAlways {
             manager.allowsBackgroundLocationUpdates = true
@@ -114,7 +110,7 @@ final class LocationService: NSObject {
         isTracking = true
     }
 
-    /// Stop all GPS / heading updates and disable background mode.
+    /// Beendet GPS- und Richtungsmessungen und deaktiviert den Hintergrundbetrieb.
     func stopUpdates() {
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
@@ -134,8 +130,8 @@ extension LocationService: CLLocationManagerDelegate {
         didUpdateLocations locations: [CLLocation]
     ) {
         guard let location = locations.last else { return }
-        // Filter out obviously bad fixes (negative accuracy or > 100 m of
-        // horizontal slop). Marine GPS is usually < 10 m.
+        // Ungültige Messungen mit negativer Genauigkeit oder mehr als 100 m
+        // horizontaler Unsicherheit verwerfen.
         guard location.horizontalAccuracy >= 0,
               location.horizontalAccuracy <= 100 else { return }
 
@@ -170,8 +166,8 @@ extension LocationService: CLLocationManagerDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.authorizationStatus = status
-            // If the user just upgraded to "Always" while a voyage is
-            // in flight, switch on background updates immediately.
+            // Wird während eines Törns dauerhafter Standortzugriff gewährt,
+            // Hintergrundmessungen sofort einschalten.
             if status == .authorizedAlways, self.isTracking {
                 self.manager.allowsBackgroundLocationUpdates = true
                 if #available(iOS 11.0, *) {
@@ -185,8 +181,8 @@ extension LocationService: CLLocationManagerDelegate {
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
-        // Silent failure — CoreLocation reports the same error every few
-        // seconds when GPS is denied; surfacing it would spam the UI.
-        // The view layer checks `authorizationStatus` instead.
+        // Wiederholte CoreLocation-Fehler bei verweigertem GPS-Zugriff nicht einzeln
+        // anzeigen. Die Oberfläche prüft stattdessen `authorizationStatus`,
+        // um häufig wiederkehrende Fehlermeldungen zu vermeiden.
     }
 }

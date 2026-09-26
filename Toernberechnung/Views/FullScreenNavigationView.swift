@@ -3,15 +3,14 @@ import CoreLocation
 
 // MARK: - FullScreenNavigationView
 //
-// Edge-to-edge nautical chart with a heading-up follow-me trace, presented
-// as a `fullScreenCover` while an `ActiveVoyageManager` voyage is recording.
+// Bildschirmfüllende Seekarte, die während der Törnaufzeichnung der Position
+// und Kompassrichtung folgt. Wird als `fullScreenCover` angezeigt.
 //
-// Two ways to exit:
-//   • "Minimieren" (chevron) closes the cover but the voyage keeps running
-//     in the background — the user goes back to the planner with the live
-//     dashboard there.
-//   • "Fahrt beenden" stops the voyage and writes the logbook entry; the
-//     cover dismisses itself when `voyageManager.isVoyageActive` flips.
+// Zwei Möglichkeiten zum Verlassen:
+//   • "Minimieren" schließt die Vollbildansicht. Der Törn läuft im Hintergrund
+//     weiter; die Planung zeigt weiterhin die aktuellen Werte.
+//   • "Fahrt beenden" beendet die Aufzeichnung und speichert das Logbuch.
+//     Die Ansicht schließt, wenn `voyageManager.isVoyageActive` false wird.
 
 struct FullScreenNavigationView: View {
 
@@ -90,12 +89,11 @@ struct FullScreenNavigationView: View {
         }
     }
 
-    // MARK: - Top Bar
+    // MARK: - Obere Leiste
     //
-    // Three pills that float over the map. We wrap them in a
-    // GlassEffectContainer so the iOS 26 morphing animation treats them
-    // as one group (Apple HIG: "group multiple glass elements within a
-    // GlassEffectContainer to ensure consistent visual results").
+    // Drei schwebende Schaltflächen über der Karte. Ein `GlassEffectContainer`
+    // gruppiert ihre Glaseffekte, damit Übergangsanimationen unter iOS 26
+    // einheitlich dargestellt werden.
     @ViewBuilder
     private var topBar: some View {
         if #available(iOS 26.0, *) {
@@ -149,11 +147,10 @@ struct FullScreenNavigationView: View {
         }
     }
 
-    // MARK: - Bottom Dashboard
+    // MARK: - Unterer Übersichtsbereich
     //
-    // Outer panel = Liquid Glass (the floating overlay). Inner tiles stay
-    // on Color.fieldBackground because they sit INSIDE the glass panel
-    // and glass-on-glass is forbidden.
+    // Die äußere Fläche verwendet Liquid Glass. Innere Kacheln behalten
+    // Color.fieldBackground, damit keine Glasfläche über einer anderen liegt.
     private var bottomDashboard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Capsule()

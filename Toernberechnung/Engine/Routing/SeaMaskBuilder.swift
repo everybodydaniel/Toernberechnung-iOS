@@ -26,7 +26,7 @@ enum SeaMaskBuilder {
         let lon: Double
     }
 
-    // MARK: - Build
+    // MARK: - Aufbau
 
     static func build() -> BuildResult {
         let n = GridConfig.rows * GridConfig.cols
@@ -110,7 +110,7 @@ enum SeaMaskBuilder {
         return BuildResult(cells: cells, chartDepth: depth, buoyPositions: buoyFlat)
     }
 
-    // MARK: - Bundle Loading
+    // MARK: - Laden aus dem App-Bundle
 
     private static func loadBundledJSON(named name: String, ext: String) -> [String: Any]? {
         guard let url = Bundle.main.url(forResource: name, withExtension: ext),
@@ -120,7 +120,7 @@ enum SeaMaskBuilder {
         return json
     }
 
-    // MARK: - OSM Feature Collection Parsing
+    // MARK: - Einlesen der OSM-Objektsammlung
 
     private static func parseFeatureCollection(
         _ json: [String: Any],
@@ -171,7 +171,7 @@ enum SeaMaskBuilder {
         }
     }
 
-    // MARK: - NordSBefV Parsing
+    // MARK: - Einlesen der NordSBefV-Daten
 
     private static func parseNordSBefVCollection(
         _ json: [String: Any],
@@ -206,7 +206,7 @@ enum SeaMaskBuilder {
         }
     }
 
-    // MARK: - Geometry Parsing
+    // MARK: - Einlesen der Geometrie
 
     private struct ParsedGeometry {
         var point: CLLocationCoordinate2D?
@@ -272,7 +272,7 @@ enum SeaMaskBuilder {
         }
     }
 
-    // MARK: - Demo LineString Fairways
+    // MARK: - Beispiel-Fahrwasser als LineStrings
 
     private static func parseDemoLineStringFairways(_ json: [String: Any], cells: inout [UInt8]) {
         guard let features = json["features"] as? [[String: Any]] else { return }
@@ -293,7 +293,7 @@ enum SeaMaskBuilder {
         }
     }
 
-    // MARK: - Rasterization
+    // MARK: - Rasterung
 
     private static func rasterizePolygon(
         _ polygon: [CLLocationCoordinate2D],
@@ -378,7 +378,7 @@ enum SeaMaskBuilder {
         }
     }
 
-    // MARK: - Buoy Proximity Stamping
+    // MARK: - Eintragen der Tonnenumgebung ins Raster
 
     private static func stampBuoyProximity(
         _ buoys: [BuoyPoint],
@@ -421,7 +421,7 @@ enum SeaMaskBuilder {
         }
     }
 
-    // MARK: - LineString Buffer Stamping
+    // MARK: - Eintragen gepufferter Linien ins Raster
 
     private static func stampLineStringBuffer(
         _ line: [CLLocationCoordinate2D],

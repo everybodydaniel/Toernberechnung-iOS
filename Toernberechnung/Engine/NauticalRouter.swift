@@ -1,28 +1,26 @@
 import Foundation
 import CoreLocation
 
-// MARK: - Nautical Router
+// MARK: - Nautische Routenführung
 //
-// 1:1 port of the original implementation.  The waypoint coordinates
-// and edges are taken VERBATIM from the verified reference graph; they are
-// the hand-curated fairways of the East Frisian Wadden Sea sourced from
-// OpenSeaMap, BSH nautical charts and the Emden Plantabelle.
+// Der Katalog enthält die von Hand zusammengestellten Koordinaten und
+// Fahrwasserverbindungen des ostfriesischen Wattenmeers auf Grundlage
+// von OpenSeaMap, BSH-Seekarten und der Emder Plantabelle.
 //
-// Because every edge in this graph is verified to lie in navigable water,
-// there is NO automatic land-pruning here — the safe routes are encoded
-// by construction.  Adding new edges therefore demands chart verification
-// before merging.
+// Die Verbindungen gelten im Katalog als schiffbar. Deshalb werden hier
+// keine Verbindungen automatisch wegen Landkontakt entfernt. Neue Verbindungen
+// müssen vor der Übernahme anhand von Seekarten geprüft werden.
 
 enum NauticalRouter {
 
-    // MARK: - Waypoint type
+    // MARK: - Wegpunkttyp
 
     struct Waypoint: Hashable, Identifiable {
         let id: String
         let lat: Double
         let lon: Double
-        /// Planning chart depth relative to SKN in metres (negative = trockenfallend).
-        /// RouteExpander preserves these Android reference depths.
+        /// Kartentiefe für die Planung in Metern relativ zu SKN (negativ = trockenfallend).
+        /// RouteExpander übernimmt diese Tiefen aus dem Fahrwasserkatalog.
         let chartDepth: Double
         let isSeegat: Bool
 
@@ -30,9 +28,8 @@ enum NauticalRouter {
             CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
 
-        /// Optional iOS-side extras consumed by `RouteExpander`. These do not
-        /// exist in the original `WP` struct; for fairway WPs they remain nil
-        /// and the calling code inherits values from the nearest user WP.
+        /// Zusätzliche Gezeitenangaben für `RouteExpander`. Bei Fahrwasserpunkten
+        /// übernimmt der aufrufende Code die Werte vom nächsten gewählten Wegpunkt.
         var tideStationID: String? { nil }
         var hwOffsetMinutes: Int { 0 }
 
@@ -45,7 +42,7 @@ enum NauticalRouter {
         }
     }
 
-    // MARK: - Catalog (ported verbatim from Android implementation)
+    // MARK: - Fahrwasserkatalog
 
     static let waypoints: [Waypoint] = [
         // === EMS-FAHRWASSER (Süd→Nord) ===
@@ -107,7 +104,7 @@ enum NauticalRouter {
         Waypoint("borkum_sw",       53.560, 6.600, 6.0),
         Waypoint("borkum_east",     53.580, 6.800, 4.0),
 
-        // === OFFSHORE-RAND (offene See nördlich der Inseln) ===
+        // === RAND ZUR OFFENEN SEE (nördlich der Inseln) ===
         Waypoint("sea_borkum_w",    53.610, 6.580, 12.0),
         Waypoint("sea_borkum_n",    53.650, 6.720, 15.0),
         Waypoint("sea_juist",       53.710, 6.980, 15.0),
@@ -129,7 +126,7 @@ enum NauticalRouter {
         Waypoint("leybucht_coast",  53.590, 7.100, -1.2),
         Waypoint("norddeich_appr",  53.610, 7.140, 0.5),
 
-        // === HAFEN-WAYPOINTS ===
+        // === HAFEN-WEGPUNKTE ===
         Waypoint("borkum_hbr",      53.5606, 6.7502, 3.0),
         Waypoint("juist_hbr",       53.6722, 6.9982, -1.2),
         Waypoint("norderney_hbr",   53.7024, 7.1637, 1.5),
@@ -161,7 +158,7 @@ enum NauticalRouter {
         Waypoint("jade_inner_s",    53.480, 8.180, 5.0),
         Waypoint("jade_dangast_a",  53.450, 8.150, 2.0),
 
-        // === JADE-CONNECTORS ===
+        // === JADE-VERBINDUNGEN ===
         Waypoint("horum_fairway",   53.687, 8.080, 5.0),
         Waypoint("hooksiel_fairway", 53.642, 8.100, 4.0),
         Waypoint("whv_fairway",     53.520, 8.160, 8.0),
@@ -176,7 +173,7 @@ enum NauticalRouter {
 
     ]
 
-    // MARK: - Edges (ported verbatim from Android implementation)
+    // MARK: - Fahrwasserverbindungen
 
     private static let edges: [(String, String)] = [
         // ── Ems-Fahrwasser (Süd→Nord) ──
@@ -213,7 +210,7 @@ enum NauticalRouter {
         ("memmert_juist_s", "juist_hbr"),
         ("memmert_w", "sea_juist"),
 
-        // ── Offshore-Kette ──
+        // ── Kette in der offenen See ──
         ("sea_borkum_n", "sea_juist"),
         ("sea_juist", "sea_norderney"),
         ("sea_norderney", "sea_baltrum"),
@@ -221,7 +218,7 @@ enum NauticalRouter {
         ("sea_langeoog", "sea_spiekeroog"),
         ("sea_spiekeroog", "sea_wangerooge"),
 
-        // ── Seegatten (Offshore → Inneres Watt & Häfen) ──
+        // ── Seegatten (offene See → inneres Watt und Häfen) ──
         ("sea_juist", "osterems"),
         ("sea_norderney", "osterems"),
         ("osterems", "busetief_n"),
@@ -284,7 +281,7 @@ enum NauticalRouter {
         ("jade_whv_appr", "jade_inner_s"),
         ("jade_inner_s", "jade_dangast_a"),
 
-        // ── Jade-Connectors ──
+        // ── Jade-Verbindungen ──
         ("horumersiel_hbr", "horum_fairway"),
         ("horum_fairway", "jade_horum"),
         ("hooksiel_hbr", "hooksiel_fairway"),
@@ -314,7 +311,7 @@ enum NauticalRouter {
 
     ]
 
-    /// Map for waypoint lookups, including legacy and harbor aliases.
+    /// Zuordnung zum Nachschlagen von Wegpunkten, einschließlich alter Kennungen und Hafennamen.
     private static let waypointMap: [String: Waypoint] = {
         var map: [String: Waypoint] = [:]
         for wp in waypoints { map[wp.id] = wp }
@@ -347,9 +344,9 @@ enum NauticalRouter {
         return map
     }()
 
-    /// Adjacency list. The reference graph is hand-verified, so no automated
-    /// land-pruning is applied here. Adding edges therefore demands chart
-    /// verification before merging.
+    /// Liste benachbarter Wegpunkte. Die Fahrwasserverbindungen wurden von Hand geprüft,
+    /// daher werden Verbindungen nicht automatisch wegen Landkontakt entfernt.
+    /// Neue Verbindungen müssen vor der Übernahme anhand von Seekarten geprüft werden.
     private static let adjacency: [String: [String]] = {
         var adj: [String: [String]] = [:]
         for (a, b) in edges {
@@ -360,15 +357,15 @@ enum NauticalRouter {
         return adj
     }()
 
-    // MARK: - Public API
+    // MARK: - Öffentliche Schnittstelle
 
-    /// Shortest fairway route between two coordinates. Returns the full
-    /// ordered list of waypoints; the caller MUST NOT drop intermediate
-    /// nodes when rendering the polyline.
+    /// Kürzeste Fahrwasserroute zwischen zwei Koordinaten. Gibt alle Wegpunkte
+    /// in ihrer Reihenfolge zurück. Bei der Darstellung dürfen keine Zwischenpunkte
+    /// aus der Routenlinie entfernt werden.
     static func route(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) -> [Waypoint] {
-        // Android's safety evaluator uses the catalog fairway path. Raster
-        // routing and simplification must never replace its depth samples:
-        // SeaMask depths are navigation hints, not surveyed soundings.
+        // Die Tiefenbewertung verwendet den Fahrwasserpfad aus dem Katalog.
+        // Rasterrouten und Vereinfachungen dürfen dessen Tiefenwerte nicht ersetzen:
+        // SeaMask-Tiefen sind Orientierungshilfen und keine vermessenen Lottiefen.
         let startWP = nearest(to: start)
         let endWP = nearest(to: end)
         if startWP.id == endWP.id { return [startWP] }
@@ -409,8 +406,8 @@ enum NauticalRouter {
                 guard let nwp = waypointMap[neighbor] else { continue }
                 let edgeDist = haversineNm(cwp.coordinate, nwp.coordinate)
                 
-                // Android dijkstraOrNull: apply the same legacy-edge penalty
-                // even at endpoints; no additional preference for deep water.
+                // Der gleiche Zuschlag gilt für alte Verbindungen
+                // auch an den Endpunkten. Tiefes Wasser erhält keinen zusätzlichen Vorrang.
                 let isShortcut = current.contains("leybucht") || neighbor.contains("leybucht") ||
                     ["norddeich_appr", "juist_hbr", "norderney_hbr", "borkum_hbr"].contains(current) ||
                     ["norddeich_appr", "juist_hbr", "norderney_hbr", "borkum_hbr"].contains(neighbor)
@@ -433,7 +430,7 @@ enum NauticalRouter {
         return path.first == startID ? path : nil
     }
 
-    // MARK: - Distance helpers
+    // MARK: - Hilfsfunktionen für Entfernungen
 
     static func haversineNm(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
         let earthRadiusNm = 3440.065

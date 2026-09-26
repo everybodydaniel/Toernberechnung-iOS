@@ -1,10 +1,11 @@
+// Die bestehende große Implementierung bleibt bei dieser Erweiterung unverändert.
+// swiftlint:disable file_length
 import CoreLocation
 import Foundation
 import Network
 import WeatherKit
 
-// This file contains the shared cache, WeatherKit adapter, and route batching actor.
-// swiftlint:disable file_length
+// Enthält gemeinsamen Zwischenspeicher, WeatherKit-Anbindung und Actor für gebündelte Routenabfragen.
 
 protocol MarineWeatherClient: Sendable {
     func fetch(
@@ -436,8 +437,8 @@ struct ResilientMarineWeatherClient: MarineWeatherClient {
     }
 }
 
-/// BrightSky weather service for open DWD (Deutscher Wetterdienst) weather data.
-/// Provides reliable marine forecasts, wind speed, gusts, and wind direction without requiring WeatherKit entitlements.
+/// BrightSky-Dienst für offene Wetterdaten des Deutschen Wetterdienstes (DWD).
+/// Liefert Vorhersagen, Windgeschwindigkeit, Böen und Windrichtung ohne WeatherKit-Berechtigung.
 struct BrightSkyWeatherClient: MarineWeatherClient {
     private let session: URLSession
     private static let baseURL = "https://api.brightsky.dev"
@@ -478,14 +479,14 @@ struct BrightSkyWeatherClient: MarineWeatherClient {
         var hourlyWeather: WeatherFetchedHourlyValue?
         var dailyWeather: WeatherFetchedValue<[MarineDailyForecast]>?
 
-        // 1. Fetch current weather if needed
+        // 1. Bei Bedarf aktuelles Wetter laden
         if wantsCurrent {
             if let current = try? await fetchCurrent(lat: lat, lon: lon, now: now) {
                 currentWeather = current
             }
         }
 
-        // 2. Fetch forecast if hourly or daily needed
+        // 2. Vorhersage für benötigte Stunden- oder Tageswerte laden
         if wantsHourly || wantsDaily {
             let start = hourlyInterval?.start ?? now
             let end = hourlyInterval?.end ?? calendar.date(byAdding: .day, value: 7, to: start) ?? start.addingTimeInterval(7 * 86400)
@@ -510,7 +511,7 @@ struct BrightSkyWeatherClient: MarineWeatherClient {
                 )
             }
 
-            // If current was requested but direct call had failed, derive from nearest hourly
+            // Bei fehlgeschlagenem Direktabruf aktuelles Wetter aus dem nächsten Stundenwert ableiten
             if wantsCurrent && currentWeather == nil, let first = hourlyList.first {
                 currentWeather = WeatherFetchedValue(
                     value: currentFromHourly(first),
@@ -532,7 +533,7 @@ struct BrightSkyWeatherClient: MarineWeatherClient {
         )
     }
 
-    // MARK: - API Calls
+    // MARK: - API-Aufrufe
 
     private func fetchCurrent(lat: Double, lon: Double, now: Date) async throws -> WeatherFetchedValue<MarineCurrentWeather> {
         let urlString = String(format: "%@/current_weather?lat=%.4f&lon=%.4f", locale: Locale(identifier: "en_US_POSIX"), Self.baseURL, lat, lon)
@@ -597,7 +598,7 @@ struct BrightSkyWeatherClient: MarineWeatherClient {
         return (hourly, daily)
     }
 
-    // MARK: - Mapping Helpers
+    // MARK: - Hilfsfunktionen zur Datenzuordnung
 
     private func makeMarineWind(speedKmh: Double?, gustKmh: Double?, directionDegrees: Int?) -> MarineWind {
         let speedKnots = (speedKmh ?? 0.0) / Self.kmhPerKnot
@@ -1474,8 +1475,8 @@ actor MaritimeWeatherService: MaritimeWeatherProviding {
                 }
                 snapshots[key] = snapshot
             case .failure:
-                // Preserve successful areas. The decision engine evaluates all
-                // known hazards and treats this missing area as an advisory gap.
+                // Erfolgreich geladene Gebiete erhalten. Die Bewertung berücksichtigt alle
+                // bekannten Gefahren und behandelt dieses fehlende Gebiet als Datenlücke.
                 continue
             }
         }

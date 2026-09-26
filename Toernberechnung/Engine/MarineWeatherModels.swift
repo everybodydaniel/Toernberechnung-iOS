@@ -130,7 +130,7 @@ struct MarineWind: Codable, Equatable, Sendable {
 
     var effectiveGustKnots: Double { gustKnots ?? speedKnots }
 
-    /// `arrow.down` rotated by this angle shows where the wind travels to.
+    /// `arrow.down` zeigt nach der Drehung um diesen Winkel die Richtung, in die der Wind weht.
     var flowArrowRotationDegrees: Double { Double(directionDegrees) }
 }
 

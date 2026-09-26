@@ -1,61 +1,61 @@
 import Foundation
 
-// MARK: - Tide Data Provider Protocol
+// MARK: - Protokoll für Gezeitendatenanbieter
 
-/// Abstraction for obtaining tidal event data for a BSH reference station.
+/// Schnittstelle für Gezeitenereignisse einer BSH-Referenzstation.
 ///
-/// Supports multiple backends:
-/// - Online BSH API (`BSHTideDataProvider`)
-/// - Mock data for unit tests (`MockTideDataProvider`)
-/// - Manual user entry fallback
+/// Unterstützt verschiedene Datenquellen:
+/// - BSH-Online-API (`BSHTideDataProvider`)
+/// - Testdaten (`MockTideDataProvider`)
+/// - Manuelle Eingabe als Ersatz
 ///
-/// The provider must fail gracefully if a station ID is unknown, unavailable,
-/// renamed, or not supported by BSH. Never crash on missing data.
+/// Unbekannte, fehlende, umbenannte oder nicht unterstützte Stationskennungen
+/// müssen kontrolliert behandelt werden. Fehlende Daten dürfen keinen Absturz auslösen.
 protocol TideDataProvider {
-    var usesAndroidForecastLevels: Bool { get }
+    var usesForecastWaterLevels: Bool { get }
     func routeEvents(for waypoint: RouteWaypoint, covering span: ClosedRange<Date>) async throws -> [TideEvent]
-    /// Full HW/NW coverage, including adjacent events outside the requested interval.
+    /// Vollständige Hoch- und Niedrigwasserdaten einschließlich benachbarter Ereignisse außerhalb des angefragten Zeitraums.
     func tidalEvents(for stationID: String, covering span: ClosedRange<Date>) async throws -> [TideEvent]
 
-    /// Fetch high-water events for a reference station around a date.
+    /// Lädt Hochwasserereignisse einer Referenzstation um ein Datum.
     ///
     /// - Parameters:
-    ///   - stationID: BSH station ID (e.g. "507P"). May be provisional or incorrect.
-    ///   - date: The approximate date to search around.
-    /// - Returns: Array of `TideEvent` sorted by time, or empty if station is unknown.
-    /// - Throws: Network errors, parse errors. Unknown station should return empty, not throw.
+    ///   - stationID: BSH-Stationskennung, z. B. "507P". Kann vorläufig oder fehlerhaft sein.
+    ///   - date: Ungefähres Datum für die Suche.
+    /// - Returns: Nach Zeit sortierte `TideEvent`-Liste; bei unbekannter Station leer.
+    /// - Throws: Netzwerk- oder Einlesefehler. Unbekannte Stationen liefern eine leere Liste statt eines Fehlers.
     func highWaters(
         for stationID: String,
         around date: Date
     ) async throws -> [TideEvent]
 
-    /// Fetch mean tidal range for a station, if available from the data source.
-    /// Returns nil if the provider does not supply this value.
+    /// Lädt den mittleren Tidenhub einer Station, sofern die Quelle ihn liefert.
+    /// Gibt andernfalls nil zurück.
     func meanTidalRange(for stationID: String) async throws -> Double?
 
-    /// Fetch mean high water for a station, if available from the data source.
-    /// Returns nil if the provider does not supply this value.
+    /// Lädt das mittlere Hochwasser einer Station, sofern die Quelle es liefert.
+    /// Gibt andernfalls nil zurück.
     func meanHighWater(for stationID: String) async throws -> Double?
 
-    /// Current-year BSH reference values and station capability metadata.
+    /// BSH-Referenzwerte des aktuellen Jahres und Angaben zu verfügbaren Stationsdaten.
     func stationReference(
         for stationID: String,
         around date: Date
     ) async throws -> TideStationReference?
 
-    /// Conservative meteorological correction for the relevant HW cycle.
-    /// A comparison station is only considered when explicitly supplied.
+    /// Vorsichtige wetterbedingte Korrektur für den passenden Hochwasserzyklus.
+    /// Eine Vergleichsstation wird nur verwendet, wenn sie ausdrücklich angegeben ist.
     func waterLevelCorrection(
         for stationID: String,
         at highWaterTime: Date,
         confirmedComparisonStationID: String?
     ) async -> WaterLevelCorrectionResolution
 
-    /// Time-dependent correction over `span`, so a waypoint reached hours away
-    /// from high water is not charged the peak surge.
+    /// Zeitabhängige Korrektur über `span`. An einem Wegpunkt mit Ankunft weit
+    /// vor oder nach Hochwasser wird dadurch nicht die Spitzenabweichung verwendet.
     ///
-    /// `anchorHighWaterTime` selects the gauge's HW cycle (and its uncertainty
-    /// band); the caller samples the result at the actual arrival time.
+    /// `anchorHighWaterTime` wählt den Hochwasserzyklus des Pegels samt Unsicherheitsbereich.
+    /// Der Aufrufer wertet das Ergebnis zur tatsächlichen Ankunftszeit aus.
     func waterLevelCorrectionSeries(
         for stationID: String,
         covering span: ClosedRange<Date>,
@@ -65,18 +65,18 @@ protocol TideDataProvider {
 }
 
 extension TideDataProvider {
-    var usesAndroidForecastLevels: Bool { false }
+    var usesForecastWaterLevels: Bool { false }
     func routeEvents(for waypoint: RouteWaypoint, covering span: ClosedRange<Date>) async throws -> [TideEvent] {
         try await tidalEvents(for: waypoint.tidalReferenceStationID, covering: span)
     }
     func tidalEvents(for stationID: String, covering span: ClosedRange<Date>) async throws -> [TideEvent] {
-        // Compatibility for manual/test providers that only supply HW.
+        // Kompatibilität für manuelle und Testanbieter, die nur Hochwasser liefern.
         let middle = span.lowerBound.addingTimeInterval(span.upperBound.timeIntervalSince(span.lowerBound) / 2)
         return try await highWaters(for: stationID, around: middle)
     }
 
-    /// Providers without a forecast curve keep the previous behaviour: one
-    /// scalar sampled at the high-water peak, applied flat.
+    /// Anbieter ohne Vorhersagekurve behalten das bisherige Verhalten:
+    /// ein Wert am Hochwassergipfel wird für den gesamten Zeitraum angewendet.
     func waterLevelCorrectionSeries(
         for stationID: String,
         covering span: ClosedRange<Date>,
@@ -91,18 +91,18 @@ extension TideDataProvider {
     }
 }
 
-// MARK: - BSH Tide Data Provider
+// MARK: - BSH-Gezeitendatenanbieter
 
-/// Wraps the existing `BSHTideService` to conform to `TideDataProvider`.
+/// Bindet den vorhandenen `BSHTideService` an `TideDataProvider` an.
 ///
-/// Maps station IDs to `HarbourOption` for the BSH fetch call.
-/// If a station ID is not found in the known harbour list, returns empty results
-/// rather than throwing, so the calculation engine marks the waypoint as incomplete.
+/// Ordnet Stationskennungen einer `HarbourOption` für den BSH-Abruf zu.
+/// Unbekannte Kennungen liefern leere Ergebnisse, damit die Berechnung
+/// den Wegpunkt als unvollständig markieren kann.
 final class BSHTideDataProvider: TideDataProvider {
-    var usesAndroidForecastLevels: Bool { true }
+    var usesForecastWaterLevels: Bool { true }
     func routeEvents(for waypoint: RouteWaypoint, covering span: ClosedRange<Date>) async throws -> [TideEvent] {
         guard let latitude = waypoint.latitude, let longitude = waypoint.longitude else { return [] }
-        return try await AndroidPassageForecastStore.shared.events(
+        return try await BSHPassageForecastStore.shared.events(
             latitude: latitude, longitude: longitude, covering: span
         )
     }
@@ -118,7 +118,7 @@ final class BSHTideDataProvider: TideDataProvider {
         do {
             return try await BSHTideService.shared.highWaters(for: stationID, around: date)
         } catch {
-            // BSH fetch failed — return empty so the waypoint is marked incomplete.
+            // Bei fehlgeschlagenem BSH-Abruf leeres Ergebnis liefern, damit der Wegpunkt als unvollständig gilt.
             return []
         }
     }
@@ -165,9 +165,9 @@ final class BSHTideDataProvider: TideDataProvider {
     }
 }
 
-// MARK: - Mock Tide Data Provider
+// MARK: - Gezeitendatenanbieter für Tests
 
-/// Mock provider for unit tests. Returns configurable tide events.
+/// Testanbieter mit einstellbaren Gezeitenereignissen.
 final class MockTideDataProvider: TideDataProvider {
     var tidalEventsByStation: [String: [TideEvent]] = [:]
     func tidalEvents(for stationID: String, covering span: ClosedRange<Date>) async throws -> [TideEvent] {
@@ -176,26 +176,24 @@ final class MockTideDataProvider: TideDataProvider {
         return try await highWaters(for: stationID, around: span.lowerBound)
     }
 
-    /// Pre-configured high water events keyed by station ID.
+    /// Vorbereitete Hochwasserereignisse nach Stationskennung.
     var highWatersByStation: [String: [TideEvent]] = [:]
-    /// Pre-configured mean tidal ranges keyed by station ID.
+    /// Vorbereitete mittlere Tidenhübe nach Stationskennung.
     var meanTidalRanges: [String: Double] = [:]
-    /// Pre-configured mean high water values keyed by station ID.
+    /// Vorbereitete mittlere Hochwasserwerte nach Stationskennung.
     var meanHighWaters: [String: Double] = [:]
     var referencesByStation: [String: TideStationReference] = [:]
     var correctionsByStation: [String: WaterLevelCorrectionResolution] = [:]
-    /// Optional time-dependent corrections. When a station is absent here, the
-    /// protocol's default kicks in and the scalar from `correctionsByStation`
-    /// is used — so tests written before the curve existed keep working.
+    /// Optionale zeitabhängige Korrekturen. Fehlt hier eine Station, verwendet
+    /// die Standardimplementierung den Einzelwert aus `correctionsByStation`.
+    /// So bleiben ältere Tests ohne Vorhersagekurve verwendbar.
     var correctionSeriesByStation: [String: WaterLevelCorrectionSeries] = [:]
-    /// If true, throws an error on fetch to simulate network failure.
+    /// Löst bei true einen Abruffehler aus, um einen Netzwerkausfall nachzubilden.
     var shouldThrow: Bool = false
-    /// Counts `highWaters(for:around:)` calls so tests can prove the passage
-    /// window search resolves tide data once per waypoint instead of once per
-    /// candidate departure time.
+    /// Zählt `highWaters(for:around:)`-Aufrufe. Tests können damit prüfen, ob die
+    /// Passagefenstersuche Gezeitendaten einmal pro Wegpunkt statt einmal pro Abfahrt lädt.
     ///
-    /// Lock-protected: `PassageWindowSolver` resolves its waypoints
-    /// concurrently, so an unsynchronised dictionary would race.
+    /// Eine Sperre schützt die gemeinsame Zuordnung auch bei parallelen Aufrufen.
     var highWatersCallCount: [String: Int] {
         callCountLock.withLock {
             storedHighWatersCallCount
@@ -256,11 +254,11 @@ final class MockTideDataProvider: TideDataProvider {
     }
 }
 
-/// The Android map planner enriches its local harbours with the nearest BSH
-/// forecast station within 20 km, then uses the nearest local harbour per sample.
-/// This snapshot preserves that two-stage lookup and centimetre/SKN conversion.
-actor AndroidPassageForecastStore {
-    static let shared = AndroidPassageForecastStore()
+/// Ordnet lokalen Häfen die nächste BSH-Vorhersagestation innerhalb von 20 km zu.
+/// Für jeden Messpunkt wird danach der nächste lokale Hafen verwendet.
+/// Wasserstände werden von Zentimetern in Meter umgerechnet und auf SKN bezogen.
+actor BSHPassageForecastStore {
+    static let shared = BSHPassageForecastStore()
 
     struct Station: Sendable {
         let name: String
@@ -308,7 +306,7 @@ actor AndroidPassageForecastStore {
             if station.chartDatumAboveGaugeZeroMeters == nil, let height = event.heightMeters {
                 converted = TideEvent(time: event.time, heightMeters: height - datum,
                                       type: event.type, phase: event.phase)
-                converted.androidCurrentTimestampIsISO8601 = event.androidCurrentTimestampIsISO8601
+                converted.currentTimestampIsISO8601 = event.currentTimestampIsISO8601
                 converted.usesAstronomicalPrediction = event.usesAstronomicalPrediction
             }
             return converted
@@ -324,7 +322,7 @@ actor AndroidPassageForecastStore {
             .map { event -> TideEvent in
                 var predicted = event
                 predicted.usesAstronomicalPrediction = true
-                predicted.androidCurrentTimestampIsISO8601 = false
+                predicted.currentTimestampIsISO8601 = false
                 return predicted
             }
         return (forecast + adjacent).sorted { $0.time < $1.time }
@@ -368,9 +366,9 @@ actor AndroidPassageForecastStore {
                       let type = raw["event"] as? String else { return nil }
                 var event = TideEvent(time: time, heightMeters: height / 100 - (datum ?? 0), type: type, phase: nil)
                 event.usesAstronomicalPrediction = forecast == nil
-                // SimpleTidalCurrentProvider uses ZonedDateTime.parse directly,
-                // unlike TideTimes: space-separated BSH timestamps disable current.
-                event.androidCurrentTimestampIsISO8601 = timestamp.contains("T") &&
+                // Die Strömungsberechnung verwendet nur ISO-8601-Zeitstempel mit Zeitzonenangabe.
+                // Zeitstempel mit Leerzeichen bleiben dafür ausgeschlossen.
+                event.currentTimestampIsISO8601 = timestamp.contains("T") &&
                     (timestamp.hasSuffix("Z") || timestamp.range(of: #"[+-]\d{2}:\d{2}$"#, options: .regularExpression) != nil)
                 return event
             }.sorted { $0.time < $1.time }

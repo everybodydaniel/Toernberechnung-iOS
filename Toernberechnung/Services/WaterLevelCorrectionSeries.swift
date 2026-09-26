@@ -1,18 +1,18 @@
 import Foundation
 
-/// Time-bounded meteorological corrections. Outside sampled coverage the
-/// calculation returns an explicitly provisional astronomical scenario (zero surge).
+/// Zeitlich begrenzte wetterbedingte Korrekturen. Außerhalb der verfügbaren Werte
+/// liefert die Berechnung ein ausdrücklich vorläufiges astronomisches Szenario ohne Windstau.
 struct WaterLevelCorrectionSeries: Equatable, Sendable {
 
     struct Sample: Equatable, Sendable {
         let time: Date
-        /// Correction applied by the planner. Model samples are capped at zero
-        /// when no pointwise lower confidence bound is available.
+        /// Vom Planer verwendete Korrektur. Modellwerte werden höchstens mit 0 angesetzt,
+        /// wenn keine untere Vertrauensgrenze für jeden Zeitpunkt vorliegt.
         let meters: Double
         var quality: WaterLevelCorrectionQuality? = nil
     }
 
-    /// Ascending by time. May be empty, in which case only `fallback` applies.
+    /// Nach Zeit aufsteigend sortiert. Bei leerer Liste gilt nur `fallback`.
     let samples: [Sample]
     let fallback: WaterLevelCorrectionResolution
 
@@ -56,34 +56,33 @@ struct WaterLevelCorrectionSeries: Equatable, Sendable {
 
 }
 
-// MARK: - Curve point correction
+// MARK: - Korrektur eines Kurvenpunkts
 
 extension WaterLevelCurvePoint {
-    /// Model forecast minus astronomical prediction, in metres.
+    /// Modellvorhersage minus astronomische Vorhersage in Metern.
     ///
-    /// Both values are already referenced to chart datum, so the datum cancels
-    /// in the difference, just as it does for a tidal event's raw forecast
-    /// and astronomical centimetre values above gauge zero.
+    /// Beide Werte beziehen sich bereits auf Kartennull. Der gemeinsame Bezug
+    /// fällt in der Differenz weg, ebenso wie bei den Rohwerten eines Gezeitenereignisses
+    /// in Zentimetern über Pegelnull.
     var centralCorrectionMeters: Double? {
         guard let forecastMetersSkn, let astroMetersSkn else { return nil }
         return forecastMetersSkn - astroMetersSkn
     }
 }
 
-// MARK: - Building a series from the BSH forecast
+// MARK: - Zeitreihe aus der BSH-Vorhersage erstellen
 
 extension BSHWaterLevelForecastService {
 
-    /// Builds a time-dependent correction for one gauge.
+    /// Erstellt eine zeitabhängige Korrektur für einen Pegel.
     ///
     /// - Parameters:
-    ///   - anchorHighWaterTime: selects the **gauge's** high-water cycle and
-    ///     therefore the uncertainty band that applies. This is deliberately a
-    ///     different quantity from the sampling time: it is gauge-local,
-    ///     whereas the sampling time is the arrival time at a waypoint that may
-    ///     sit an offset away from the gauge.
-    ///   - span: the time range the caller will sample. Padded by an hour so
-    ///     interpolation still has bracketing points at the edges.
+    ///   - anchorHighWaterTime: Wählt den Hochwasserzyklus des Pegels und dessen
+    ///     Unsicherheitsbereich. Unterscheidet sich von der Auswertungszeit:
+    ///     Diese ist die Ankunft am Wegpunkt, dessen Hochwasser einen Versatz
+    ///     gegenüber dem Pegel haben kann.
+    ///   - span: Zeitbereich für die Auswertung. Wird um eine Stunde erweitert,
+    ///     damit an den Grenzen umgebende Werte für die Interpolation vorliegen.
     func correctionSeries(
         for localStationID: String,
         covering span: ClosedRange<Date>,
@@ -122,9 +121,9 @@ extension BSHWaterLevelForecastService {
         let padded = span.lowerBound.addingTimeInterval(-3_600) ... span.upperBound.addingTimeInterval(3_600)
         let samples = forecast.curve.filter { padded.contains($0.time) }.compactMap { point -> WaterLevelCorrectionSeries.Sample? in
             guard let central = point.centralCorrectionMeters, central.isFinite else { return nil }
-            // The automated curve is a central model estimate without a pointwise
-            // lower confidence bound. Positive setup must therefore not create
-            // additional calculated clearance. Negative setdown is retained.
+            // Die automatische Kurve ist eine mittlere Modellschätzung ohne untere
+            // Vertrauensgrenze für jeden Zeitpunkt. Positiver Windstau darf daher kein
+            // zusätzliches Wasser unter Kiel ergeben. Negative Abweichungen bleiben erhalten.
             return .init(time: point.time, meters: min(central, 0), quality: quality)
         }.sorted { $0.time < $1.time }
         let fallback = WaterLevelCorrectionResolution(

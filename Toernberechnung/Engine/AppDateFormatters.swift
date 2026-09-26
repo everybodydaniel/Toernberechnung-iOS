@@ -1,12 +1,11 @@
 import Foundation
 
-// MARK: - App Date Formatters
+// MARK: - Datums- und Zeitformate
 //
-// Single source of truth for all human-readable date / time formatting in
-// the app. Every formatter is pre-configured with the German locale
-// (`de_DE`) and the Berlin time zone (`Europe/Berlin`) so the UI never
-// shows English month names, AM/PM clocks, or off-by-one-hour values when
-// the underlying timestamp is UTC-based (BSH and WeatherKit payloads are).
+// Zentrale Formatierung von Datum und Uhrzeit in der App.
+// Alle Formatierer verwenden `de_DE` und `Europe/Berlin`.
+// So erscheinen deutsche Monatsnamen und Uhrzeiten im 24-Stunden-Format.
+// UTC-Zeitstempel von BSH und WeatherKit werden in die Ortszeit umgerechnet.
 
 enum AppDateFormatters {
 
@@ -20,17 +19,17 @@ enum AppDateFormatters {
         return cal
     }()
 
-    /// `HH:mm` (e.g. "14:30").
+    /// `HH:mm` (z. B. "14:30").
     static let hourMinute: DateFormatter = make("HH:mm")
-    /// `dd.MM.yyyy` (e.g. "14.05.2026").
+    /// `dd.MM.yyyy` (z. B. "14.05.2026").
     static let dayMonthYear: DateFormatter = make("dd.MM.yyyy")
-    /// `EEEE, dd.MM.yyyy` (e.g. "Donnerstag, 14.05.2026").
+    /// `EEEE, dd.MM.yyyy` (z. B. "Donnerstag, 14.05.2026").
     static let weekdayLong: DateFormatter = make("EEEE, dd.MM.yyyy")
-    /// `EE dd.MM. HH:mm` (e.g. "Do 14.05. 14:30").
+    /// `EE dd.MM. HH:mm` (z. B. "Do 14.05. 14:30").
     static let shortWeekdayDateTime: DateFormatter = make("EE dd.MM. HH:mm")
-    /// `EEE` (e.g. "Do").
+    /// `EEE` (z. B. "Do").
     static let weekdayShort: DateFormatter = make("EEE")
-    /// `EEE dd.MM.` (e.g. "Do 14.05.").
+    /// `EEE dd.MM.` (z. B. "Do 14.05.").
     static let weekdayDay: DateFormatter = make("EEE dd.MM.")
 
     private static func make(_ pattern: String) -> DateFormatter {
@@ -41,7 +40,7 @@ enum AppDateFormatters {
         return f
     }
 
-    /// Format a duration in hours as `Hh MMm` (German short style).
+    /// Formatiert eine Dauer in Stunden als `Hh MMm`.
     static func duration(hours: Double) -> String {
         let totalMinutes = max(Int((hours * 60).rounded()), 0)
         return "\(totalMinutes / 60) h \(totalMinutes % 60) min"

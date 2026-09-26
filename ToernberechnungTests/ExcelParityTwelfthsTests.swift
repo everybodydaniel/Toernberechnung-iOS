@@ -2,23 +2,23 @@ import Foundation
 import XCTest
 @testable import Toernberechnung
 
-/// Proves that `TwelfthsRuleStrategy` reproduces the Excel formula `L39` of
-/// "Excel-Tool-Törnberechnung_V2.1" exactly.
+/// Prüft `TwelfthsRuleStrategy` gegen die Excel-Formel `L39` des
+/// "Excel-Tool-Törnberechnung_V2.1".
 ///
-/// Excel `L35` (one twelfth) = `SUM(L33)/12`, and `L39` selects a multiple of it:
+/// Excel `L35` (ein Zwölftel) = `SUM(L33)/12`; `L39` wählt ein Vielfaches davon:
 ///
 /// ```
 /// ≤1 → 1   ≤2 → 3   ≤3 → 6   ≤4 → 9   ≤5 → 11  ≤7 → 12
 /// ≤8 → 11  ≤9 → 9   ≤10 → 6  ≤11 → 3  ≤12 → 1  >12 → Fehlertext
 /// ```
 ///
-/// The bucket boundaries are inclusive on the upper end (`IF(L37<=1, …)`), which
-/// is why every whole hour is asserted explicitly — an off-by-one there would
-/// silently change the water deficit by a whole twelfth.
+/// Die obere Grenze jedes Bereichs ist eingeschlossen (`IF(L37<=1, …)`).
+/// Deshalb wird jede volle Stunde ausdrücklich geprüft. Eine falsche Grenze
+/// würde die Fehlmenge um ein ganzes Zwölftel verändern.
 final class ExcelParityTwelfthsTests: XCTestCase {
 
     private let strategy = TwelfthsRuleStrategy()
-    /// Excel `L33`. Chosen so one twelfth is exactly 0,20 m.
+    /// Excel `L33`, so gewählt, dass ein Zwölftel genau 0,20 m beträgt.
     private let mth = 2.4
     private let accuracy = 1e-9
 
@@ -42,13 +42,13 @@ final class ExcelParityTwelfthsTests: XCTestCase {
         XCTAssertTrue(atHighWater.isValid)
         XCTAssertEqual(atHighWater.messages, ["keine Fehlmenge"])
 
-        // The app additionally tolerates floating point noise below 0,01 h.
-        // Excel compares against a literal 0; the epsilon can only ever turn a
-        // rounding artefact into the Excel result, never the other way round.
+        // Die App toleriert zusätzlich Gleitkommaabweichungen unter 0,01 h.
+        // Excel vergleicht direkt mit 0. Die Toleranz erhält bei kleinen Rundungsfehlern
+        // das erwartete Ergebnis einer Ankunft zum Hochwasser.
         XCTAssertEqual(fmw(0.005).fmwMeters, 0, accuracy: accuracy)
     }
 
-    /// Every bucket, asserted at its inclusive upper boundary and just beyond it.
+    /// Jeden Bereich an seiner eingeschlossenen oberen Grenze und knapp darüber prüfen.
     func testEveryBucketMatchesTheExcelStaircase() {
         let expectations: [(deviation: Double, twelfths: Double)] = [
             (0.5, 1), (1.0, 1),
@@ -78,9 +78,9 @@ final class ExcelParityTwelfthsTests: XCTestCase {
 
     /// Excel `IF(L37>12,"rel. HW od. Startzeit fehlt !!!")`.
     ///
-    /// Deliberate divergence: Excel's `L45` swallows that text through
-    /// `IFERROR(…, SUM(L41:Q44))` and silently continues with a bare MHW, i.e.
-    /// as if there were no water deficit at all. The app refuses instead.
+    /// Bewusste Abweichung: Excel fängt den Fehlertext in `L45` über
+    /// `IFERROR(…, SUM(L41:Q44))` ab und rechnet mit MHW ohne Fehlmenge weiter.
+    /// Die App lehnt diese Berechnung ab.
     func testDeviationBeyondTidalCycleIsRejected() {
         let beyond = fmw(12.0001)
         XCTAssertFalse(beyond.isValid)
@@ -88,7 +88,7 @@ final class ExcelParityTwelfthsTests: XCTestCase {
         XCTAssertEqual(beyond.oneTwelfthMeters, 0.20, accuracy: accuracy)
     }
 
-    /// Excel `L37 = ABS(L29-L31)*24` — the sign is removed before the lookup.
+    /// Excel `L37 = ABS(L29-L31)*24`: Der Betrag wird vor der Auswahl gebildet.
     func testDeviationIsSymmetricAroundHighWater() {
         for hours in [1.0, 3.0, 5.0, 7.0, 12.0] {
             XCTAssertEqual(
@@ -100,8 +100,8 @@ final class ExcelParityTwelfthsTests: XCTestCase {
         }
     }
 
-    /// Excel guards this with `IF(L33=0,"",…)`. The engine reaches the guard in
-    /// `RouteCalculationService` instead, so here only the arithmetic is pinned.
+    /// Excel prüft dies mit `IF(L33=0,"",…)`. Die App prüft es in
+    /// `RouteCalculationService`; hier werden nur die Rechenschritte abgesichert.
     func testZeroTidalRangeStaysFinite() {
         let result = strategy.missingWater(deviationHours: 3, meanTidalRangeMeters: 0)
         XCTAssertEqual(result.oneTwelfthMeters, 0, accuracy: accuracy)

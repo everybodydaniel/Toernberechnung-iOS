@@ -2,12 +2,12 @@ import Foundation
 import XCTest
 @testable import Toernberechnung
 
-/// The BSH surge is no longer a single scalar pinned to the high-water peak.
-/// These tests guard the two properties that make that safe:
+/// Die BSH-Wasserstandsabweichung wird zeitabhängig statt nur am Hochwassergipfel angewendet.
+/// Diese Tests sichern zwei Eigenschaften ab:
 ///
-/// 1. Missing or unusable curve data degrades to exactly the previous scalar.
-/// 2. The correction *quality* never changes with the sample time, so the
-///    provenance advisory remains stable throughout the sampled curve.
+/// 1. Fehlende oder unbrauchbare Kurvendaten verwenden den bisherigen Einzelwert.
+/// 2. Innerhalb der Kurvenabdeckung bleibt die Quellenqualität erhalten;
+///    außerhalb gelten die ausdrücklich vorläufigen Ersatzwerte.
 final class WaterLevelCorrectionSeriesTests: XCTestCase {
 
     private let accuracy = 1e-9
@@ -42,7 +42,7 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         )
     }
 
-    // MARK: - Sampling
+    // MARK: - Auswertung der Zeitreihe
 
     func testInterpolatesLinearlyBetweenSamples() {
         let series = slopingSeries()
@@ -80,9 +80,9 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         XCTAssertEqual(single.resolution(at: base).meters, peak().meters, accuracy: accuracy)
     }
 
-    // MARK: - The safety invariant
+    // MARK: - Sicherheitsbedingung
 
-    /// A curve preserves quality within its sampled coverage and degrades outside.
+    /// Innerhalb der Kurvenabdeckung bleibt die Qualität erhalten; außerhalb wird sie herabgesetzt.
     func testQualityIsTimeBoundedToForecastCoverage() {
         for quality in [
             WaterLevelCorrectionQuality.localOfficial,
@@ -107,8 +107,8 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         }
     }
 
-    /// End to end: a comparison gauge remains visibly provisional, but source
-    /// provenance does not overwrite the calculated clearance status.
+    /// Gesamtprüfung: Ein Vergleichspegel bleibt als vorläufig erkennbar.
+    /// Die Datenherkunft überschreibt aber nicht den berechneten Tiefenstatus.
     func testComparisonGaugeRemainsAdvisoryAfterCurveSampling() {
         let sampled = slopingSeries(quality: .confirmedComparison)
             .resolution(at: base.addingTimeInterval(900))
@@ -132,11 +132,11 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         XCTAssertEqual(sampled.detail, "Lokale amtliche Scheitelwertvorhersage.")
     }
 
-    // MARK: - Curve point arithmetic
+    // MARK: - Berechnung einzelner Kurvenpunkte
 
-    /// Both values are referenced to chart datum, so the datum cancels in the
-    /// difference — this is the same quantity the peak record derives from raw
-    /// centimetres above gauge zero.
+    /// Beide Werte beziehen sich auf Kartennull. Dieser Bezug fällt in ihrer
+    /// Differenz weg. Das entspricht der Differenz der Rohwerte am Hochwassergipfel
+    /// in Zentimetern über Pegelnull.
     func testCurvePointCorrectionIsForecastMinusAstronomicalPrediction() {
         let point = WaterLevelCurvePoint(
             time: base,
@@ -152,10 +152,10 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         XCTAssertNil(incomplete.centralCorrectionMeters)
     }
 
-    // MARK: - Provider integration
+    // MARK: - Einbindung der Datenanbieter
 
-    /// Every provider that predates the curve keeps working through the
-    /// protocol's default implementation.
+    /// Ältere Anbieter ohne Kurve bleiben durch die Standardimplementierung
+    /// des Protokolls verwendbar.
     func testProviderWithoutSeriesFallsBackToTheScalarDefault() async {
         let provider = MockTideDataProvider()
         provider.correctionsByStation[stationID] = peak(meters: 0.42)
@@ -170,8 +170,8 @@ final class WaterLevelCorrectionSeriesTests: XCTestCase {
         XCTAssertEqual(series.resolution(at: base).meters, 0.42, accuracy: accuracy)
     }
 
-    /// Regression test for the sampling bug: two waypoints on the same gauge,
-    /// reached 30 minutes apart, must not receive an identical surge.
+    /// Regressionstest: Zwei Wegpunkte mit demselben Pegel und 30 Minuten
+    /// unterschiedlicher Ankunft müssen verschiedene Wasserstandskorrekturen erhalten.
     func testArrivalTimeSamplingDiffersBetweenWaypointsOnTheSameGauge() async {
         let provider = MockTideDataProvider()
         provider.correctionSeriesByStation[stationID] = slopingSeries()

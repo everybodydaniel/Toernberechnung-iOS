@@ -38,6 +38,9 @@ final class NautiSpeechInputTests: XCTestCase {
 
         XCTAssertEqual(controller.state, .recording)
         client.yield(NautiSpeechTranscript(text: "Plane einen Törn nach Juist", isFinal: true))
+        await waitUntil { controller.transcript == "Plane einen Törn nach Juist" }
+        XCTAssertEqual(controller.state, .recording)
+        client.finish()
         await waitUntil { controller.state == .idle }
 
         XCTAssertEqual(controller.transcript, "Plane einen Törn nach Juist")
@@ -53,7 +56,7 @@ final class NautiSpeechInputTests: XCTestCase {
         await waitUntil { controller.errorMessage != nil }
 
         XCTAssertEqual(controller.state, .idle)
-        XCTAssertTrue(controller.errorMessage?.contains("Sprachressourcen") == true)
+        XCTAssertEqual(controller.errorMessage, NautiSpeechInputError.assetsUnavailable.localizedDescription)
     }
 
     @MainActor
@@ -149,6 +152,114 @@ final class NautiSpeechInputTests: XCTestCase {
     }
 
     @MainActor
+    func testStopWaitsForFinalWords() async {
+        let client = FakeNautiSpeechInputClient()
+        client.stopResult = "Plane einen Törn nach Juist"
+        let controller = NautiSpeechInputController(client: client)
+        await controller.start()
+        client.yield(.init(text: "Plane einen Törn", isFinal: false))
+        await waitUntil { controller.transcript == "Plane einen Törn" }
+        await controller.stop()
+        XCTAssertEqual(controller.transcript, "Plane einen Törn nach Juist")
+        XCTAssertEqual(controller.state, .idle)
+        XCTAssertEqual(client.stopCount, 1)
+    }
+
+    @MainActor
+    func testStopTimeoutReturnsAndPreservesRecognizedText() async {
+        let client = FakeNautiSpeechInputClient()
+        client.finishWhenStopped = false
+        let controller = NautiSpeechInputController(client: client, finalizationTimeout: .milliseconds(30))
+        await controller.start()
+        client.yield(.init(text: "Nach Juist", isFinal: false))
+        await waitUntil { controller.transcript == "Nach Juist" }
+        await controller.stop()
+        XCTAssertEqual(controller.state, .idle)
+        XCTAssertEqual(controller.transcript, "Nach Juist")
+        XCTAssertEqual(controller.errorMessage, NautiSpeechInputError.finalizationTimedOut.localizedDescription)
+        await waitUntil { client.cancelCount > 0 }
+    }
+
+    @MainActor
+    func testThirdBackendStartsOnlyAfterBothFailedBackendsAreReleased() async throws {
+        let primary = FakeNautiSpeechBackend(error: NautiSpeechInputError.onDeviceRecognitionUnavailable)
+        let fallback = FakeNautiSpeechBackend(error: NautiSpeechInputError.downloadFailed)
+        let last = FakeNautiSpeechBackend()
+        let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: { fallback }, additionalFallback: {
+            XCTAssertEqual(primary.cancelCount, 1)
+            XCTAssertEqual(fallback.cancelCount, 1)
+            return last
+        })
+        _ = try await client.startTranscription()
+        XCTAssertEqual(last.startCount, 1)
+        await client.cancelTranscription()
+    }
+
+    @MainActor
+    func testDownloadFailureKeepsOriginalCauseInsteadOfGenericAssetsError() async {
+        let original = NSError(domain: "SpeechDownloadTest", code: 42)
+        let primary = FakeNautiSpeechBackend(error: NautiSpeechFailure(reason: .downloadFailed, underlying: original))
+        let fallback = FakeNautiSpeechBackend(error: NautiSpeechInputError.onDeviceRecognitionUnavailable)
+        let client = AppleNautiSpeechInputClient(primary: { primary }, fallback: { fallback })
+        do {
+            _ = try await client.startTranscription()
+            XCTFail("Der Downloadfehler muss erhalten bleiben.")
+        } catch {
+            XCTAssertEqual(NautiSpeechInputError.reason(for: error), .downloadFailed)
+            XCTAssertEqual(((error as? NautiSpeechFailure)?.underlying as? NSError)?.code, 42)
+        }
+    }
+
+    @MainActor
+    func testSpeechDraftStaysInOriginatingConversationAndIsNotSent() async {
+        let client = FakeNautiSpeechInputClient()
+        let model = NautiChatViewModel(repository: MemoryNautiConversationRepository(), speechClient: client)
+        model.draft = "Bitte:"
+        let original = model.activeConversationID
+        await model.startSpeechInput()
+        client.yield(.init(text: "Plane einen Törn", isFinal: false))
+        await waitUntil { model.draft == "Bitte: Plane einen Törn" }
+        XCTAssertFalse(model.canSend)
+        let other = model.createConversation()
+        client.yield(.init(text: "Späterer Text", isFinal: true))
+        await Task.yield()
+        XCTAssertEqual(model.activeConversationID, other)
+        XCTAssertEqual(model.draft, "")
+        XCTAssertFalse(model.messages.contains { $0.role == .user })
+        model.selectConversation(original)
+        XCTAssertEqual(model.draft, "Bitte: Plane einen Törn")
+    }
+
+    @MainActor
+    func testSecondRecordingAppendsWithoutDuplicatingTheFirst() async {
+        let client = FakeNautiSpeechInputClient()
+        let model = NautiChatViewModel(repository: MemoryNautiConversationRepository(), speechClient: client)
+        model.draft = "Bitte"
+        await model.startSpeechInput()
+        client.stopResult = "Plane einen Törn"
+        await model.speechInput.stop()
+        XCTAssertEqual(model.draft, "Bitte Plane einen Törn")
+        await model.startSpeechInput()
+        client.stopResult = "nach Juist"
+        await model.speechInput.stop()
+        XCTAssertEqual(model.draft, "Bitte Plane einen Törn nach Juist")
+        XCTAssertTrue(model.canSend)
+        XCTAssertFalse(model.messages.contains { $0.role == .user })
+    }
+
+    @MainActor
+    func testSpeechCorrectsNauticalWordWithoutChangingExistingDraft() async {
+        let client = FakeNautiSpeechInputClient()
+        let model = NautiChatViewModel(repository: MemoryNautiConversationRepository(), speechClient: client)
+        model.draft = "Turn als Beispiel:"
+        await model.startSpeechInput()
+        client.yield(.init(text: "Plane einen Turn nach Juist", isFinal: false))
+        await waitUntil { model.draft == "Turn als Beispiel: Plane einen Törn nach Juist" }
+        XCTAssertEqual(model.speechInput.transcript, "Plane einen Törn nach Juist")
+        model.speechInput.cancel()
+    }
+
+    @MainActor
     private func waitUntil(
         _ condition: @escaping @MainActor () -> Bool
     ) async {
@@ -163,6 +274,8 @@ final class NautiSpeechInputTests: XCTestCase {
 private final class FakeNautiSpeechInputClient: NautiSpeechInputClient {
     let permission: NautiSpeechPermission
     private var continuation: AsyncThrowingStream<NautiSpeechTranscript, Error>.Continuation?
+    var stopResult: String?
+    var finishWhenStopped = true
 
     private(set) var startCount = 0
     private(set) var stopCount = 0
@@ -185,7 +298,8 @@ private final class FakeNautiSpeechInputClient: NautiSpeechInputClient {
 
     func stopTranscription() async {
         stopCount += 1
-        continuation?.finish()
+        if let stopResult { continuation?.yield(.init(text: stopResult, isFinal: true)) }
+        if finishWhenStopped { continuation?.finish() }
         continuation = nil
     }
 
@@ -198,6 +312,8 @@ private final class FakeNautiSpeechInputClient: NautiSpeechInputClient {
     func yield(_ transcript: NautiSpeechTranscript) {
         continuation?.yield(transcript)
     }
+
+    func finish() { continuation?.finish() }
 
     func finish(throwing error: Error) {
         continuation?.finish(throwing: error)

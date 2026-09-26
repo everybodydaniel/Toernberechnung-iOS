@@ -1,19 +1,18 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Tap anywhere to dismiss the keyboard
+// MARK: - Tastatur durch Tippen außerhalb schließen
 //
-// SwiftUI only closes the keyboard on submit or on an interactive scroll
-// dismiss. iPhone users expect a plain tap next to the field to work too, so
-// we install a single tap recognizer on the app's UIWindow.
+// Ergänzt eine Tipp-Erkennung im UIWindow, damit ein Tipp neben ein Textfeld
+// die Tastatur schließt. SwiftUI unterstützt dies sonst nur beim Bestätigen
+// oder über passende Scrollgesten.
 //
-// Window level is deliberate: sheets (SettingsSheet, the planning sheet,
-// CrewEventEditor) are presented into the same window, so one recognizer
-// covers every text field in the app. The system keyboard itself lives in a
-// separate UIRemoteKeyboardWindow and is therefore never affected.
+// Die Erkennung im Fenster gilt auch für modale Ansichten wie Einstellungen
+// und CrewEventEditor. Die Systemtastatur liegt in einem separaten
+// UIRemoteKeyboardWindow und ist davon nicht betroffen.
 
-/// Zero-sized view whose only job is to reach the hosting `UIWindow` once and
-/// attach the dismiss recognizer to it.
+/// Ansicht ohne Größe, die einmal auf das übergeordnete `UIWindow` zugreift
+/// und dort die Tipp-Erkennung zum Schließen der Tastatur anbringt.
 struct KeyboardDismissGestureInstaller: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
@@ -24,7 +23,7 @@ struct KeyboardDismissGestureInstaller: UIViewRepresentable {
         let probe = UIView(frame: .zero)
         probe.isUserInteractionEnabled = false
         probe.isHidden = true
-        // The view is not in a window yet while `makeUIView` runs.
+        // Während `makeUIView` ist die Ansicht noch keinem Fenster zugeordnet.
         DispatchQueue.main.async { [weak probe] in
             context.coordinator.install(in: probe?.window)
         }
@@ -49,8 +48,8 @@ struct KeyboardDismissGestureInstaller: UIViewRepresentable {
             uninstall()
 
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-            // Never consume the touch: buttons, list rows, map pans and every
-            // SwiftUI gesture keep receiving it unchanged.
+            // Berührungen nicht abfangen. Buttons, Listenzeilen, Kartenbewegungen
+            // und SwiftUI-Gesten erhalten sie weiterhin unverändert.
             tap.cancelsTouchesInView = false
             tap.delaysTouchesBegan = false
             tap.delaysTouchesEnded = false
@@ -81,9 +80,9 @@ struct KeyboardDismissGestureInstaller: UIViewRepresentable {
             true
         }
 
-        /// Ignore taps that land on a text input or any other UIKit control.
-        /// Without this, tapping straight from one field into the next would
-        /// resign the first responder while the target field claims it.
+        /// Tipps auf Textfelder oder andere UIKit-Bedienelemente auslassen.
+        /// So verliert beim direkten Wechsel zwischen Feldern nicht das bisherige
+        /// Feld den Fokus, während das nächste ihn übernimmt.
         func gestureRecognizer(
             _ gestureRecognizer: UIGestureRecognizer,
             shouldReceive touch: UITouch

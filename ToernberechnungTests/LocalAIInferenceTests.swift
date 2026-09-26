@@ -318,7 +318,9 @@ final class LocalAIInferenceTests: XCTestCase {
             inferenceClient: client,
             repository: MemoryNautiConversationRepository()
         )
-        viewModel.draft = "Wie sind morgen die Gezeiten auf Juist?"
+        // Erklärungsfragen erreichen den eingesetzten Modellclient.
+        // Konkrete Gezeitenanfragen verarbeitet die feste Aktionszuordnung.
+        viewModel.draft = "Erkläre mir die Gezeiten im Wattenmeer."
 
         let returnedDispatch = await viewModel.sendCurrentDraft()
 

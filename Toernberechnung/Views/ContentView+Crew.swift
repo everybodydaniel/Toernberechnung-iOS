@@ -89,8 +89,7 @@ enum CrewspaceSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// Crewspace is fully local: the crew roster and the appointments both live in
-/// SwiftData on this device. There is no account and nothing leaves the phone.
+/// Crew-Liste und Termine werden lokal mit SwiftData gespeichert.
 struct CrewspaceView: View {
     let topContentInset: CGFloat
     @Binding var headerVisible: Bool
@@ -118,7 +117,7 @@ struct CrewspaceView: View {
 
 }
 
-/// A normal list row, so the title and section control scroll with the content.
+/// Normale Listenzeile, damit Titel und Bereichsauswahl mit dem Inhalt scrollen.
 struct CrewspaceScrollingHeader: View {
     @Binding var section: CrewspaceSection
 
@@ -389,7 +388,7 @@ struct CrewspaceCrewView: View {
     }
 }
 
-/// Shared by Crewspace and Nauti so fields, defaults and validation stay identical.
+/// Gemeinsam für Crewspace und Nauti, damit Felder, Standardwerte und Prüfungen übereinstimmen.
 struct CrewMemberForm: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CrewMemberRecord.createdAt) private var crewMembers: [CrewMemberRecord]

@@ -62,6 +62,10 @@ targets:
       - path: Toernberechnung/Engine/NavigationTracker.swift
       - path: Toernberechnung/Engine/ActiveVoyageManager.swift
       - path: Toernberechnung/Engine/Routing
+      - path: Toernberechnung/Services/NautiSpeechInputManager.swift
+      - path: Toernberechnung/Services/NautiSpeechAnalyzerBackend.swift
+      - path: Toernberechnung/Services/NautiAudioCapture.swift
+      - path: Toernberechnung/Services/SpeechAudioFormatConverter.swift
       - path: Toernberechnung/Services/LocationService.swift
       - path: Toernberechnung/Services/WeatherKitManager.swift
       - path: Toernberechnung/Services/LocalAIInferenceManager.swift

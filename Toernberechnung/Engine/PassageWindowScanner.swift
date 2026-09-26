@@ -1,22 +1,22 @@
 import Foundation
 
-/// Route adapter for the Android-compatible ten-minute departure scan.
+/// Verbindet die Routenplanung mit der Abfahrtssuche im Zehn-Minuten-Raster.
 struct PassageWindowScanner {
 
-    // MARK: - Public types
+    // MARK: - Öffentliche Typen
 
     struct Window: Equatable {
         let start: Date
         let end: Date
-        /// BSH HW used as anchor (for display).
+        /// BSH-Hochwasser als zeitlicher Bezug für die Anzeige.
         let anchoredHighWater: Date?
-        /// Bottleneck waypoint name (for display).
+        /// Name des begrenzenden Wegpunkts für die Anzeige.
         let bottleneckName: String?
         let waterLevelQuality: WaterLevelCorrectionQuality
         let waterLevelDetail: String?
         let recommendedDeparture: Date
         let recommendedClearanceMeters: Double
-        /// Arrival at the limiting waypoint for `recommendedDeparture`.
+        /// Ankunft am begrenzenden Wegpunkt bei `recommendedDeparture`.
         let bottleneckArrival: Date?
         let bottleneckDepthDetail: String?
 
@@ -46,7 +46,7 @@ struct PassageWindowScanner {
 
         func contains(_ date: Date) -> Bool { date >= start && date <= end }
 
-        /// A single safe sample proves no interval of usable duration.
+        /// Ein einzelner geeigneter Zeitpunkt belegt kein Zeitfenster mit nutzbarer Dauer.
         var hasUsableDuration: Bool { end > start }
 
         var displayString: String {
@@ -61,14 +61,14 @@ struct PassageWindowScanner {
         }
     }
 
-    // MARK: - Config
+    // MARK: - Konfiguration
 
     private let calculationService: RouteCalculationService
-    /// Original scan resolution.
+    /// Ursprüngliche Schrittweite der Suche.
     var scanIncrementSeconds: TimeInterval = 600
-    /// Search range before the selected departure.
+    /// Suchbereich vor der gewählten Abfahrt.
     var scanBackwardHours: Double = 12
-    /// Search range after the selected departure.
+    /// Suchbereich nach der gewählten Abfahrt.
     var scanForwardHours: Double = 24
     var scanSelectedDay: Bool = false
 
@@ -76,9 +76,9 @@ struct PassageWindowScanner {
         self.calculationService = calculationService
     }
 
-    // MARK: - Entry point
+    // MARK: - Einstiegspunkt
 
-    /// Route-wide departure window search.
+    /// Suche nach Abfahrtsfenstern für die gesamte Route.
     func findSafeWindow(
         route: RoutePlan,
         boatSettings: BoatSettings,
@@ -94,7 +94,7 @@ struct PassageWindowScanner {
         return solution.routeWindow
     }
 
-    /// Full solution including the per-bottleneck windows.
+    /// Vollständiges Ergebnis einschließlich der Zeitfenster einzelner Engstellen.
     func solve(
         route: RoutePlan,
         boatSettings: BoatSettings,

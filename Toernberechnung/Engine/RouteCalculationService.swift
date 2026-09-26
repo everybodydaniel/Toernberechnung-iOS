@@ -1,37 +1,34 @@
 import Foundation
 
-// MARK: - Route Calculation Service
+// MARK: - Routenberechnung
 
-/// The single source of truth for all tidal Go / No-Go calculations in the app.
+/// Zentrale Berechnung der gezeitenabhängigen Befahrbarkeit in der App.
 ///
-/// This service replaces `ManualPassageCalculator`. It calculates ETA, tidal water depth,
-/// and clearance under keel for every waypoint in a multi-waypoint route.
+/// Die Berechnung verwendet strukturierte Wegpunkt-, Gezeiten-, Strecken- und Bootsdaten.
+/// Sie hängt nicht von festen Wegpunktnamen, Inselnamen oder bestimmten Routen ab.
+/// Emden → Norderney dient nur als Referenz für einen Regressionstest.
 ///
-/// The service is **geography-independent**: it consumes structured waypoint, tide, leg,
-/// and boat data. No calculation code depends on fixed waypoint names, island names,
-/// or specific routes. The Emden → Norderney example is only a regression test fixture.
-///
-/// ## Calculation Flow
-/// 1. Validate inputs
-/// 2. Calculate arrival times at each waypoint using leg data
-/// 3. For each waypoint:
-///    a. Resolve relevant high water (from provider or manual entry)
-///    b. Apply HW offset
-///    c. Calculate deviation from HW
-///    d. Apply tidal height strategy (1/12 rule) to get FmW
-///    e. Calculate available water depth (MHW or Lottiefe mode)
-///    f. Calculate clearance under keel
-///    g. Determine waypoint status
-/// 4. Combine all waypoint statuses into overall route status
+/// ## Berechnungsablauf
+/// 1. Eingaben prüfen
+/// 2. Ankunftszeiten aus den Streckenabschnitten berechnen
+/// 3. Jeden Wegpunkt auswerten:
+///    a. Passendes Hochwasser vom Anbieter oder aus manueller Eingabe ermitteln
+///    b. Zeitversatz des Hochwassers anwenden
+///    c. Abstand der Ankunft zum Hochwasser berechnen
+///    d. Fehlmenge Wasser mit der Gezeitenstrategie (Zwölftelregel) berechnen
+///    e. Verfügbare Wassertiefe im MHW- oder Lottiefe-Modus bestimmen
+///    f. Wasser unter Kiel berechnen
+///    g. Status des Wegpunkts bestimmen
+/// 4. Einzelne Statuswerte zum Routenstatus zusammenführen
 final class RouteCalculationService {
 
     private let tidalHeightStrategy: TidalHeightStrategy
     private let calendar: Calendar
 
-    /// Creates a calculation service.
+    /// Erstellt den Berechnungsdienst.
     /// - Parameters:
-    ///   - tidalHeightStrategy: Strategy for computing FmW. Default is TwelfthsRuleStrategy.
-    ///   - timeZone: Time zone for date calculations. Default is Europe/Berlin.
+    ///   - tidalHeightStrategy: Strategie zur Berechnung der Fehlmenge Wasser. Standard: TwelfthsRuleStrategy.
+    ///   - timeZone: Zeitzone für Datumsberechnungen. Standard: Europe/Berlin.
     init(
         tidalHeightStrategy: TidalHeightStrategy = ContinuousTwelfthsStrategy(),
         timeZone: TimeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
@@ -42,15 +39,15 @@ final class RouteCalculationService {
         self.calendar = cal
     }
 
-    // MARK: - Main Calculation
+    // MARK: - Hauptberechnung
 
-    /// Calculate tidal Go/No-Go for a complete multi-waypoint route.
+    /// Berechnet die gezeitenabhängige Befahrbarkeit einer vollständigen Route.
     ///
     /// - Parameters:
-    ///   - route: The route plan with all waypoints and legs.
-    ///   - boatSettings: Boat draft and safety margin.
-    ///   - tideDataProvider: Provider for BSH tide data.
-    /// - Returns: Complete route calculation result.
+    ///   - route: Routenplan mit allen Wegpunkten und Streckenabschnitten.
+    ///   - boatSettings: Tiefgang und Sicherheitsabstand des Boots.
+    ///   - tideDataProvider: Anbieter der BSH-Gezeitendaten.
+    /// - Returns: Vollständiges Ergebnis der Routenberechnung.
     func calculate(
         route: RoutePlan,
         boatSettings: BoatSettings,
@@ -59,7 +56,7 @@ final class RouteCalculationService {
     ) async -> RouteCalculationResult {
         var messages: [String] = []
 
-        // Validate basic inputs.
+        // Grundlegende Eingaben prüfen.
         guard boatSettings.draftMeters.isFinite, boatSettings.draftMeters > 0 else {
             return errorResult(route: route, boatSettings: boatSettings,
                                message: "Tiefgang muss größer als 0 sein.")
@@ -77,16 +74,16 @@ final class RouteCalculationService {
                                message: "Anzahl der Legs stimmt nicht mit den Wegpunkten überein.")
         }
 
-        // Resolve the same forecast inputs used by the Android-compatible scanner.
-        var currentModels: [AndroidPassageLeg]?
-        if tideDataProvider.usesAndroidForecastLevels {
-            var models: [AndroidPassageLeg] = []
+        // Die gleichen Vorhersagewerte wie für die Abfahrtssuche verwenden.
+        var currentModels: [TidalPassageLeg]?
+        if tideDataProvider.usesForecastWaterLevels {
+            var models: [TidalPassageLeg] = []
             for index in route.legs.indices {
                 let events = (try? await tideDataProvider.routeEvents(for: route.waypoints[index],
                     covering: route.plannedStartTime ... route.plannedStartTime)) ?? []
-                models.append(AndroidPassageLeg(distanceNm: route.legs[index].distanceNm,
+                models.append(TidalPassageLeg(distanceNm: route.legs[index].distanceNm,
                     speedKnots: route.legs[index].speedThroughWaterKnots,
-                    courseDegrees: AndroidPassageLeg.course(from: route.waypoints[index], to: route.waypoints[index + 1]),
+                    courseDegrees: TidalPassageLeg.course(from: route.waypoints[index], to: route.waypoints[index + 1]),
                     events: events))
             }
             currentModels = models
@@ -100,7 +97,7 @@ final class RouteCalculationService {
             arrivalTimes.append(legResult.arrivalTime)
         }
 
-        // Calculate each waypoint.
+        // Jeden Wegpunkt berechnen.
         var waypointResults: [WaypointCalculationResult] = []
         for (index, waypoint) in route.waypoints.enumerated() {
             let arrivalTime = arrivalTimes[index]
@@ -115,17 +112,17 @@ final class RouteCalculationService {
             waypointResults.append(result)
         }
 
-        // Determine overall tidal status.
+        // Gesamten Gezeitenstatus bestimmen.
         let tidalStatus: RouteStatus = legResults.contains(where: { !$0.isValid }) ? .noGo : Self.determineRouteStatus(
             waypointStatuses: waypointResults.map(\.status)
         )
 
-        // Compute summary values.
+        // Zusammengefasste Werte berechnen.
         let totalDistance = legResults.reduce(0) { $0 + $1.leg.distanceNm }
         let totalTime = legResults.reduce(0) { $0 + $1.travelTimeHours }
         let worstWuK = waypointResults.compactMap(\.clearanceUnderKeelWuKMeters).min()
 
-        // Add leg validity warnings.
+        // Warnungen zu ungültigen Streckenabschnitten ergänzen.
         for legResult in legResults where !legResult.isValid {
             messages.append(contentsOf: legResult.messages)
         }
@@ -137,16 +134,15 @@ final class RouteCalculationService {
             totalTravelTimeHours: totalTime,
             worstClearanceUnderKeel: worstWuK,
             tidalStatus: tidalStatus,
-            weatherStatus: .incomplete, // Weather is assessed separately by the view model.
+            weatherStatus: .incomplete, // Das ViewModel bewertet das Wetter gesondert.
             combinedStatus: CombinedRouteStatus.combine(tidal: tidalStatus, weather: .incomplete),
             messages: messages
         )
     }
 
-    // MARK: - Per-Waypoint Calculation
+    // MARK: - Berechnung einzelner Wegpunkte
 
-    // The calculation is intentionally kept linear so every safety input remains auditable.
-    // swiftlint:disable:next function_body_length
+    // Die Berechnung bleibt geradlinig, damit jede sicherheitsrelevante Eingabe nachvollziehbar ist.
     private func calculateWaypoint(
         waypoint: RouteWaypoint,
         arrivalTime: Date,
@@ -242,9 +238,9 @@ final class RouteCalculationService {
 
     }
 
-    // MARK: - Static Helper Functions (Pure, Testable)
+    // MARK: - Statische, unabhängig prüfbare Hilfsfunktionen
 
-    /// Speed over ground = speed through water + tidal current.
+    /// Fahrt über Grund = Fahrt durchs Wasser + Gezeitenströmung.
     static func calculateSpeedOverGround(
         speedThroughWaterKnots: Double,
         tidalCurrentKnots: Double
@@ -252,8 +248,8 @@ final class RouteCalculationService {
         speedThroughWaterKnots + tidalCurrentKnots
     }
 
-    /// Travel time in hours = distance / speed over ground.
-    /// Returns nil if SOG <= 0.
+    /// Fahrtdauer in Stunden = Strecke / Fahrt über Grund.
+    /// Gibt nil zurück, wenn SOG <= 0 ist.
 
 
     static func calculateTravelTimeHours(
@@ -264,11 +260,11 @@ final class RouteCalculationService {
         return distanceNm / speedOverGroundKnots
     }
 
-    /// Calculate leg results including arrival times, cumulative distance, and validity.
+    /// Berechnet Ankunftszeiten, Gesamtstrecke und Gültigkeit der Streckenabschnitte.
     static func calculateLegResults(
         startTime: Date,
         legs: [RouteLeg],
-        currentModels: [AndroidPassageLeg]? = nil
+        currentModels: [TidalPassageLeg]? = nil
     ) -> [LegCalculationResult] {
         var results: [LegCalculationResult] = []
         var currentTime = startTime
@@ -319,7 +315,7 @@ final class RouteCalculationService {
         return results
     }
 
-    /// Apply signed high-water offset to a reference HW time.
+    /// Wendet den vorzeichenbehafteten Hochwasserversatz auf die Referenzzeit an.
     static func applyHighWaterOffset(
         referenceHWTime: Date,
         offsetMinutes: Int
@@ -327,10 +323,10 @@ final class RouteCalculationService {
         referenceHWTime.addingTimeInterval(Double(offsetMinutes) * 60)
     }
 
-    /// Calculate the absolute deviation in decimal hours between arrival and high water.
+    /// Berechnet den absoluten Abstand zwischen Ankunft und Hochwasser in Dezimalstunden.
     ///
-    /// Uses the absolute time interval, handling midnight crossing correctly
-    /// because both values carry full date context.
+    /// Beide Werte enthalten das vollständige Datum. Dadurch wird ein Wechsel
+    /// über Mitternacht korrekt berücksichtigt.
     static func calculateDeviationHours(
         arrivalTime: Date,
         highWaterTime: Date
@@ -338,7 +334,7 @@ final class RouteCalculationService {
         abs(arrivalTime.timeIntervalSince(highWaterTime)) / 3600
     }
 
-    /// Find the high water event nearest to the target time.
+    /// Sucht das Hochwasserereignis, das der Zielzeit am nächsten liegt.
     static func findNearestHighWater(
         to targetTime: Date,
         from events: [TideEvent]
@@ -348,7 +344,7 @@ final class RouteCalculationService {
             .min(by: { abs($0.timeIntervalSince(targetTime)) < abs($1.timeIntervalSince(targetTime)) })
     }
 
-    /// Determine waypoint status from clearance under keel and safety margin.
+    /// Bestimmt den Wegpunktstatus aus Wasser unter Kiel und Sicherheitsabstand.
     static func determineWaypointStatus(
         clearanceUnderKeel: Double,
         safetyMargin: Double
@@ -366,20 +362,20 @@ final class RouteCalculationService {
         _ quality: WaterLevelCorrectionQuality,
         to status: WaypointStatus
     ) -> WaypointStatus {
-        // Data provenance controls the advisory text, not the physical safety
-        // result. A usable fallback (manual value, model estimate, comparison
-        // gauge or zero-surge scenario) must never turn adequate clearance into
-        // "Beschränkt". Conversely, quality must never make a No-Go safe.
+        // Die Datenherkunft bestimmt den Hinweistext, nicht das Ergebnis der Tiefenprüfung.
+        // Ein nutzbarer Ersatzwert (manuelle Eingabe, Modellschätzung, Vergleichspegel oder
+        // Szenario ohne wetterbedingte Abweichung) darf ausreichendes Wasser unter Kiel nicht
+        // als "Beschränkt" einstufen. Datenqualität darf umgekehrt ein No-Go nicht als sicher einstufen.
         _ = quality
         return status
     }
 
-    /// Determine overall route status from all waypoint statuses.
+    /// Bestimmt den Routenstatus aus allen Wegpunktstatuswerten.
     ///
-    /// - `noGo` if any waypoint is noGo (insufficient depth)
-    /// - `incomplete` if any required input is missing or cannot be evaluated
-    /// - `warning` if any waypoint is below safety margin
-    /// - `go` only if all waypoints are go
+    /// - `noGo`, wenn an einem Wegpunkt die Wassertiefe nicht ausreicht
+    /// - `incomplete`, wenn eine erforderliche Eingabe fehlt oder nicht auswertbar ist
+    /// - `warning`, wenn der Sicherheitsabstand an einem Wegpunkt unterschritten wird
+    /// - `go` nur, wenn alle Wegpunkte den Status go haben
     static func determineRouteStatus(
         waypointStatuses: [WaypointStatus]
     ) -> RouteStatus {
@@ -388,12 +384,12 @@ final class RouteCalculationService {
             return .incomplete
         }
         if waypointStatuses.contains(.warning) { return .warning }
-        // An empty list means nothing was evaluated — that is missing data,
-        // never a green light.
+        // Eine leere Liste bedeutet, dass nichts ausgewertet wurde.
+        // Das gilt als fehlende Daten und nicht als Freigabe.
         return waypointStatuses.isEmpty ? .incomplete : .go
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Private Hilfsfunktionen
 
     private func errorResult(
         route: RoutePlan,

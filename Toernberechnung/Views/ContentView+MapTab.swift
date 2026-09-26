@@ -1,12 +1,13 @@
+// Die bestehende große Implementierung bleibt bei dieser Erweiterung unverändert.
 // swiftlint:disable file_length
 import SwiftUI
 
-// MARK: - Dashboard Snap Positions
+// MARK: - Rastpositionen des Kartenbereichs
 
 enum DashboardDetent: CaseIterable {
-    case nautiOnly  // Compact assistant launcher (~58pt)
-    case summary    // Status + Nauti + passage window + metrics
-    case full       // Everything including voyage actions
+    case nautiOnly  // Kompakter Einstieg zum Assistenten, etwa 58 pt hoch
+    case summary    // Status, Nauti, Passagefenster und Messwerte
+    case full       // Alle Inhalte einschließlich der Törn-Aktionen
 
     var height: CGFloat {
         switch self {
@@ -16,7 +17,7 @@ enum DashboardDetent: CaseIterable {
         }
     }
 
-    /// Returns the next detent when dragging upward.
+    /// Gibt beim Ziehen nach oben die nächste Rastposition zurück.
     var expandedNeighbour: DashboardDetent {
         switch self {
         case .nautiOnly: return .summary
@@ -25,7 +26,7 @@ enum DashboardDetent: CaseIterable {
         }
     }
 
-    /// Returns the next detent when dragging downward.
+    /// Gibt beim Ziehen nach unten die nächste Rastposition zurück.
     var collapsedNeighbour: DashboardDetent {
         switch self {
         case .nautiOnly: return .nautiOnly
@@ -191,7 +192,7 @@ struct IntermediateStopPickerSheet: View {
 
 extension ContentView {
 
-    // MARK: - Route Display Properties
+    // MARK: - Eigenschaften der Routenanzeige
 
     var displayStartHarbourName: String { viewModel.selectedStartHarbour?.name ?? "Start wählen" }
     var displayDestinationHarbourName: String { viewModel.selectedDestinationHarbour?.name ?? "Ziel wählen" }
@@ -213,7 +214,7 @@ extension ContentView {
         max((viewModel.calculationResult?.totalDistanceNm ?? 0) * 0.35, 0)
     }
 
-    // MARK: - Calculator Tab
+    // MARK: - Berechnungsbereich
 
     func calculatorTab() -> some View {
         GeometryReader { geometry in
@@ -264,7 +265,7 @@ extension ContentView {
                     Spacer(minLength: 20)
                 }
 
-                // MARK: Floating Warning Callout Card
+                // MARK: Schwebende Warnungskarte
                 if let warning = selectedMapWarning, !nautiDashboardMode.isExpanded {
                     warningMapCalloutCard(warning: warning)
                         .frame(maxWidth: min(geometry.size.width - 32, 440))
@@ -280,7 +281,7 @@ extension ContentView {
                         .zIndex(15)
                 }
 
-                // MARK: Draggable Bottom Dashboard
+                // MARK: Verschiebbarer unterer Übersichtsbereich
                 mapDraggableBottomPanel(availableHeight: geometry.size.height)
                     .frame(
                         maxWidth: !nautiDashboardMode.isExpanded && dashboardDetent == .nautiOnly && !hasCalculatedRouteDashboard
@@ -293,9 +294,9 @@ extension ContentView {
                             ? 12
                             : (dashboardDetent == .nautiOnly && !hasCalculatedRouteDashboard ? 0 : 14)
                     )
-                    // With the keyboard up the tab bar is hidden anyway, so the
-                    // 86/104pt reserved for it would only push the chat input
-                    // back behind the keyboard.
+                    // Bei geöffneter Tastatur ist die Bereichsleiste verborgen. Die sonst
+                    // reservierten 86/104 pt würden die Chat-Eingabe hinter die Tastatur
+                    // verschieben und werden deshalb freigegeben.
                     .padding(.bottom, dashboardBottomInset)
             }
         }
@@ -308,21 +309,21 @@ extension ContentView {
             mapPlanningSummaryPill
         }
         .buttonStyle(.plain)
-        // Glass outside the button, `.contentShape` inside the label — with
-        // the interactive glass inside, only the leading icon (which carries
-        // its own glass circle) was hit-testable.
+        // Glaseffekt außerhalb des Buttons, `.contentShape` innerhalb des Inhalts.
+        // Bei interaktivem Glas im Button war zuvor nur das führende Symbol
+        // mit seinem eigenen Glaskreis antippbar.
         .appDarkFloatingOverlay(cornerRadius: 22)
         .accessibilityLabel("Törnplanung bearbeiten")
         .accessibilityIdentifier("MapPlanningPill")
     }
 
-    // MARK: - Maritime Warning Map Callout Card
+    // MARK: - Nautische Warnungskarte auf der Karte
 
     private func warningMapCalloutCard(warning: MaritimeWarning) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             warningCalloutHeader(warning: warning)
 
-            // Description Details
+            // Einzelheiten der Beschreibung
             Text(warning.details)
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(Color.secondary)
@@ -431,9 +432,9 @@ extension ContentView {
         }
     }
 
-    /// Space reserved under the map dashboard. Normally that is the floating
-    /// tab bar; while the keyboard is open the tab bar is gone and the panel
-    /// should sit right on top of the keyboard instead.
+    /// Abstand unter dem Kartenbereich. Normalerweise ist dort die schwebende
+    /// Bereichsleiste. Bei geöffneter Tastatur entfällt sie, damit der Bereich
+    /// direkt oberhalb der Tastatur liegt.
     var dashboardBottomInset: CGFloat {
         if keyboardVisible, nautiDashboardMode.isExpanded { return 8 }
         if isPad { return 120 }
@@ -443,8 +444,8 @@ extension ContentView {
         return dashboardDetent == .nautiOnly ? 104 : 86
     }
 
-    /// One graphite Glass surface with three inline modes: route dashboard,
-    /// Nauti chat, and Nauti history.
+    /// Eine gemeinsame dunkelgraue Glasfläche für Routenübersicht,
+    /// Nauti-Chat und Nauti-Verlauf.
     private func mapDraggableBottomPanel(availableHeight: CGFloat) -> some View {
         let dashboardHeight: CGFloat = {
             if dashboardDetent == .nautiOnly {
@@ -639,12 +640,12 @@ extension ContentView {
 
         var body: some View {
             ZStack {
-                // Glass icon background matching the top pill
+                // Glashintergrund des Symbols passend zur oberen Schaltfläche
                 Circle()
                     .frame(width: size, height: size)
                     .appGlassIconBackground()
 
-                // Rotating ocean gradient aura ring
+                // Drehender Leuchtring mit blauem Farbverlauf
                 Circle()
                     .strokeBorder(
                         AngularGradient(
@@ -661,7 +662,7 @@ extension ContentView {
                     .rotationEffect(.degrees(rotationAngle))
                     .frame(width: size, height: size)
 
-                // Breathing marine background glow
+                // Pulsierendes blaues Hintergrundlicht
                 Circle()
                     .fill(
                         LinearGradient(
@@ -679,7 +680,7 @@ extension ContentView {
                         radius: isPulsing ? (size * 0.16) : 2
                     )
 
-                // Animated sparkles icon
+                // Animiertes Funkel-Symbol
                 Image(systemName: "sparkles")
                     .font(.system(size: size * 0.44, weight: .bold))
                     .foregroundStyle(
@@ -889,13 +890,13 @@ extension ContentView {
         }
     }
 
-    /// Drag gesture for the bottom dashboard panel that snaps between detents.
-    /// No real-time offset tracking — just detect direction on end and animate.
+    /// Ziehgeste für den unteren Bereich mit festen Rastpositionen.
+    /// Die Richtung wird erst am Ende ausgewertet und der Wechsel animiert.
     private var dashboardDragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
             .onChanged { _ in
-                // Intentionally empty — no real-time offset tracking to avoid
-                // visual glitches. The snap happens entirely in onEnded.
+                // Bleibt leer, um Darstellungsfehler durch laufende Positionsänderungen zu vermeiden.
+                // Der Wechsel zur Rastposition erfolgt vollständig in onEnded.
             }
             .onEnded { value in
                 guard !nautiDashboardMode.isExpanded else { return }
@@ -906,10 +907,10 @@ extension ContentView {
 
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
                     if translation < -20 || velocity < -120 {
-                        // Drag up → expand to full
+                        // Nach oben ziehen → vollständig öffnen
                         dashboardDetent = .full
                     } else if translation > 20 || velocity > 120 {
-                        // Drag down → collapse to nautiOnly
+                        // Nach unten ziehen → auf nautiOnly verkleinern
                         dashboardDetent = .nautiOnly
                     }
                     dashboardDragOffset = 0
@@ -1195,8 +1196,8 @@ extension ContentView {
                             .foregroundStyle(.secondary)
                     }
                     Button {
-                        // Input changes already calculate live so passage windows
-                        // remain visible while planning. Reuse that calculation.
+                        // Eingabeänderungen berechnen bereits laufend neu, damit Passagefenster
+                        // während der Planung sichtbar bleiben. Dieses Ergebnis wiederverwenden.
                         if !viewModel.isCalculating, viewModel.calculationResult == nil {
                             if let plan = viewModel.routePlan {
                                 viewModel.runCalculation(plan: plan)
@@ -1507,10 +1508,9 @@ extension ContentView {
         }
     }
 
-    // The compact date picker plus the label is wider than a 402pt phone can
-    // fit, which used to wrap "Abfahrt" onto a second line. `fixedSize` keeps
-    // the label on one line and the tighter metrics buy back the space it
-    // needs.
+    // Datumauswahl und Beschriftung waren zusammen zu breit für ein 402-pt-Display.
+    // `fixedSize` hält "Abfahrt" in einer Zeile; engere Abstände schaffen
+    // den nötigen Platz.
     private var routeDatePicker: some View {
         HStack(spacing: 8) {
             Image(systemName: "calendar.badge.clock")
@@ -1592,7 +1592,7 @@ extension ContentView {
         .background(Color.fieldBackground, in: Capsule(style: .continuous))
     }
 
-    // MARK: - Intermediate Stops (Zwischenstopps)
+    // MARK: - Zwischenstopps
 
     private var intermediateStopsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1621,10 +1621,9 @@ extension ContentView {
         }
     }
 
-    /// Single intermediate-stop row. Receives the `IntermediateStop` by
-    /// value so the closures capture its UUID, never its index — that's
-    /// the guarantee against "Index out of range" when SwiftUI re-diffs
-    /// during deletion.
+    /// Einzelne Zwischenstoppzeile. `IntermediateStop` wird als Wert übergeben,
+    /// damit die Rückruffunktionen seine UUID statt eines Listenindex speichern.
+    /// Das verhindert ungültige Indizes beim Löschen während des SwiftUI-Abgleichs.
     @ViewBuilder
     private func intermediateStopRow(stop: IntermediateStop) -> some View {
         let stopID = stop.id
@@ -1695,7 +1694,7 @@ extension ContentView {
         return HarbourOption.options.filter { !unavailable.contains($0.id) }
     }
 
-    // MARK: - Save Calculation (Logbook)
+    // MARK: - Berechnung im Logbuch speichern
 
     @MainActor
     func saveCalculation() {
@@ -1799,19 +1798,17 @@ extension ContentView {
     private func revealRouteDashboard() {
         routeDashboardRevealPending = false
         withAnimation(reduceMotion ? .easeOut(duration: 0.20) : .spring(response: 0.50, dampingFraction: 0.82)) {
-            // `.full` rather than `.summary`: the voyage actions ("Speichern",
-            // "Fahrt starten") live in the bottom section, and having to drag
-            // the sheet up once more to reach them was a needless step.
+            // `.full` zeigt die Aktionen "Speichern" und "Fahrt starten" im unteren
+            // Bereich direkt an. So ist kein weiteres Hochziehen nötig.
             dashboardDetent = .full
             dashboardDragOffset = 0
         }
     }
 
-    // MARK: - Voyage lifecycle (called from disclaimer alert)
+    // MARK: - Start und Ende des Törns nach Bestätigung des Hinweises
 
-    /// Start live GPS tracking. The logbook entry is created only when
-    /// the user ends the voyage, so starting GPS does not create a fake
-    /// completed trip.
+    /// Startet die GPS-Aufzeichnung. Der Logbucheintrag entsteht erst beim
+    /// Beenden des Törns, damit der Start keine abgeschlossene Fahrt vortäuscht.
     @MainActor
     func startActiveVoyage() {
         guard let plan = viewModel.routePlan else { return }
@@ -1822,7 +1819,7 @@ extension ContentView {
         )
     }
 
-    /// Stop tracking, persist the actual voyage as a second logbook entry.
+    /// Beendet die Aufzeichnung und speichert den tatsächlichen Törn als weiteren Logbucheintrag.
     @MainActor
     func finishActiveVoyage() {
         let weather = weatherSnapshots.first(where: { $0.regionID == viewModel.destinationHarbourID })?.currentSummary

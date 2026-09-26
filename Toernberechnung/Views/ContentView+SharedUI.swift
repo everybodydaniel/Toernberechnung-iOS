@@ -12,8 +12,8 @@ extension ContentView {
         return "\(totalMinutes / 60)h \(totalMinutes % 60)m"
     }
 
-    // German-locale, Berlin-timezone formatters. These delegate to
-    // `AppDateFormatters` so the whole app uses one consistent set.
+    // Formatierer mit deutscher Sprache und Berliner Zeitzone. Verwenden
+    // `AppDateFormatters`, damit die Formate in der gesamten App einheitlich bleiben.
     static var dateFormatter: DateFormatter { AppDateFormatters.dayMonthYear }
     static var timeFormatter: DateFormatter { AppDateFormatters.hourMinute }
     static var slotFormatter: DateFormatter { AppDateFormatters.hourMinute }
@@ -108,8 +108,8 @@ enum AppHeaderBrandStyle {
     }
 }
 
-// The header floats over the current content without painting a separate
-// surface, so the map remains continuous behind the TideNode wordmark.
+// Die Kopfzeile liegt ohne eigene Hintergrundfläche über dem Inhalt.
+// So bleibt die Karte hinter dem TideNode-Schriftzug durchgehend sichtbar.
 struct AppHeader: View {
     let brandStyle: AppHeaderBrandStyle
     let settingsAction: () -> Void
@@ -159,7 +159,7 @@ struct AppHeader: View {
         .overlay(alignment: .topTrailing) {
             if unreadWarningsCount > 0 {
                 ZStack {
-                    // Outer pulsing breathing halo
+                    // Äußerer pulsierender Lichtkreis
                     Circle()
                         .fill(Color(red: 1.0, green: 0.18, blue: 0.22).opacity(0.55))
                         .frame(width: 14, height: 14)
@@ -167,7 +167,7 @@ struct AppHeader: View {
                         .opacity(isGlowPulsing ? 0.9 : 0.3)
                         .blur(radius: 2)
 
-                    // Sharp inner glowing dot with dark outline
+                    // Innerer leuchtender Punkt mit dunklem Rand
                     Circle()
                         .fill(
                             RadialGradient(
@@ -201,11 +201,9 @@ struct AppHeader: View {
         .accessibilityIdentifier("AppHeaderWarningsButton")
     }
 
-    // The glass surface sits OUTSIDE the button and `.contentShape` is the
-    // last modifier inside the label. With the glass inside the label its
-    // interactive effect swallowed the tap wherever a scroll view or the
-    // MapLibre chart sat underneath the header — which was every tab except
-    // Crewspace, the only one that pads its content below the header.
+    // Die Glasfläche liegt außerhalb des Buttons; `.contentShape` ist der
+    // letzte Modifier im Button-Inhalt. Innerhalb des Inhalts fing der interaktive
+    // Glaseffekt Tipps ab, wenn eine Scrollansicht oder Karte darunter lag.
     private var settingsButton: some View {
         Button(action: settingsAction) {
             Image(systemName: "gearshape.fill")
@@ -254,10 +252,9 @@ struct SettingsSheet: View {
                 }
                 .padding(16)
             }
-            // iOS 26 sheets get an automatic Liquid Glass background —
-            // any opaque background we paint would hide that. The helper
-            // hides our gradient on 26+ and keeps it as a clean fallback
-            // for 18/25.
+            // Modale Ansichten erhalten ab iOS 26 automatisch einen Liquid-Glass-Hintergrund.
+            // Ein deckender eigener Hintergrund würde ihn verdecken. Die Hilfsfunktion
+            // blendet deshalb ab iOS 26 den Farbverlauf aus und behält ihn für ältere Versionen.
             .appSheetBackground {
                 LinearGradient(
                     colors: [Color.appBackground, Color.cardBackground, Color.fieldBackground],
@@ -269,9 +266,9 @@ struct SettingsSheet: View {
             .navigationTitle("Einstellungen")
             .navigationBarTitleDisplayMode(.inline)
         }
-        // Sheets form their own presentation boundary. Applying the selected
-        // appearance here makes an already open settings sheet update
-        // immediately instead of retaining the scheme it was presented with.
+        // Modale Ansichten haben einen eigenen Darstellungsbereich. Das gesetzte
+        // Erscheinungsbild wird deshalb auch hier angewendet, damit eine bereits
+        // geöffnete Einstellungsansicht sofort auf Änderungen reagiert.
         .preferredColorScheme(activeAppearance.colorScheme)
         .fullScreenCover(isPresented: $introductionShown) {
             TideNodeOnboardingView { introductionShown = false }
@@ -486,7 +483,7 @@ struct SettingsSheet: View {
         }
     }
 
-    // Top-level settings card → Liquid Glass on iOS 26.
+    // Äußere Einstellungskarte mit Liquid Glass ab iOS 26.
     private func settingsGlassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .appCardSurface(cornerRadius: 24)
@@ -505,7 +502,7 @@ struct SettingsSheet: View {
             ForEach(tenths, id: \.self) { tenth in
                 let value = Double(tenth) / 10
                 Button {
-                    // Persist the existing decimal-string contract without locale ambiguity.
+                    // Dezimalwerte weiterhin als Zeichenketten im vorhandenen, sprachunabhängigen Format speichern.
                     storage.wrappedValue = "\(tenth / 10).\(tenth % 10)"
                 } label: {
                     if currentValue == value {
@@ -543,15 +540,14 @@ struct SettingsSheet: View {
         value.formatted(.number.precision(.fractionLength(1))) + " m"
     }
 
-    // MARK: - Manual numeric input field (replaces dropdown for Länge & Sicherheitsmarge)
+    // MARK: - Direkte Zahleneingabe für Länge und Sicherheitsabstand
 
-    /// A text-field row that only accepts decimal numbers.
-    /// – Keyboard is `.decimalPad` (digits + separator, no emoji).
-    /// – Non-numeric characters are stripped on every keystroke.
-    /// – On commit the value is normalised to German locale with exactly two
-    ///   fraction digits (e.g. "0.1" → "0,10", "12" → "12,00").
-    /// – The underlying `@AppStorage` string keeps the dot-decimal contract
-    ///   used elsewhere ("12.00").
+    /// Textfeldzeile für Dezimalzahlen.
+    /// – `.decimalPad` bietet Ziffern und Dezimaltrennzeichen.
+    /// – Andere Zeichen werden nach jeder Eingabe entfernt.
+    /// – Beim Bestätigen wird der Wert deutsch mit zwei Nachkommastellen formatiert,
+    ///   z. B. "0.1" → "0,10" und "12" → "12,00".
+    /// – Die `@AppStorage`-Zeichenkette behält das interne Punktformat, z. B. "12.00".
     private func settingsMeasurementField(
         _ title: String,
         storage: Binding<String>,
@@ -569,8 +565,8 @@ struct SettingsSheet: View {
         .appFieldSurface(cornerRadius: 16)
     }
 
-    // Inline text-field row. Sits INSIDE a glass card, so it stays as a
-    // flat field on every OS (never stack glass on glass).
+    // Textfeldzeile innerhalb einer Glaskarte. Sie bleibt auf allen
+    // Betriebssystemversionen ohne zusätzlichen Glaseffekt.
     private func settingsTextField(
         _ title: String,
         text: Binding<String>,
@@ -676,7 +672,7 @@ extension UIColor {
     }
 }
 
-// MARK: - Custom Compact DatePicker with Transparent/White Subview Background
+// MARK: - Kompakte Datumauswahl mit transparentem oder weißem Unteransichtshintergrund
 struct CustomCompactDatePicker: View {
     @Binding var selection: Date
     var components: DatePickerComponents = [.date, .hourAndMinute]
@@ -695,7 +691,7 @@ struct CustomCompactDatePicker: View {
     }
 }
 
-// Observe only the main vertical scroll view, not nested horizontal controls.
+// Nur die äußere vertikale Scrollansicht beobachten, keine eingebetteten horizontalen Elemente.
 extension View {
     func tracksAppHeaderVisibility(_ visible: Binding<Bool>) -> some View {
         onScrollGeometryChange(for: Bool.self) { geometry in
@@ -750,6 +746,13 @@ struct PrivacyPolicySheet: View {
                             + "(Bundesamt für Seeschifffahrt und Hydrographie). Wetter- und Winddaten werden über die "
                             + "BrightSky-Schnittstelle (DWD – Deutscher Wetterdienst) sowie Apple WeatherKit bezogen. "
                             + "Dabei können Ortskoordinaten und technisch notwendige Verbindungsdaten übertragen werden."
+                    )
+
+                    privacyCard(
+                        icon: "mic.fill",
+                        title: "Lokale Spracheingabe bei Nauti",
+                        detail: "Spracheingabe startet nur auf deinen Wunsch. Audio wird lokal verarbeitet und nicht gespeichert oder hochgeladen. "
+                            + "Fehlende Sprachmodelle können von Apple heruntergeladen werden. Den erkannten Text prüfst du vor dem Senden."
                     )
 
                     Link(destination: URL(string: "https://everybodydaniel.github.io/Toernberechnung-iOS/datenschutz.html")!) {

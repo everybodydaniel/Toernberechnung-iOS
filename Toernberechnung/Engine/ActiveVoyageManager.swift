@@ -3,68 +3,67 @@ import CoreLocation
 import Observation
 import SwiftData
 
-// MARK: - Active Voyage Manager
+// MARK: - Verwaltung des aktiven Törns
 //
-// Owns the lifecycle of a live tracked voyage:
+// Verwaltet die Aufzeichnung eines laufenden Törns:
 //
 //   • `startVoyage(route:userWaypointIDs:plannedSpeedKnots:)`
-//        Switches on background-capable GPS, binds the navigation tracker
-//        to the planned route, resets all running totals.
-//   • Per-fix processing
-//        Filters out idle GPS noise, accumulates the breadcrumb trail,
-//        sums actual distance sailed in nautical miles, tracks max and
-//        average SOG.
+//        Startet GPS mit Hintergrundbetrieb, verbindet die Navigation
+//        mit der geplanten Route und setzt die Summen zurück.
+//   • Verarbeitung jeder Positionsmessung
+//        Filtert GPS-Schwankungen im Stillstand, speichert den Fahrtverlauf
+//        und berechnet Strecke sowie höchste und mittlere Fahrt über Grund.
 //   • `stopVoyageAndSaveLogbook(...)`
-//        Persists a `CalculationRecord` flagged as `isActualVoyage = true`
-//        with the GPS-measured distance, average / max SOG, duration, and
-//        a JSON-encoded breadcrumb trail.  Then clears the active session.
+//        Speichert einen `CalculationRecord` mit `isActualVoyage = true`,
+//        GPS-Strecke, Geschwindigkeiten, Dauer und Fahrtverlauf als JSON.
+//        Beendet anschließend die aktive Sitzung.
 //
-// `elapsedTime` is intentionally **computed** from `voyageStartTime` so
-// the value stays correct after the app is backgrounded — `Timer` won't
-// fire while suspended, but `Date()` always works.  Views animate the
-// clock via a `TimelineView` that re-reads `elapsedTime` once per second.
+// `elapsedTime` wird aus `voyageStartTime` und `Date()` berechnet.
+// So bleibt die Dauer nach einer Unterbrechung im Hintergrund korrekt,
+// auch wenn der Timer währenddessen nicht läuft. Die Oberfläche liest
+// den Wert über `TimelineView` einmal pro Sekunde neu.
 
 @Observable
 @MainActor
 final class ActiveVoyageManager {
 
-    // MARK: - State
+    // MARK: - Zustand
 
     private(set) var isVoyageActive: Bool = false
     private(set) var voyageStartTime: Date?
     private(set) var voyageEndTime: Date?
 
-    /// Cumulative GPS-measured distance in nautical miles.
+    /// Gesamte per GPS gemessene Strecke in Seemeilen.
     private(set) var totalDistanceNm: Double = 0
     private(set) var maxSOGKnots: Double = 0
     private(set) var averageSOGKnots: Double = 0
     private(set) var sampleCount: Int = 0
 
-    /// Breadcrumb trail of accepted GPS samples.  Exposed so the map can
-    /// draw the actual sailed path on top of the planned route polyline.
+    /// Fahrtverlauf aus gültigen GPS-Messungen. Die Karte kann ihn
+    /// über der geplanten Route darstellen.
     private(set) var breadcrumbs: [CLLocation] = []
 
-    /// Planned route the voyage is anchored to (for UI + logbook output).
+    /// Geplante Route des Törns für die Oberfläche und den Logbucheintrag.
     private(set) var activeRoute: RoutePlan?
     private(set) var userWaypointIDs: [UUID] = []
     private(set) var latestWeatherSnapshot: MaritimeWeatherSnapshot?
 
-    /// Computed live elapsed-time.  Reads `Date()` so it's correct even
-    /// when the app was suspended for hours.
+    /// Berechnet die bisherige Dauer mit `Date()`. Der Wert bleibt auch
+    /// nach längeren Unterbrechungen der App korrekt.
     var elapsedTime: TimeInterval {
         guard let start = voyageStartTime else { return 0 }
         return Date().timeIntervalSince(start)
     }
 
-    // MARK: - Dependencies
+    // MARK: - Abhängigkeiten
 
     private let locationService: LocationService
     private let tracker: NavigationTracker
     private let weatherService: MaritimeWeatherService
-    /// Minimum distance (m) between consecutive accepted breadcrumbs.
-    /// Discards idle GPS jitter when the boat is moored.
+    /// Mindestabstand in Metern zwischen gespeicherten Positionen.
+    /// Filtert GPS-Schwankungen bei einem festliegenden Boot.
     private let minBreadcrumbMeters: Double = 5
-    /// Maximum acceptable horizontal accuracy (m) for breadcrumb samples.
+    /// Größte zulässige horizontale Messungenauigkeit in Metern für den Fahrtverlauf.
     private let maxAccuracyMeters: Double = 30
 
     init(
@@ -77,10 +76,10 @@ final class ActiveVoyageManager {
         self.weatherService = weatherService
     }
 
-    // MARK: - Public API
+    // MARK: - Öffentliche Schnittstelle
 
-    /// Start a live voyage. Requests Always-authorization, switches on
-    /// background updates, binds the tracker, and resets running totals.
+    /// Startet die Törnaufzeichnung. Fordert dauerhaften Standortzugriff an,
+    /// aktiviert Hintergrundmessungen, verbindet die Navigation und setzt die Summen zurück.
     func startVoyage(
         route: RoutePlan,
         userWaypointIDs: [UUID],
@@ -88,7 +87,7 @@ final class ActiveVoyageManager {
     ) {
         guard !isVoyageActive else { return }
 
-        // Reset session state.
+        // Sitzungszustand zurücksetzen.
         activeRoute = route
         self.userWaypointIDs = userWaypointIDs
         voyageStartTime = Date()
@@ -112,12 +111,12 @@ final class ActiveVoyageManager {
 
         tracker.setRoute(route, userWaypointIDs: userWaypointIDs, plannedSpeedKnots: plannedSpeedKnots)
 
-        // Install the fan-out callback BEFORE starting updates so we
-        // don't miss the very first fix.
+        // Rückruffunktion vor dem Start der Messungen registrieren,
+        // damit die erste Position erfasst wird.
         locationService.onLocationUpdate = { [weak self] location in
-            // The closure runs from CL's delegate (main actor); we hop to
-            // the main actor explicitly to satisfy isolation when the
-            // delegate eventually moves off-main on iOS 18+.
+            // Der Aufruf erfolgt derzeit über den Core-Location-Delegate auf dem MainActor.
+            // Der ausdrückliche Wechsel zum MainActor sichert den Zugriff auch dann ab,
+            // wenn der Delegate später auf einem anderen Ausführungskontext läuft.
             Task { @MainActor [weak self] in
                 self?.processLocation(location)
             }
@@ -128,8 +127,8 @@ final class ActiveVoyageManager {
         isVoyageActive = true
     }
 
-    /// Stop the voyage, persist a logbook entry, and clear session state.
-    /// Returns the inserted record so the caller can display a confirmation.
+    /// Beendet den Törn, speichert einen Logbucheintrag und setzt die Sitzung zurück.
+    /// Gibt den gespeicherten Eintrag für eine Bestätigung in der Oberfläche zurück.
     @discardableResult
     func stopVoyageAndSaveLogbook(
         modelContext: ModelContext,
@@ -177,7 +176,7 @@ final class ActiveVoyageManager {
         return record
     }
 
-    // MARK: - Per-fix processing
+    // MARK: - Verarbeitung der Positionsmessungen
 
     private var lastLocation: CLLocation?
     private var sogSum: Double = 0
@@ -194,14 +193,14 @@ final class ActiveVoyageManager {
         guard location.horizontalAccuracy >= 0,
               location.horizontalAccuracy <= maxAccuracyMeters else { return }
 
-        // Speed normalisation (m/s → kn).
+        // Geschwindigkeit von m/s in Knoten umrechnen.
         let sogKnots = max(0, location.speed) * 1.94384
 
-        // Update the navigation tracker on every accepted fix.
+        // Navigation mit jeder gültigen Positionsmessung aktualisieren.
         tracker.update(location: location, speedKnots: sogKnots)
         refreshWeatherIfNeeded(for: location)
 
-        // Discard near-stationary jitter when accumulating breadcrumbs.
+        // Positionsschwankungen im Stillstand beim Speichern des Fahrtverlaufs verwerfen.
         if let last = lastLocation {
             let metres = location.distance(from: last)
             guard metres >= minBreadcrumbMeters else { return }
@@ -279,7 +278,7 @@ final class ActiveVoyageManager {
         UserDefaults.standard.set(date, forKey: Self.navigationWeatherNextCheckKey)
     }
 
-    // MARK: - Cleanup / encoding
+    // MARK: - Aufräumen und Kodieren
 
     private func cleanup() {
         locationService.onLocationUpdate = nil
@@ -329,7 +328,7 @@ final class ActiveVoyageManager {
         struct Point: Codable {
             let lat: Double
             let lon: Double
-            let ts: Double   // unix epoch seconds
+            let ts: Double   // Sekunden seit Beginn der Unix-Zeitrechnung
         }
         let points = trail.map {
             Point(lat: $0.coordinate.latitude,

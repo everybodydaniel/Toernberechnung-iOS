@@ -1,13 +1,12 @@
 import Foundation
 import Observation
 
-// MARK: - Intermediate Stop Model
+// MARK: - Modell für Zwischenstopps
 //
-// A user-added Zwischenstopp. Has a stable `id` so SwiftUI's diffing
-// stays safe even when stops are added, reordered, or deleted in quick
-// succession — using the raw harbour id (which the user can change)
-// would let SwiftUI reference a stale slot mid-update and crash with
-// "Index out of range".
+// Ein vom Nutzer ergänzter Zwischenstopp mit stabiler `id`. So kann SwiftUI
+// die Liste auch bei schnellen Änderungen sicher abgleichen. Eine veränderbare
+// Hafenkennung als Identität könnte während einer Aktualisierung zu einem
+// ungültigen Index und einem Absturz führen.
 
 struct IntermediateStop: Identifiable, Equatable {
     let id: UUID
@@ -19,16 +18,15 @@ struct IntermediateStop: Identifiable, Equatable {
     }
 }
 
-// MARK: - Route Planner View Model
+// MARK: - ViewModel der Routenplanung
 
-/// Observable view model for the Map tab's multi-waypoint route calculation.
+/// Beobachtbares ViewModel für die Routenberechnung mit mehreren Wegpunkten im Kartenbereich.
 ///
-/// Replaces the former inline `ManualPassageCalculator` usage in `ContentView+MapTab`.
-/// When the user selects start, destination, and departure time, this view model
-/// automatically resolves a multi-waypoint route and runs `RouteCalculationService`.
+/// Nach Auswahl von Start, Ziel und Abfahrt wird die Route automatisch aufgebaut
+/// und mit `RouteCalculationService` berechnet.
 @Observable
 final class RoutePlannerViewModel {
-    // MARK: - Input State
+    // MARK: - Eingabezustand
 
     var startHarbourID: String = "" {
         didSet {
@@ -46,11 +44,10 @@ final class RoutePlannerViewModel {
             }
         }
     }
-    /// Ordered list of intermediate stops (Zwischenstopps). Each stop has a
-    /// stable UUID so SwiftUI can safely diff the list — using the raw
-    /// harbour id as the SwiftUI id is unsafe because two stops MAY share
-    /// the same harbour id, and SwiftUI's index-based diff can produce
-    /// "Index out of range" crashes when an item is deleted mid-update.
+    /// Geordnete Zwischenstopps mit jeweils stabiler UUID für den Listenabgleich
+    /// in SwiftUI. Hafenkennungen eignen sich nicht als Identität, da zwei Stopps
+    /// denselben Hafen verwenden können. Eine stabile UUID verhindert ungültige
+    /// Indizes, wenn während einer Aktualisierung ein Eintrag gelöscht wird.
     var intermediateStops: [IntermediateStop] = [] {
         didSet {
             let sanitized = sanitizedIntermediateStops(intermediateStops)
@@ -78,39 +75,39 @@ final class RoutePlannerViewModel {
             scheduleRecalculation()
         }
     }
-    /// Excel `$AD$13`. `nil` (the default) means the BSH forecast is used;
-    /// setting a value — including `0` — overrides it for the whole trip.
+    /// Excel `$AD$13`. Der Standardwert `nil` verwendet die BSH-Vorhersage.
+    /// Ein gesetzter Wert, einschließlich `0`, ersetzt sie für den gesamten Törn.
     var bshWaterLevelCorrection: Double? {
         didSet { scheduleRecalculation() }
     }
     private(set) var confirmedComparisonGaugeIDs: [String: String] = [:]
 
-    // MARK: - Calculation State
+    // MARK: - Berechnungszustand
 
     var routePlan: RoutePlan?
     var calculationResult: RouteCalculationResult?
-    /// Leg-based summary suitable for the UI (only user-selected harbours).
+    /// Zusammenfassung nach Streckenabschnitten für die Oberfläche; zeigt nur gewählte Häfen.
     var routeSummary: RouteSummary?
-    /// IDs of the user-selected waypoints inside the expanded `routePlan`.
-    /// Used by the summary builder to skip Dijkstra fairway WPs.
+    /// Kennungen der gewählten Wegpunkte im erweiterten `routePlan`.
+    /// Die Zusammenfassung kann damit zusätzliche Dijkstra-Fahrwasserpunkte auslassen.
     private(set) var userWaypointIDs: [UUID] = []
     var isCalculating: Bool = false
     var calculationError: String?
 
-    // MARK: - Passage Window
+    // MARK: - Passagefenster
 
     var passageWindow: PassageWindowScanner.Window?
     var passageWindows: [PassageWindowScanner.Window] = []
     var isSearchingWindow: Bool = false
     var passageWindowMessage: String?
 
-    // MARK: - Weather Status
+    // MARK: - Wetterstatus
 
     var weatherStatus: WeatherStatus = .incomplete
     var routeWeatherValidationState: RouteWeatherValidationState = .idle
     private(set) var routeWeatherValidationID: UUID?
 
-    // MARK: - Computed Properties
+    // MARK: - Berechnete Eigenschaften
 
     var selectedStartHarbour: HarbourOption? { HarbourOption.optionalByID(startHarbourID) }
     var selectedDestinationHarbour: HarbourOption? { HarbourOption.optionalByID(destinationHarbourID) }
@@ -121,8 +118,8 @@ final class RoutePlannerViewModel {
             && startHarbourID != destinationHarbourID
     }
 
-    // Backwards-compatible accessors for code paths that are already guarded
-    // by `hasCompleteRouteInput` or an existing route.
+    // Kompatible Zugriffe für Abläufe, die bereits durch `hasCompleteRouteInput`
+    // oder eine vorhandene Route abgesichert sind.
     var startHarbour: HarbourOption { selectedStartHarbour ?? HarbourOption.options[0] }
     var destinationHarbour: HarbourOption { selectedDestinationHarbour ?? HarbourOption.options[0] }
 
@@ -255,7 +252,7 @@ final class RoutePlannerViewModel {
         return String(format: "%.2f m", worst)
     }
 
-    // MARK: - Dependencies
+    // MARK: - Abhängigkeiten
 
     private let catalog: WaddenSeaCatalog
     private let calculationService: RouteCalculationService
@@ -264,7 +261,7 @@ final class RoutePlannerViewModel {
     private var calculationTask: Task<Void, Never>?
     private var passageWindowTask: Task<Void, Never>?
 
-    // MARK: - Init
+    // MARK: - Initialisierung
 
     init(
         catalog: WaddenSeaCatalog? = nil,
@@ -279,10 +276,10 @@ final class RoutePlannerViewModel {
         self.passageScanner = scanner
     }
 
-    // MARK: - Route Resolution
+    // MARK: - Ermittlung der Route
 
-    /// Reloads boat settings (cruising speed, draft, margin) from UserDefaults
-    /// and triggers recalculation if a route plan exists.
+    /// Lädt Bootseinstellungen (Geschwindigkeit, Tiefgang, Sicherheitsabstand)
+    /// aus UserDefaults neu und berechnet einen vorhandenen Routenplan erneut.
     func reloadBoatSettings() {
         let loadedSpeed = Self.loadSpeedFromSettings()
         if abs(speedKnots - loadedSpeed) > 0.05 {
@@ -292,7 +289,7 @@ final class RoutePlannerViewModel {
         }
     }
 
-    /// Called when start / destination / intermediate stops change.
+    /// Wird bei Änderungen von Start, Ziel oder Zwischenstopps aufgerufen.
     func onRouteChanged() {
         confirmedComparisonGaugeIDs.removeAll()
 
@@ -304,11 +301,11 @@ final class RoutePlannerViewModel {
         buildHarbourChainAndCalculate()
     }
 
-    /// Add several explicitly selected intermediate harbours in one mutation.
-    /// Unknown IDs, route endpoints and already-used harbours are ignored while
-    /// preserving the order in which the user selected the remaining stops.
-    /// Stops may be prepared before start and destination are complete; route
-    /// calculation still begins only once `hasCompleteRouteInput` is true.
+    /// Fügt mehrere ausdrücklich gewählte Zwischenhäfen gemeinsam hinzu.
+    /// Unbekannte Kennungen, Start und Ziel sowie bereits verwendete Häfen werden
+    /// ausgelassen. Die Reihenfolge der übrigen Auswahl bleibt erhalten.
+    /// Stopps können schon vor vollständiger Start- und Zielauswahl vorbereitet werden;
+    /// die Berechnung beginnt erst, wenn `hasCompleteRouteInput` true ist.
     @discardableResult
     func addIntermediateStops(harbourIDs: [String]) -> Int {
         let knownHarbourIDs = Set(HarbourOption.options.map(\.id))
@@ -333,17 +330,16 @@ final class RoutePlannerViewModel {
         return additions.count
     }
 
-    /// Remove the intermediate stop with the given stable UUID. Uses
-    /// `removeAll(where:)` so no index is ever read against a stale list —
-    /// fixes the "Index out of range" crash that occurred when the trash
-    /// button was tapped mid-SwiftUI-diff.
+    /// Entfernt den Zwischenstopp mit der angegebenen stabilen UUID.
+    /// `removeAll(where:)` vermeidet Indexzugriffe auf eine veraltete Liste
+    /// und verhindert Abstürze beim Löschen während eines SwiftUI-Abgleichs.
     func removeIntermediateStop(id stopID: IntermediateStop.ID) {
         intermediateStops.removeAll(where: { $0.id == stopID })
     }
 
-    /// Update the harbour for the stop with the given UUID. The model enforces
-    /// the same uniqueness rules as the picker so non-UI callers cannot create
-    /// unknown, endpoint, or duplicate waypoints.
+    /// Ändert den Hafen des Stopps mit der angegebenen UUID. Es gelten dieselben
+    /// Eindeutigkeitsregeln wie in der Auswahl. Auch andere Aufrufer können keine
+    /// unbekannten, doppelten oder mit Start und Ziel identischen Wegpunkte einfügen.
     @discardableResult
     func updateIntermediateStop(id stopID: IntermediateStop.ID, to rawHarbourID: String) -> Bool {
         let harbourID = rawHarbourID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -366,8 +362,8 @@ final class RoutePlannerViewModel {
         Set([startHarbourID, destinationHarbourID].filter { !$0.isEmpty })
     }
 
-    /// Removes endpoint collisions after Start or Ziel changes. Assignment to
-    /// `intermediateStops` triggers exactly one route refresh via its observer.
+    /// Entfernt nach Änderungen von Start oder Ziel übereinstimmende Zwischenstopps.
+    /// Die Zuweisung an `intermediateStops` löst über den Beobachter genau eine Aktualisierung aus.
     @discardableResult
     private func removeIntermediateStopsMatchingEndpoints() -> Bool {
         let endpoints = endpointHarbourIDs
@@ -378,8 +374,8 @@ final class RoutePlannerViewModel {
         return true
     }
 
-    /// Maintains a unique, catalog-backed route chain for every assignment,
-    /// including assistant actions and future non-UI callers.
+    /// Erhält bei jeder Zuweisung eine eindeutige Route aus Katalogeinträgen,
+    /// auch bei Assistentenaktionen und künftigen Aufrufern außerhalb der Oberfläche.
     private func sanitizedIntermediateStops(_ candidates: [IntermediateStop]) -> [IntermediateStop] {
         let knownHarbourIDs = Set(HarbourOption.options.map(\.id))
         var unavailable = endpointHarbourIDs
@@ -392,7 +388,7 @@ final class RoutePlannerViewModel {
         }
     }
 
-    // MARK: - Route Building (Start → Stop 1 → Stop 2 → … → Destination)
+    // MARK: - Routenaufbau (Start → Stopp 1 → Stopp 2 → … → Ziel)
 
     private func buildHarbourChainAndCalculate() {
         guard hasCompleteRouteInput else {
@@ -404,9 +400,9 @@ final class RoutePlannerViewModel {
             + intermediateStops.map(\.harbourID)
             + [destinationHarbourID]
 
-        // Build user waypoints from the catalog templates (or harbour
-        // fallback). Each user WP keeps a stable UUID so the RouteSummary
-        // builder can identify them after RouteExpander injects fairway WPs.
+        // Erstellt gewählte Wegpunkte aus Katalogvorlagen oder ersatzweise Hafendaten.
+        // Jeder Punkt behält eine stabile UUID, damit RouteSummary ihn nach dem
+        // Einfügen zusätzlicher Fahrwasserpunkte durch RouteExpander wiedererkennt.
         var userWPs: [RouteWaypoint] = []
         for id in harbourIDs {
             if let template = catalog.waypointTemplate(forHarbourID: id) {
@@ -445,8 +441,8 @@ final class RoutePlannerViewModel {
             userWPs[index] = SurveyedDepthCatalog.applying(to: userWPs[index], harbourID: harbourIDs[index])
         }
 
-        // Build placeholder legs (distance 0) — RouteExpander will re-emit
-        // the legs with real Haversine distances after inserting fairway WPs.
+        // Erstellt vorläufige Streckenabschnitte mit Entfernung 0. Nach dem Einfügen
+        // der Fahrwasserpunkte berechnet RouteExpander die tatsächlichen Haversine-Entfernungen.
         let placeholderLegs: [RouteLeg] = zip(userWPs, userWPs.dropFirst()).map { from, to in
             RouteLeg(
                 id: UUID(),
@@ -470,11 +466,11 @@ final class RoutePlannerViewModel {
             tidalStateLabel: "BSH-Gezeiten am Reisetag"
         )
 
-        // Remember which IDs are user-selected for the RouteSummary builder.
+        // Kennungen der gewählten Wegpunkte für die Zusammenfassung speichern.
         userWaypointIDs = userWPs.map(\.id)
 
-        // Inject Dijkstra fairway WPs so the engine sees the actual
-        // shallow Watt-segments (bottlenecks).
+        // Dijkstra-Fahrwasserpunkte einfügen, damit die Berechnung
+        // auch flache Wattabschnitte und Engstellen prüft.
         let plan = RouteExpander.expandWithFairwayWaypoints(basePlan)
         routePlan = plan
         for stationID in Set(plan.waypoints.map(\.tidalReferenceStationID)) {
@@ -506,7 +502,7 @@ final class RoutePlannerViewModel {
         invalidateRouteWeatherValidation()
     }
 
-    // MARK: - Calculation
+    // MARK: - Berechnung
 
     private func scheduleRecalculation() {
         guard let plan = routePlan else {
@@ -514,13 +510,13 @@ final class RoutePlannerViewModel {
             return
         }
 
-        // Rebuild the plan with updated parameters.
+        // Plan mit aktualisierten Parametern neu erstellen.
         var updatedPlan = plan
         updatedPlan.plannedStartTime = departure
         updatedPlan.date = planningDay
         updatedPlan.bshWaterLevelCorrectionMeters = bshWaterLevelCorrection
 
-        // Update leg speeds.
+        // Geschwindigkeiten der Streckenabschnitte aktualisieren.
         for i in updatedPlan.legs.indices {
             updatedPlan.legs[i].speedThroughWaterKnots = speedKnots
         }

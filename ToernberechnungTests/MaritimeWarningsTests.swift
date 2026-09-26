@@ -9,7 +9,7 @@ final class MaritimeWarningsTests: XCTestCase {
         let warnings = MaritimeWarningsService.defaultCuratedWarnings
         XCTAssertGreaterThanOrEqual(warnings.count, 5)
 
-        // Verify Wangerooge hazard notice
+        // Gefahrenmeldung für Wangerooge prüfen
         let wangerooge = warnings.first { $0.id == "bsh-nwn-2026-08" }
         XCTAssertNotNil(wangerooge)
         XCTAssertEqual(wangerooge?.severity, .hazard)
@@ -17,13 +17,13 @@ final class MaritimeWarningsTests: XCTestCase {
         XCTAssertTrue(wangerooge?.isNorthSeaOrGermanBight == true)
         XCTAssertNotNil(wangerooge?.coordinate)
 
-        // Verify Helgoland shooting area notice
+        // Meldung zum Schießgebiet bei Helgoland prüfen
         let helgoland = warnings.first { $0.id == "bsh-nwn-2026-15" }
         XCTAssertNotNil(helgoland)
         XCTAssertEqual(helgoland?.severity, .hazard)
         XCTAssertTrue(helgoland?.isNorthSeaOrGermanBight == true)
 
-        // Ensure all curated warnings are strictly North Sea / German Bight
+        // Prüfen, dass alle zusammengestellten Warnungen die Nordsee oder Deutsche Bucht betreffen
         for warning in warnings {
             XCTAssertTrue(warning.isNorthSeaOrGermanBight)
         }
@@ -166,7 +166,7 @@ final class MaritimeWarningsTests: XCTestCase {
         XCTAssertEqual(pin.subtitle, "Deutsche Bucht")
     }
 
-    // MARK: - BSH Nautical Warnings Parser Tests
+    // MARK: - Tests zum Einlesen der BSH-Warnnachrichten
 
     func testBSHNauticalWarningsParserRealText() {
         let bshSampleText = """
@@ -227,11 +227,11 @@ final class MaritimeWarningsTests: XCTestCase {
         """
 
         let warnings = BSHNauticalWarningsParser.parse(text: bshSampleText)
-        // 518 (underwater work), 509 (munitions), 495 (lighthouse) + local warning
-        // 511 (navtex index) is skipped
+        // 518 (Unterwasserarbeiten), 509 (Munition), 495 (Leuchtfeuer) und lokale Warnung.
+        // 511 (Navtex-Verzeichnis) wird ausgelassen.
         XCTAssertGreaterThanOrEqual(warnings.count, 3)
 
-        // Check warning 509 (Hazard: Munition at Norderney)
+        // Warnung 509 prüfen: Munitionsgefahr bei Norderney
         let norderneyMunition = warnings.first { $0.id.contains("509") }
         XCTAssertNotNil(norderneyMunition)
         XCTAssertEqual(norderneyMunition?.severity, .hazard)
@@ -244,18 +244,18 @@ final class MaritimeWarningsTests: XCTestCase {
             XCTAssertEqual(coord.longitude, 7.0 + (9.9 / 60.0), accuracy: 0.001)
         }
 
-        // Check warning 518 (Warning: Underwater operations)
+        // Warnung 518 prüfen: Unterwasserarbeiten
         let underwater = warnings.first { $0.id.contains("518") }
         XCTAssertNotNil(underwater)
         XCTAssertEqual(underwater?.severity, .warning)
         XCTAssertTrue(underwater?.areaName.contains("Deutsche Bucht") == true)
 
-        // Check warning 495 (Notice: Lighthouse character change)
+        // Meldung 495 prüfen: geänderte Leuchtfeuerkennung
         let lighthouse = warnings.first { $0.id.contains("495") }
         XCTAssertNotNil(lighthouse)
         XCTAssertEqual(lighthouse?.severity, .notice)
 
-        // Ensure 511 navtex broadcast index was excluded
+        // Prüfen, dass das Navtex-Sendeverzeichnis 511 ausgeschlossen wurde
         let navtexIndex = warnings.first { $0.id.hasSuffix("-511") }
         XCTAssertNil(navtexIndex)
     }

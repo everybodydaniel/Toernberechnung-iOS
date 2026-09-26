@@ -4,40 +4,37 @@ DerivedData/
 xcuserdata/
 *.xcscmblueprint
 
-# ── Build ─────────────────────────────
+# ── Build-Ausgaben ─────────────────────
 build/
 .build/
 *.ipa
 *.dSYM.zip
 *.dSYM
+*.xcresult
+*.xcactivitylog
 
-# ── Dependencies ──────────────────────
+# ── Abhängigkeiten ─────────────────────
 vendor/bundle/
 .bundle/
-
-# ── Fastlane ──────────────────────────
-fastlane/report.xml
-fastlane/test_output/
-fastlane/ui_test_output/
-fastlane/screenshots/
-fastlane/Preview.html
 
 # ── macOS ─────────────────────────────
 .DS_Store
 *.swp
 *~
 
-# ── Logs ──────────────────────────────
+# ── Protokolle ─────────────────────────
 build_output.log
 test_output.log
 
-# ── IDEs/Tools ─────────────────────────
+# ── Entwicklungsumgebungen und Werkzeuge ──
 .claude/
+.codex/
 
-# ── Secrets ───────────────────────────
+# ── Zugangsdaten ───────────────────────
 GoogleService-Info.plist
 AuthKey_*.p8
 .env
 .env.*
-fastlane/.env
-fastlane/.env.*
+*.p8
+*.p12
+*.mobileprovision

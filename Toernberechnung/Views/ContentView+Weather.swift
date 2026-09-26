@@ -366,11 +366,9 @@ extension ContentView {
                         }
                         selectedWeatherDay = WeatherDaySelection(day: day, harbour: weatherHarbour, initialHours: hours)
                     } label: {
-                        // Every element except the range bar carries a fixed
-                        // width. On a 402pt phone the old row was wider than
-                        // the panel, so the layout squeezed the temperature
-                        // labels down to unreadable slivers. The bar is now
-                        // the only flexible part and absorbs the difference.
+                        // Alle Elemente außer dem Temperaturbalken haben feste Breiten. Auf einem
+                        // 402-pt-Display drückte die zu breite Zeile die Temperaturtexte zusammen.
+                        // Der Balken ist nun allein flexibel und nimmt die Breitenänderung auf.
                         HStack(spacing: 8) {
                             Text(weatherDayLabel(day.date, index: index))
                                 .font(.system(size: 15, weight: .bold))
@@ -426,9 +424,8 @@ extension ContentView {
         HStack(spacing: 2) {
             Image(systemName: "drop.fill")
                 .font(.system(size: 8, weight: .bold))
-            // Proportional digits made "42%" wider than "41%", so some badges
-            // truncated and others did not. Monospaced digits give every
-            // percentage the same width.
+            // Proportionale Ziffern machten "42%" breiter als "41%". Gleich breite
+            // Ziffern verhindern unterschiedliche Textkürzungen bei Prozentangaben.
             Text("\(chance)%")
                 .font(.system(size: 10, weight: .heavy).monospacedDigit())
                 .lineLimit(1)

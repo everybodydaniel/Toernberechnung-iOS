@@ -1,55 +1,55 @@
 import Foundation
 
-// MARK: - Tidal Reference Station
+// MARK: - Gezeitenreferenzstation
 
-/// A BSH tidal reference station / gauge.
-/// Station IDs are provisional and may not match BSH's current online data.
+/// BSH-Gezeitenreferenzstation oder Pegel.
+/// Stationskennungen sind vorläufig und können von aktuellen BSH-Daten abweichen.
 struct TidalReferenceStation: Identifiable, Codable, Equatable {
-    /// BSH station ID (e.g. "507P"). May be unavailable or renamed.
+    /// BSH-Stationskennung, z. B. "507P". Kann fehlen oder umbenannt worden sein.
     var id: String
-    /// Human-readable station name (e.g. "Emden, Große Seeschleuse").
+    /// Lesbarer Stationsname, z. B. "Emden, Große Seeschleuse".
     var name: String
     var latitude: Double?
     var longitude: Double?
-    /// Default Mean Tidal Range if known. Source metadata attached.
+    /// Bekannter Standardwert für den mittleren Tidenhub mit Quellenangabe.
     var meanTidalRangeMeters: SourcedValue<Double>?
-    /// Default Mean High Water if known. Source metadata attached.
+    /// Bekannter Standardwert für das mittlere Hochwasser mit Quellenangabe.
     var meanHighWaterMeters: SourcedValue<Double>?
 }
 
-// MARK: - Waypoint Template
+// MARK: - Wegpunktvorlage
 
-/// A pre-configured waypoint template from the catalog.
-/// Templates provide planning defaults that require skipper verification.
+/// Vorbereitete Wegpunktvorlage aus dem Katalog.
+/// Planungswerte aus Vorlagen müssen vom Skipper geprüft werden.
 struct WaypointTemplate: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
     var latitude: Double?
     var longitude: Double?
-    /// BSH tidal reference station ID.
+    /// Kennung der BSH-Gezeitenreferenzstation.
     var tidalReferenceStationID: String
-    /// BSH tidal reference station name.
+    /// Name der BSH-Gezeitenreferenzstation.
     var tidalReferenceStationName: String
-    /// Signed HW offset from reference station in minutes.
+    /// Vorzeichenbehafteter Hochwasserversatz gegenüber der Referenzstation in Minuten.
     var highWaterOffsetMinutes: Int
-    /// Calculation mode: MHW-based or Lottiefe-based.
+    /// Berechnungsmodus auf Grundlage von MHW oder Lottiefe.
     var calculationMode: WaypointCalculationMode
-    /// Default Mean Tidal Range.
+    /// Standardwert für den mittleren Tidenhub.
     var defaultMTH: SourcedValue<Double>?
-    /// Default Mean High Water (for MHW mode).
+    /// Standardwert für das mittlere Hochwasser im MHW-Modus.
     var defaultMHW: SourcedValue<Double>?
-    /// Default Lottiefe (for Lottiefe mode).
+    /// Standardwert für die Lottiefe im Lottiefe-Modus.
     var defaultLottiefe: SourcedValue<Double>?
-    /// Default chart depth / Peilplan value.
+    /// Standardwert für Kartentiefe oder Peilplan.
     var defaultChartDepth: SourcedValue<Double>?
-    /// Associated island (e.g. "Norderney"). Nil for mainland/fairway.
+    /// Zugehörige Insel, z. B. "Norderney". Bei Festland und Fahrwasser nil.
     var island: String?
-    /// Category: "Hafen", "Wattenhoch", "Fahrwasser", "Reede".
+    /// Kategorie: "Hafen", "Wattenhoch", "Fahrwasser", "Reede".
     var category: String
-    /// Notes or source reference.
+    /// Hinweise oder Quellenangabe.
     var notes: String
 
-    /// Convert this template into a RouteWaypoint with catalog defaults.
+    /// Erstellt aus der Vorlage einen RouteWaypoint mit Katalogwerten.
     func toRouteWaypoint() -> RouteWaypoint {
         RouteWaypoint(
             id: UUID(),
@@ -73,22 +73,22 @@ struct WaypointTemplate: Identifiable, Codable, Equatable {
     }
 }
 
-// MARK: - Wadden Sea Catalog
+// MARK: - Wattenmeerkatalog
 
-/// Data-driven catalog for the East Frisian Wadden Sea.
+/// Datenbasierter Katalog für das ostfriesische Wattenmeer.
 ///
-/// Loaded from a bundled JSON file. Adding a new island, harbour, route, waypoint,
-/// or Peilplan value only requires modifying the JSON data, not the calculation code.
+/// Wird aus einer mitgelieferten JSON-Datei geladen. Neue Inseln, Häfen, Routen,
+/// Wegpunkte oder Peilplanwerte werden in den Daten ergänzt, ohne den Rechencode zu ändern.
 ///
-/// The catalog is designed so future areas (North Frisian, Dutch Wadden Sea)
-/// can be supported by adding more data.
+/// Weitere Daten können künftig auch andere Gebiete wie das nordfriesische
+/// oder niederländische Wattenmeer abdecken.
 struct WaddenSeaCatalog: Codable, Equatable {
     var stations: [TidalReferenceStation]
     var waypoints: [WaypointTemplate]
 
-    // MARK: Lookup
+    // MARK: Nachschlagen
 
-    /// Find a waypoint template matching a HarbourOption ID.
+    /// Sucht eine Wegpunktvorlage zur Kennung einer HarbourOption.
     func waypointTemplate(forHarbourID harbourID: String) -> WaypointTemplate? {
         waypoints.first { wp in
             harbourIDMatches(harbourID: harbourID, waypointName: wp.name)
@@ -102,9 +102,9 @@ struct WaddenSeaCatalog: Codable, Equatable {
         return waypointName.lowercased().contains(normalized)
     }
 
-    // MARK: Loading
+    // MARK: Laden
 
-    /// Load the catalog from the bundled JSON resource.
+    /// Lädt den Katalog aus der mitgelieferten JSON-Datei.
     static func loadBundled() -> WaddenSeaCatalog {
         guard let url = Bundle.main.url(forResource: "wadden_sea_catalog", withExtension: "json"),
               let data = try? Data(contentsOf: url) else {

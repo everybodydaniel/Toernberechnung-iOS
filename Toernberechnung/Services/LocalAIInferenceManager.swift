@@ -116,9 +116,9 @@ private struct FoundationModelsBackend: LocalAIModelBackend {
 
         try Task.checkCancellation()
 
-        // High-confidence data requests do not need generative reasoning.
-        // Resolving them first also prevents an older trip plan in the chat
-        // transcript from being emitted again for a new weather request.
+        // Eindeutige Datenanfragen benötigen keine generative Auswertung.
+        // Ihre direkte Verarbeitung verhindert, dass ein alter Törnplan aus dem
+        // Chatverlauf erneut als Antwort auf eine neue Wetteranfrage ausgegeben wird.
         if let deterministicResult = NautiDeterministicIntentRouter.route(request) {
             return deterministicResult
         }
@@ -128,8 +128,8 @@ private struct FoundationModelsBackend: LocalAIModelBackend {
                 return try await generate(request)
             } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
                 try Task.checkCancellation()
-                // Retry once in a fresh session with no older transcript.
-                // The current question and all system safety instructions stay intact.
+                // Einmal in einer neuen Sitzung ohne älteren Verlauf wiederholen.
+                // Die aktuelle Frage und alle Sicherheitsanweisungen bleiben erhalten.
                 return try await generate(request.preparedForLocalModel(historyCharacterLimit: 0))
             }
         } catch is CancellationError {
@@ -147,15 +147,15 @@ private struct FoundationModelsBackend: LocalAIModelBackend {
     }
 
     private func generate(_ request: NautiInferenceRequest) async throws -> NautiInferenceResult {
-        // Explanatory and advice questions do not require action generation.
-        // Route them directly to knowledge generation to cut response latency in half.
+        // Erklärungs- und Beratungsfragen benötigen keine erzeugte App-Aktion.
+        // Die direkte Antwortgenerierung vermeidet einen zusätzlichen Verarbeitungsschritt.
         if let latest = request.messages.last(where: { $0.role == .user })?.text,
            NautiDeterministicIntentRouter.asksForAdvice(latest) {
             return try await generateKnowledgeAnswer(request)
         }
 
-        // Semantic classification uses only two cases, rather than forcing every
-        // knowledge question through the complete app-action schema.
+        // Die semantische Zuordnung unterscheidet nur zwei Fälle. So müssen
+        // Wissensfragen nicht das vollständige Schema für App-Aktionen durchlaufen.
         let classifier = LanguageModelSession(instructions: """
         Ordne die Absicht des aktuellen Auftrags ein, nicht einzelne Schlüsselwörter.
         knowledge: Wissen, Erklärung, Beratung, Vorbereitung, umgangssprachliche Fragen und Rückfragen.
@@ -215,8 +215,8 @@ private struct FoundationModelsBackend: LocalAIModelBackend {
     }
 
     func releaseResources() async {
-        // No model or session is retained by this backend. Foundation Models
-        // owns the system model and decides when its shared weights are evicted.
+        // Dieses Backend hält weder Modell noch Sitzung dauerhaft vor. Foundation Models
+        // verwaltet das Systemmodell und entscheidet über die Freigabe seiner gemeinsamen Gewichte.
     }
 
     private static func prompt(
@@ -461,8 +461,8 @@ private enum GeneratedHarbour {
     }
 }
 
-/// Central, composable instructions for the Apple Foundation Models session.
-/// Keep domain advice separate from the structured app-action contract.
+/// Zentrale, kombinierbare Anweisungen für die Apple-Foundation-Models-Sitzung.
+/// Fachliche Hinweise bleiben vom strukturierten Format für App-Aktionen getrennt.
 private enum NautiSystemPrompt {
     static let instructions = [role, seamanship, waddenSea, safety, appActions].joined(separator: "\n\n")
     static let knowledgeInstructions = [role, seamanship, waddenSea, safety, """

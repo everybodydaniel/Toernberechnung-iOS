@@ -3,16 +3,14 @@ import UIKit
 
 // MARK: - MeasurementTextField
 
-/// A settings row that lets the user type a decimal measurement value.
+/// Einstellungszeile zur direkten Eingabe eines Dezimalwerts.
 ///
-/// Design constraints:
-/// - `.decimalPad` keyboard → no emoji key, no letters.
-/// - A `UITextFieldDelegate` blocks any character that is not a digit,
-///   comma, or dot at the UIKit level so nothing unwanted ever appears.
-/// - On end-of-editing the value is normalised to a German-locale string
-///   with exactly **one** fraction digit (e.g. "0.1" → "0,1").
-/// - The backing `@AppStorage` string keeps the dot-decimal contract used
-///   by the rest of the app (e.g. "10.5").
+/// Vorgaben:
+/// - `.decimalPad` bietet Ziffern und Dezimaltrennzeichen.
+/// - `UITextFieldDelegate` lässt nur Ziffern, Komma und Punkt zu.
+/// - Nach dem Bearbeiten erscheint der Wert im deutschen Format mit
+///   einer Nachkommastelle, z. B. "0.1" → "0,1".
+/// - Die `@AppStorage`-Zeichenkette behält das interne Punktformat, z. B. "10.5".
 
 struct MeasurementTextField: View {
     let title: String
@@ -21,8 +19,8 @@ struct MeasurementTextField: View {
     let icon: String
     let identifier: String
 
-    /// The display text shown in the text field (German locale, comma
-    /// as separator, two fraction digits).
+    /// Text im Eingabefeld: deutsches Format mit Komma
+    /// und einer Nachkommastelle.
     @State private var displayText: String = ""
     @FocusState private var isFocused: Bool
 
@@ -39,8 +37,8 @@ struct MeasurementTextField: View {
 
             Spacer(minLength: 8)
 
-            // We wrap UIKit's UITextField so we can install a delegate that
-            // rejects non-numeric characters *before* they reach the model.
+            // UIKit-UITextField einbinden, damit ein Delegate unzulässige
+            // Zeichen ablehnt, bevor sie das Datenmodell erreichen.
             NumericUITextField(
                 text: $displayText,
                 onCommit: commitValue
@@ -68,24 +66,24 @@ struct MeasurementTextField: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Hilfsfunktionen
 
-    /// Commit: parse whatever is in `displayText`, write the normalised
-    /// dot-decimal string into `storage`, refresh `displayText`.
+    /// Liest `displayText`, speichert den normalisierten Wert mit Dezimalpunkt
+    /// in `storage` und aktualisiert anschließend die Anzeige.
     private func commitValue() {
         let parsed = parseToDouble(displayText)
         let clamped = max(parsed, 0)
-        // Dot-decimal for the data layer ("10.50")
+        // Dezimalpunkt für die Datenebene, z. B. "10.5"
         storage = String(format: "%.1f", clamped)
-        // Comma-decimal for the UI ("10,50")
+        // Dezimalkomma für die Oberfläche, z. B. "10,5"
         displayText = formatForDisplay(storage)
     }
 
-    /// Turn the stored dot-decimal string into a German-locale display
-    /// string with exactly two fraction digits.
+    /// Wandelt den gespeicherten Wert mit Dezimalpunkt in eine deutsche
+    /// Anzeige mit genau einer Nachkommastelle um.
     private func formatForDisplay(_ dotDecimal: String) -> String {
         let value = parseToDouble(dotDecimal)
-        // Build "X,XX" using the German number formatter.
+        // "X,X" mit dem deutschen Zahlenformatierer erstellen.
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "de_DE")
         formatter.numberStyle = .decimal
@@ -95,7 +93,7 @@ struct MeasurementTextField: View {
         return formatter.string(from: NSNumber(value: value)) ?? "0,0"
     }
 
-    /// Parse a string that may use dot *or* comma as decimal separator.
+    /// Liest eine Zahl mit Punkt oder Komma als Dezimaltrennzeichen.
     private func parseToDouble(_ text: String) -> Double {
         let normalised = text
             .replacingOccurrences(of: ",", with: ".")
@@ -105,11 +103,11 @@ struct MeasurementTextField: View {
 
 // MARK: - NumericUITextField (UIViewRepresentable)
 
-/// Wraps a `UITextField` with a `.decimalPad` keyboard and a delegate
-/// that rejects every character outside `0-9 , .`.
+/// Bindet ein `UITextField` mit `.decimalPad` und einem Delegate ein,
+/// der nur Zeichen aus `0-9 , .` zulässt.
 ///
-/// This gives us hard guarantees that no emoji, letter, or other
-/// symbol can ever be entered — regardless of third-party keyboards.
+/// Damit werden Buchstaben, Emoji und andere Symbole auch bei
+/// Tastaturen von Drittanbietern abgelehnt.
 private struct NumericUITextField: UIViewRepresentable {
     @Binding var text: String
     var onCommit: () -> Void
@@ -131,7 +129,7 @@ private struct NumericUITextField: UIViewRepresentable {
         field.smartDashesType = .no
         field.smartInsertDeleteType = .no
         field.returnKeyType = .done
-        // Add a "Fertig" (Done) button to the decimal pad
+        // Schaltfläche "Fertig" zur Zahlentastatur hinzufügen
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
         let spacer = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
@@ -153,14 +151,14 @@ private struct NumericUITextField: UIViewRepresentable {
     }
 
     func updateUIView(_ field: UITextField, context: Context) {
-        // Only update when the field is NOT first responder to avoid
-        // fighting with the user's live edits.
+        // Nur ohne Eingabefokus aktualisieren, damit laufende
+        // Eingaben des Nutzers nicht überschrieben werden.
         if !field.isFirstResponder {
             field.text = text
         }
     }
 
-    // MARK: Coordinator
+    // MARK: Koordinator
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: NumericUITextField
@@ -169,20 +167,20 @@ private struct NumericUITextField: UIViewRepresentable {
             self.parent = parent
         }
 
-        // Reject any character that is not a digit, comma, or dot.
+        // Alle Zeichen außer Ziffern, Komma und Punkt ablehnen.
         func textField(
             _ textField: UITextField,
             shouldChangeCharactersIn range: NSRange,
             replacementString string: String
         ) -> Bool {
-            // Allow deletions
+            // Löschen zulassen
             if string.isEmpty { return true }
 
             let allowed = CharacterSet(charactersIn: "0123456789,.")
             let incoming = CharacterSet(string.unicodeScalars.map { $0 })
             guard incoming.isSubset(of: allowed) else { return false }
 
-            // Prevent more than one decimal separator (comma or dot).
+            // Mehr als ein Dezimaltrennzeichen verhindern.
             let current = textField.text ?? ""
             if string.contains(",") || string.contains(".") {
                 let hasSeparator = current.contains(",") || current.contains(".")

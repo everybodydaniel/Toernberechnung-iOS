@@ -35,11 +35,11 @@ final class BoatSpeedConfigurationTests: XCTestCase {
         let viewModel = RoutePlannerViewModel()
         viewModel.speedKnots = 6.0
 
-        // Select harbours
+        // Häfen auswählen
         viewModel.startHarbourID = "norderney_harbor"
         viewModel.destinationHarbourID = "juist_harbor"
 
-        // Wait briefly for calculation to schedule
+        // Kurz warten, bis die Berechnung eingeplant ist
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         guard let plan = viewModel.routePlan else {
@@ -48,7 +48,7 @@ final class BoatSpeedConfigurationTests: XCTestCase {
         }
         XCTAssertEqual(plan.legs.first?.speedThroughWaterKnots ?? 0, 6.0, accuracy: 0.01)
 
-        // Change speed
+        // Geschwindigkeit ändern
         viewModel.speedKnots = 8.0
         XCTAssertEqual(UserDefaults.standard.string(forKey: "boatSpeed"), "8.0")
 

@@ -2,13 +2,13 @@ import Foundation
 import XCTest
 @testable import Toernberechnung
 
-/// Proves that the travel-time block of `RouteCalculationService` reproduces
-/// rows `O61`…`O75` of "Excel-Tool-Törnberechnung_V2.1", and closes with a full
-/// five-waypoint sheet computed by hand.
+/// Prüft die Fahrtdauerberechnung von `RouteCalculationService` gegen die Zeilen
+/// `O61`…`O75` des "Excel-Tool-Törnberechnung_V2.1". Ein vollständiges Blatt
+/// mit fünf Wegpunkten verwendet zusätzlich von Hand berechnete Erwartungen.
 ///
 /// ```
 /// O69  Fahrt über Grund = O65 + O67
-/// O71  Fahrzeit         = O61 / O69          (Excel divides by 24 for a day fraction)
+/// O71  Fahrzeit         = O61 / O69          (Excel teilt für Tagesbruchteile durch 24)
 /// O73  Ankunft          = L31 + O71 ;  U73 = O73 + U71 ;  AA73 = U73 + AA71
 /// AM61 gesamt kum. (sm) ;  AM71 gesamt kum. (Fahrzeit)
 /// ```
@@ -48,8 +48,8 @@ final class ExcelParityRouteTests: XCTestCase {
         )
     }
 
-    /// Excel yields `#DIV/0!` here. The app marks the leg invalid instead, keeps
-    /// the arrival time at the departure time and reports the reason.
+    /// Excel liefert hier `#DIV/0!`. Die App markiert den Abschnitt als ungültig,
+    /// setzt die Ankunft auf die Abfahrt und nennt die Ursache.
     func testNonPositiveSpeedOverGroundInvalidatesTheLeg() {
         for (speed, current) in [(3.0, -3.0), (2.0, -3.0)] {
             let leg = RouteLeg(
@@ -78,8 +78,8 @@ final class ExcelParityRouteTests: XCTestCase {
         }
     }
 
-    /// Excel `O73 = L31 + O71`, `U73 = O73 + U71`, `AA73 = U73 + AA71`, plus the
-    /// cumulative cells `AM61` and `AM71`.
+    /// Excel `O73 = L31 + O71`, `U73 = O73 + U71`, `AA73 = U73 + AA71`
+    /// sowie die Summenzellen `AM61` und `AM71`.
     func testArrivalTimesChainAndCumulativesAccumulate() {
         let legs = [
             makeLeg(distanceNm: 12, speedKnots: 6, currentKnots: 2),   // SOG 8,0 → 1,50 h
@@ -103,13 +103,13 @@ final class ExcelParityRouteTests: XCTestCase {
         XCTAssertEqual(results[2].cumulativeTravelTimeHours, 5, accuracy: accuracy)
     }
 
-    // MARK: - The full five-waypoint sheet
+    // MARK: - Vollständiges Blatt mit fünf Wegpunkten
 
-    /// Mirrors one complete Excel sheet: five waypoint columns (L, R, X, AD, AJ)
-    /// with mixed MHW and Lottiefe modes, four legs, one global BSH water level.
-    /// Every expected number below was computed by hand from the Excel formulas.
+    /// Bildet ein vollständiges Excel-Blatt nach: fünf Wegpunktspalten (L, R, X, AD, AJ),
+    /// MHW- und Lottiefe-Modi, vier Streckenabschnitte und ein gemeinsamer BSH-Wasserstand.
+    /// Alle Erwartungswerte wurden von Hand mit den Excel-Formeln berechnet.
     func testFiveWaypointSheetMatchesExcelReference() async {
-        // Legs chosen so every travel time is a whole number of seconds.
+        // Abschnitte so wählen, dass alle Fahrtdauern ganze Sekunden ergeben.
         let legSpecs: [(distance: Double, speed: Double, current: Double)] = [
             (12.0, 6.0, 2.0),   // SOG 8,0 → 1,50 h → 5 400 s
             (10.0, 5.0, -1.0),  // SOG 4,0 → 2,50 h → 9 000 s
@@ -173,7 +173,7 @@ final class ExcelParityRouteTests: XCTestCase {
         XCTAssertEqual(result.tidalStatus, .noGo)
     }
 
-    /// Assembles the five columns and four legs into one `RoutePlan`.
+    /// Fasst fünf Spalten und vier Streckenabschnitte in einem `RoutePlan` zusammen.
     private func makeSheetRoute(
         waypointSpecs: [WaypointSpec],
         legSpecs: [(distance: Double, speed: Double, current: Double)],
@@ -216,7 +216,7 @@ final class ExcelParityRouteTests: XCTestCase {
         )
     }
 
-    /// Asserts one Excel column (`L`, `R`, `X`, `AD`, `AJ`) cell by cell.
+    /// Prüft eine Excel-Spalte (`L`, `R`, `X`, `AD`, `AJ`) Zelle für Zelle.
     private func assertColumn(
         _ waypoint: WaypointCalculationResult,
         matches expectation: ColumnExpectation,
@@ -271,10 +271,10 @@ final class ExcelParityRouteTests: XCTestCase {
         )
     }
 
-    // MARK: - Fixture types
+    // MARK: - Typen für Testdaten
 
-    /// One Excel waypoint column: mode, reference level (L41/L43), chart depth
-    /// (L51), mean tidal range (L33) and the wanted deviation (L37).
+    /// Eine Excel-Wegpunktspalte: Modus, Bezugshöhe (L41/L43), Kartentiefe (L51),
+    /// mittlerer Tidenhub (L33) und gewünschter Abstand zum Hochwasser (L37).
     private struct WaypointSpec {
         let mode: WaypointCalculationMode
         let level: Double
@@ -283,19 +283,19 @@ final class ExcelParityRouteTests: XCTestCase {
         let deviationHours: Double
     }
 
-    /// Hand-computed expectation for one Excel column.
+    /// Von Hand berechnete Erwartungswerte einer Excel-Spalte.
     private struct ColumnExpectation {
-        let arrival: TimeInterval   // L31, relative to the planned start
+        let arrival: TimeInterval   // L31, relativ zur geplanten Startzeit
         let oneTwelfth: Double      // L35
         let fmw: Double             // L39
         let base: Double            // L45
-        let hg: Double?             // L49 — nil means "leer"
+        let hg: Double?             // L49: nil bedeutet "leer"
         let wt: Double              // L53
         let wuk: Double             // L57
         let status: WaypointStatus
     }
 
-    // MARK: - Fixture helpers
+    // MARK: - Hilfsfunktionen für Testdaten
 
     private func makeLeg(distanceNm: Double, speedKnots: Double, currentKnots: Double) -> RouteLeg {
         RouteLeg(

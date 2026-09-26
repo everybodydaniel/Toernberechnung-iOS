@@ -2,7 +2,7 @@ import Foundation
 import CoreLocation
 import SwiftUI
 
-// MARK: - Maritime Warning Source & Severity
+// MARK: - Quelle und Schweregrad nautischer Warnungen
 
 public enum MaritimeWarningSource: String, Codable, Sendable, CaseIterable {
     case bsh = "BSH Seewarndienst"
@@ -21,9 +21,9 @@ public enum MaritimeWarningSource: String, Codable, Sendable, CaseIterable {
 }
 
 public enum MaritimeWarningSeverity: String, Codable, Sendable, CaseIterable {
-    case hazard   // Red: Sperrungen, akute Gefahr, Wracks, Treibgut
-    case warning  // Amber: Verlegte Tonnen, Baggerarbeiten, Schießgebiete
-    case notice   // Blue: Allgemeine nautische Hinweise
+    case hazard   // Rot: Sperrungen, akute Gefahr, Wracks, Treibgut
+    case warning  // Gelb: verlegte Tonnen, Baggerarbeiten, Schießgebiete
+    case notice   // Blau: allgemeine nautische Hinweise
 
     public var title: String {
         switch self {
@@ -50,7 +50,7 @@ public enum MaritimeWarningSeverity: String, Codable, Sendable, CaseIterable {
     }
 }
 
-// MARK: - Primary Domain Model
+// MARK: - Zentrales Datenmodell
 
 public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
     public let id: String
@@ -114,7 +114,7 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
 
     public var isNorthSeaOrGermanBight: Bool {
         let lower = "\(areaName) \(title) \(details)".lowercased()
-        // Exclude foreign Danish / Baltic territorial notices
+        // Dänische Meldungen und Meldungen für fremde Ostseegebiete ausschließen
         let foreignKeywords = [
             "dänemark", "denmark", "danmark", "rømø", "romo",
             "lister dyb", "kattegat", "vejers", "great belt",
@@ -124,9 +124,9 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
             return false
         }
         if let lat = latitude, let lon = longitude {
-            // Coordinate bounding box strictly for German Bight, East Frisian Islands, Helgoland, Elbe, Weser, Jade, Ems
-            // German Bight latitude: Helgoland is at 54.18°N.
-            // Strict upper bound is 54.4°N to exclude all Danish territory (Rømø 55.08°N, Lister Dyb 55.09°N, Vejers 55.6°N)
+            // Koordinatenbereich für Deutsche Bucht, ostfriesische Inseln, Helgoland, Elbe, Weser, Jade und Ems.
+            // Helgoland liegt bei 54,18° N.
+            // Die Nordgrenze von 54,4° N schließt dänische Gebiete aus (Rømø 55,08° N, Lister Dyb 55,09° N, Vejers 55,6° N).
             if (53.1...54.4).contains(lat) && (6.2...9.2).contains(lon) {
                 return true
             }
@@ -147,7 +147,7 @@ public struct MaritimeWarning: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
-// MARK: - DMA Niord API Decoding Models
+// MARK: - Modelle zum Dekodieren der DMA-Niord-API
 
 struct FlexibleID: Decodable, CustomStringConvertible {
     let value: String
@@ -241,11 +241,11 @@ struct NiordSearchResponseItem: Decodable {
     func toMaritimeWarning() -> MaritimeWarning? {
         guard let warnId = shortId ?? id?.value, !warnId.isEmpty else { return nil }
 
-        // Find primary english or fallback description
+        // Englische Beschreibung suchen oder auf eine andere Beschreibung zurückgreifen
         let desc = descs?.first(where: { $0.lang == "en" }) ?? descs?.first
         let title = desc?.title ?? "Nautische Warnung \(shortId ?? warnId)"
 
-        // Extract coordinates and details
+        // Koordinaten und Einzelheiten auslesen
         var coordinates: (lat: Double, lon: Double)? = nil
         var detailsText = ""
 
@@ -269,11 +269,11 @@ struct NiordSearchResponseItem: Decodable {
             detailsText = Self.stripAndDecodeHTMLEntities(desc?.details ?? "Keine weiteren Details angegeben.")
         }
 
-        // Area name
+        // Gebietsname
         let areaName = areas?.compactMap { $0.descs?.first?.name }.joined(separator: " · ")
             ?? "Deutsche Bucht & Nordsee"
 
-        // Severity
+        // Schweregrad
         let severity: MaritimeWarningSeverity
         let upperType = (type ?? "").uppercased()
         let upperMain = (mainType ?? "").uppercased()

@@ -1,14 +1,14 @@
 import Foundation
 
-// MARK: - Waypoint Tide Context
+// MARK: - Gezeitenkontext eines Wegpunkts
 
-/// Everything needed to evaluate one waypoint's clearance at **any** arrival
-/// time, resolved once. After `resolve(...)` returns, no further I/O happens —
-/// `clearance(atArrival:strategy:)` is a synchronous call into
-/// `WaypointDepthSolver`, the very same arithmetic the route calculation uses.
+/// Einmal ermittelte Daten zur Berechnung des Wassers unter Kiel für beliebige
+/// Ankunftszeiten. Nach `resolve(...)` werden keine weiteren Daten geladen.
+/// `clearance(atArrival:strategy:)` ruft synchron `WaypointDepthSolver` auf
+/// und nutzt dieselben Rechenschritte wie die Routenberechnung.
 ///
-/// This is what makes per-bottleneck passage windows cheap: the old scanner
-/// re-resolved the same gauge data for every candidate departure time.
+/// So muss die Passagefenstersuche die gleichen Pegeldaten nicht für jede
+/// mögliche Abfahrtszeit erneut laden.
 struct WaypointTideContext: Equatable {
 
     let waypointID: UUID
@@ -16,14 +16,14 @@ struct WaypointTideContext: Equatable {
     let category: String?
     let calculationMode: WaypointCalculationMode
 
-    /// High waters **at the waypoint** (the gauge's events with the waypoint
-    /// offset already applied), covering the search span.
+    /// Hochwasserzeiten am Wegpunkt für den Suchbereich.
+    /// Der Wegpunktversatz ist bereits auf die Pegelereignisse angewendet.
     let waypointHighWaters: [Date]
     /// Excel `L33`.
     let meanTidalRangeMeters: Double
-    /// Excel `L41` or `L43`, depending on the mode.
+    /// Excel `L41` oder `L43`, je nach Modus.
     let referenceLevelMeters: Double
-    /// Excel `L51`. Nil in Lottiefe mode.
+    /// Excel `L51`. Im Lottiefe-Modus nil.
     let chartDepthMeters: Double?
     /// Excel `M55`.
     let draftMeters: Double
@@ -35,24 +35,24 @@ struct WaypointTideContext: Equatable {
     var referenceOffsetSeconds: TimeInterval = 0
     var comparisonTideStationID: String? = nil
     var forecastEvents: [TideEvent] = []
-    var androidTravelLegs: [AndroidPassageLeg]? = nil
+    var tidalTravelLegs: [TidalPassageLeg]? = nil
 
     func arrival(forDeparture departure: Date) -> Date {
-        guard let androidTravelLegs else { return departure.addingTimeInterval(travelOffsetHours * 3_600) }
-        return androidTravelLegs.reduce(departure) { $1.arrival(after: $0) }
+        guard let tidalTravelLegs else { return departure.addingTimeInterval(travelOffsetHours * 3_600) }
+        return tidalTravelLegs.reduce(departure) { $1.arrival(after: $0) }
     }
 
     let plannedArrivalTime: Date
-    /// Cumulative travel time from the route start to this waypoint.
+    /// Gesamte Fahrtdauer vom Routenstart bis zu diesem Wegpunkt.
     let travelOffsetHours: Double
 
-    // MARK: - Evaluation
+    // MARK: - Auswertung
 
     func depthResult(atArrival time: Date, strategy: TidalHeightStrategy) -> Result<WaypointDepthSolver.Output, WaypointDepthSolver.Failure>? {
         var missing: Double?
         if let curve = astronomicalCurve {
             guard let height = curve.height(at: time) else {
-                // Android returns null without bracketing forecast events.
+                // Ohne umgebende Vorhersageereignisse liegt kein Wasserstand vor.
                 return nil
             }
             if calculationMode == .meanHighWater, let chartDepthMeters {
@@ -80,8 +80,8 @@ struct WaypointTideContext: Equatable {
         )
     }
 
-    /// Clearance under keel for an arrival at `time`. Nil when the deviation
-    /// exceeds a full tidal cycle or a required input is missing.
+    /// Wasser unter Kiel bei Ankunft zu `time`. Nil, wenn der Abstand zum
+    /// Hochwasser einen ganzen Zyklus überschreitet oder eine nötige Eingabe fehlt.
     func depth(atArrival time: Date, strategy: TidalHeightStrategy) -> WaypointDepthSolver.Output? {
         if case .success(let output) = depthResult(atArrival: time, strategy: strategy) {
             return output
@@ -101,10 +101,10 @@ struct WaypointTideContext: Equatable {
         return correction.resolution(at: time).quality
     }
 
-    /// Keeps independent limitations visible together. A route can, for
-    /// example, use an unverified sounding and simultaneously lie outside the
-    /// meteorological forecast horizon; reducing that to one enum would hide
-    /// information the skipper needs.
+    /// Hält mehrere unabhängige Einschränkungen gleichzeitig sichtbar.
+    /// Eine Route kann eine ungeprüfte Lotung verwenden und zugleich außerhalb
+    /// der Wettervorhersage liegen. Ein einzelner Statuswert würde dabei
+    /// Informationen verbergen, die der Skipper benötigt.
     func qualityDetails(at time: Date) -> [String] {
         let correctionResolution = correction.resolution(at: time)
         var details = [correctionResolution.detail]
@@ -134,7 +134,7 @@ struct WaypointTideContext: Equatable {
         return details.isEmpty ? nil : details.joined(separator: " ")
     }
 
-    /// All slope changes used by the exact piecewise-linear departure solver.
+    /// Alle Steigungswechsel für die genaue abschnittsweise lineare Abfahrtsberechnung.
     var breakpoints: [Date] {
         let tidal = astronomicalCurve?.points.map(\.time) ?? waypointHighWaters.flatMap { hw in
             (-6 ... 6).map { hw.addingTimeInterval(Double($0) * 3_600) }
@@ -148,9 +148,9 @@ struct WaypointTideContext: Equatable {
         return time == first || time == last
     }
 
-    /// How much water may be missing before the keel touches.
+    /// Zulässige Fehlmenge Wasser, bevor der Kiel den Grund berührt.
     ///
-    /// Rearranging the depth chain for `WuK ≥ 0`:
+    /// Umstellen der Tiefenberechnung für `WuK ≥ 0`:
     /// `Basis − FmW + Korrektur (+ Kartentiefe) − Tiefgang ≥ 0`.
     func missingWaterBudgetMeters(correctionMeters: Double) -> Double {
         let chartDepth = calculationMode == .meanHighWater ? (chartDepthMeters ?? 0) : 0
@@ -163,18 +163,17 @@ struct WaypointTideContext: Equatable {
         }
     }
 
-    /// The route's departure search span translated into arrival times here.
+    /// Suchbereich der Abfahrt, in Ankunftszeiten an diesem Wegpunkt umgerechnet.
     func searchSpanShiftedToArrival(_ span: ClosedRange<Date>) -> ClosedRange<Date> {
         let shift = travelOffsetHours * 3_600
         return span.lowerBound.addingTimeInterval(shift)
             ... span.upperBound.addingTimeInterval(shift)
     }
 
-    // MARK: - Resolution
+    // MARK: - Ermittlung der Eingaben
 
-    // The resolution chains mirror `RouteCalculationService.calculateWaypoint`
-    // exactly, which is why they are spelled out rather than abbreviated.
-    // swiftlint:disable:next function_body_length function_parameter_count
+    // Die Auswahlreihenfolgen entsprechen `RouteCalculationService.calculateWaypoint`.
+    // Sie bleiben ausdrücklich ausgeschrieben, damit die Übereinstimmung nachvollziehbar ist.
     static func resolve(
         waypoint: RouteWaypoint,
         plannedArrivalTime: Date,
@@ -185,7 +184,7 @@ struct WaypointTideContext: Equatable {
         tideDataProvider: TideDataProvider,
         confirmedComparisonStationID: String?
     ) async -> WaypointTideContext? {
-        if tideDataProvider.usesAndroidForecastLevels, waypoint.manualHighWaterTime == nil,
+        if tideDataProvider.usesForecastWaterLevels, waypoint.manualHighWaterTime == nil,
            waypoint.calculationMode == .meanHighWater {
             guard let chartDepth = waypoint.chartDepthMeters?.value, chartDepth.isFinite,
                   draftMeters.isFinite,
@@ -228,7 +227,7 @@ struct WaypointTideContext: Equatable {
             guard let depth = waypoint.chartDepthMeters?.value, depth.isFinite else { return nil }
         }
 
-        // High waters covering the whole search span, offset onto the waypoint.
+        // Hochwasser für den gesamten Suchbereich mit angewendetem Wegpunktversatz.
         let arrivalSpan = searchSpan.lowerBound
             .addingTimeInterval(travelOffsetHours * 3_600)
             ... searchSpan.upperBound.addingTimeInterval(travelOffsetHours * 3_600)
@@ -244,7 +243,7 @@ struct WaypointTideContext: Equatable {
                     ... arrivalSpan.upperBound.addingTimeInterval(-offsetSeconds)
             )) ?? []
 
-            if !tideDataProvider.usesAndroidForecastLevels && (events.isEmpty || events.allSatisfy({ $0.heightMeters == nil })) {
+            if !tideDataProvider.usesForecastWaterLevels && (events.isEmpty || events.allSatisfy({ $0.heightMeters == nil })) {
                 let fallbackID = confirmedComparisonStationID
                     ?? BSHTideStationCatalog.requiredComparisonStation(for: waypoint.tidalReferenceStationID)?.id
                     ?? BSHTideStationCatalog.nearestComparisonStation(for: waypoint.tidalReferenceStationID)?.id
@@ -263,7 +262,7 @@ struct WaypointTideContext: Equatable {
         }
         var referenceHighWaters = events.filter { $0.type == "HW" }.map(\.time)
         let plannedReferenceTime = plannedArrivalTime.addingTimeInterval(-offsetSeconds)
-        if referenceHighWaters.isEmpty && !tideDataProvider.usesAndroidForecastLevels {
+        if referenceHighWaters.isEmpty && !tideDataProvider.usesForecastWaterLevels {
             let directHW = (try? await tideDataProvider.highWaters(for: waypoint.tidalReferenceStationID, around: plannedReferenceTime)) ?? []
             referenceHighWaters = directHW.map(\.time)
         }
@@ -278,7 +277,7 @@ struct WaypointTideContext: Equatable {
 
         let correction = await resolveCorrection(
             stationID: waypoint.tidalReferenceStationID,
-            manualCorrectionMeters: manualCorrectionMeters ?? (tideDataProvider.usesAndroidForecastLevels ? 0 : nil),
+            manualCorrectionMeters: manualCorrectionMeters ?? (tideDataProvider.usesForecastWaterLevels ? 0 : nil),
             arrivalSpan: arrivalSpan,
             anchorHighWaterTime: anchorReferenceHighWater,
             tideDataProvider: tideDataProvider,
@@ -311,8 +310,8 @@ struct WaypointTideContext: Equatable {
             )
         }
         let depthSource = waypoint.calculationMode == .lottiefe ? waypoint.lottiefeMeters : waypoint.chartDepthMeters
-        // Third-party soundings and bundled chart values remain skipper-verified
-        // inputs even when their survey month is documented.
+        // Lotungen Dritter und mitgelieferte Kartentiefen müssen vom Skipper geprüft
+        // werden, auch wenn der Vermessungsmonat dokumentiert ist.
         context.depthRequiresVerification = depthSource?.source == .catalog
         if let depthSource {
             let label = waypoint.calculationMode == .lottiefe ? "Tiefe bei MHW" : "Kartentiefe über SKN"
@@ -329,12 +328,12 @@ struct WaypointTideContext: Equatable {
         return context
     }
 
-    // MARK: - Resolution helpers
+    // MARK: - Hilfsfunktionen zur Ermittlung der Eingaben
     //
-    // Split out purely to keep `resolve` readable; the priority chains are
-    // identical to `RouteCalculationService.calculateWaypoint`.
+    // Für die Lesbarkeit von `resolve` ausgelagert. Die Auswahlreihenfolgen
+    // entsprechen `RouteCalculationService.calculateWaypoint`.
 
-    /// Excel `L33`: manual → BSH reference → catalog → provider.
+    /// Excel `L33`: manuelle Eingabe → BSH-Referenz → Katalog → Datenanbieter.
     private static func resolveMeanTidalRange(
         waypoint: RouteWaypoint,
         stationReference: TideStationReference?,
@@ -351,7 +350,7 @@ struct WaypointTideContext: Equatable {
         return 2.6
     }
 
-    /// Excel `L41` (MHW) or `L43` (Lottiefe), depending on the mode.
+    /// Excel `L41` (MHW) oder `L43` (Lottiefe), je nach Modus.
     private static func resolveReferenceLevel(
         waypoint: RouteWaypoint,
         stationReference: TideStationReference?
@@ -369,7 +368,7 @@ struct WaypointTideContext: Equatable {
         }
     }
 
-    /// Excel `L47`: a manually entered value wins over the BSH forecast.
+    /// Excel `L47`: Eine manuelle Eingabe hat Vorrang vor der BSH-Vorhersage.
     private static func resolveCorrection(
         stationID: String,
         manualCorrectionMeters: Double?,

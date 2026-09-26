@@ -3,22 +3,22 @@ import CoreLocation
 import XCTest
 @testable import Toernberechnung
 
-/// The passage calculation the Excel tool cannot do: when is a constriction
-/// open, and by how many centimetres does it miss when it is not.
+/// Prüft Passagefenster: Wann reicht die Tiefe an einer Engstelle aus,
+/// und wie viele Zentimeter fehlen außerhalb des Fensters?
 final class PassageWindowSolverTests: XCTestCase {
 
     private let accuracy = 1e-9
     private let stationID = "TEST"
     private let highWater = Date(timeIntervalSince1970: 1_768_500_000)
 
-    // MARK: - The inverse of the twelfths rule
+    // MARK: - Umkehrung der Zwölftelregel
 
-    /// Budget → largest deviation. With MTH 2,40 one twelfth is 0,20 m.
+    /// Zulässige Fehlmenge → größter Hochwasserabstand. Bei MTH 2,40 m beträgt ein Zwölftel 0,20 m.
     func testClosedFormInverseMatchesTheStaircase() {
         let strategy = TwelfthsRuleStrategy()
         let expectations: [(budget: Double, maxDeviation: Double?)] = [
-            (-0.01, nil),   // not even at high water
-            (0.00, 0),      // exactly at high water
+            (-0.01, nil),   // auch zum Hochwasser nicht ausreichend
+            (0.00, 0),      // genau zum Hochwasser
             (0.19, 0),
             (0.20, 1),      // 1/12
             (0.35, 1),
@@ -26,7 +26,7 @@ final class PassageWindowSolverTests: XCTestCase {
             (1.20, 3),      // 6/12
             (1.80, 4),      // 9/12
             (2.20, 5),      // 11/12
-            (2.40, 12),     // 12/12 — the whole cycle floats
+            (2.40, 12),     // 12/12: ausreichende Tiefe im gesamten Zyklus
             (5.00, 12)
         ]
         for expectation in expectations {
@@ -45,8 +45,8 @@ final class PassageWindowSolverTests: XCTestCase {
         }
     }
 
-    /// Property test: the closed form and the forward rule must agree on every
-    /// deviation, otherwise a window would claim water that is not there.
+    /// Eigenschaftstest: direkte Umkehrung und Vorwärtsberechnung müssen für
+    /// jeden Abstand zusammenpassen, damit ein Fenster keine fehlende Tiefe zusagt.
     func testInverseAgreesWithForwardRuleAcrossRandomInputs() {
         let strategy = TwelfthsRuleStrategy()
         var generator = SystemRandomNumberGenerator()
@@ -59,7 +59,7 @@ final class PassageWindowSolverTests: XCTestCase {
                 meanTidalRangeMeters: mth
             ) else { continue }
 
-            // Inside the window the budget must hold …
+            // Innerhalb des Fensters muss die zulässige Fehlmenge eingehalten werden …
             let inside = strategy.missingWater(
                 deviationHours: maxDeviation,
                 meanTidalRangeMeters: mth
@@ -70,11 +70,11 @@ final class PassageWindowSolverTests: XCTestCase {
                 "MTH \(mth), Budget \(budget): Fenster verspricht zu viel Wasser"
             )
 
-            // … and just outside it must break, unless the whole cycle floats.
+            // … direkt außerhalb muss sie überschritten werden, außer wenn die Tiefe
+            // im gesamten Zyklus ausreicht.
             //
-            // The probe steps beyond `hwEpsilonHours`, because a window of zero
-            // means "only at high water" and anything inside the epsilon is
-            // still treated as exactly high water by design.
+            // Die Prüfung geht über `hwEpsilonHours` hinaus. Ein Fenster mit Dauer 0
+            // bedeutet nur Hochwasser; Zeiten innerhalb der Toleranz gelten noch als Hochwasser.
             if maxDeviation < 12 {
                 let outside = strategy.missingWater(
                     deviationHours: maxDeviation + 0.02,
@@ -88,26 +88,26 @@ final class PassageWindowSolverTests: XCTestCase {
         }
     }
 
-    // MARK: - Bottleneck windows
+    // MARK: - Zeitfenster an Engstellen
 
-    /// Lottiefe 1,45 − Tiefgang 1,10 = 0,35 m Budget; MTH 2,40 ⇒ 1/12 = 0,20 m, 3/12 = 0,60 m.
-    /// Android scan: the last safe ten-minute sample is HW +/- 80 minutes.
-    func testBottleneckWindowUsesAndroidTenMinuteSamples() async {
+    /// Lottiefe 1,45 − Tiefgang 1,10 = 0,35 m zulässige Fehlmenge; MTH 2,40 ⇒ 1/12 = 0,20 m, 3/12 = 0,60 m.
+    /// Der letzte geeignete Zehn-Minuten-Wert liegt bei HW ± 80 Minuten.
+    func testBottleneckWindowUsesTenMinuteSamples() async {
         let solution = await solve(lottiefe: 1.45, meanTidalRange: 2.4, distanceNm: 0)
         let bottleneck = solution.bottlenecks.first
 
         XCTAssertEqual(bottleneck?.arrivalWindow?.lowerBound, highWater.addingTimeInterval(-4_800))
         XCTAssertEqual(bottleneck?.arrivalWindow?.upperBound, highWater.addingTimeInterval(4_800))
-        // Without travel time, arrival and departure windows coincide.
+        // Ohne Fahrtdauer stimmen Ankunfts- und Abfahrtsfenster überein.
         XCTAssertEqual(bottleneck?.departureWindow, bottleneck?.arrivalWindow)
         XCTAssertEqual(bottleneck?.category, "Wattenhoch")
         XCTAssertTrue(bottleneck?.isPassableAtPlannedTime ?? false)
     }
 
-    /// The departure window is the arrival window shifted back by the travel
-    /// time — valid because SOG does not depend on the departure time.
+    /// Das Abfahrtsfenster ist das um die Fahrtdauer vorgezogene Ankunftsfenster.
+    /// Dies gilt, weil die verwendete Fahrt über Grund nicht von der Abfahrtszeit abhängt.
     func testDepartureWindowIsShiftedByTheTravelTime() async {
-        // 12 sm at 6 kn = 2 h to the second waypoint.
+        // 12 sm bei 6 kn ergeben 2 h bis zum zweiten Wegpunkt.
         let solution = await solve(lottiefe: 1.45, meanTidalRange: 2.4, distanceNm: 12)
         guard solution.bottlenecks.count == 2 else {
             return XCTFail("Es müssen zwei Engstellen ausgewertet werden")
@@ -125,23 +125,23 @@ final class PassageWindowSolverTests: XCTestCase {
         )
     }
 
-    /// The route window is the intersection of all bottleneck windows.
+    /// Das Routenfenster ist die gemeinsame Überschneidung aller Engstellenfenster.
     func testRouteWindowIsTheIntersectionOfAllBottlenecks() async {
-        // 6 sm at 6 kn ⇒ the second waypoint is reached one hour later.
+        // 6 sm bei 6 kn: Der zweite Wegpunkt wird eine Stunde später erreicht.
         let solution = await solve(lottiefe: 1.45, meanTidalRange: 2.4, distanceNm: 6)
         let window = solution.routeWindow
 
-        // Android's ten-minute scan intersects WP1 [-80, +80] minutes
-        // and WP2 [-140, +20] minutes, giving [-80, +20].
+        // Die Suche im Zehn-Minuten-Raster überschneidet WP1 [-80, +80]
+        // und WP2 [-140, +20] Minuten. Das gemeinsame Fenster ist [-80, +20].
         XCTAssertEqual(window?.start, highWater.addingTimeInterval(-4_800))
         XCTAssertEqual(window?.end, highWater.addingTimeInterval(1_200))
         XCTAssertFalse(solution.hasInvalidLeg)
     }
 
-    /// Bottleneck windows that do not overlap close the route entirely.
+    /// Ohne Überschneidung der Engstellenfenster bleibt die gesamte Route gesperrt.
     func testNonOverlappingBottlenecksLeaveNoRouteWindow() async {
-        // 18 sm at 6 kn ⇒ three hours of travel. WP1 must be left within
-        // HW ± 1 h, but WP2 then demands a departure in HW − 4 h … HW − 2 h.
+        // 18 sm bei 6 kn ergeben drei Stunden Fahrtdauer. Die passenden
+        // Abfahrtsbereiche für beide Wegpunkte überschneiden sich nicht.
         let solution = await solve(lottiefe: 1.45, meanTidalRange: 2.4, distanceNm: 18)
 
         XCTAssertNil(solution.routeWindow)
@@ -150,9 +150,9 @@ final class PassageWindowSolverTests: XCTestCase {
         XCTAssertNotNil(solution.bottlenecks[1].departureWindow)
     }
 
-    /// A waypoint that never floats closes the whole route.
+    /// Ein Wegpunkt ohne ausreichende Tiefe sperrt die gesamte Route.
     func testWaypointThatNeverFloatsYieldsNoWindowAndReportsTheShortfall() async {
-        // Lottiefe 0,80 m with a 1,10 m draft: 0,30 m missing even at high water.
+        // Lottiefe 0,80 m bei 1,10 m Tiefgang: Auch zum Hochwasser fehlen 0,30 m.
         let solution = await solve(lottiefe: 0.80, meanTidalRange: 2.4, distanceNm: 0)
 
         XCTAssertNil(solution.routeWindow)
@@ -175,8 +175,8 @@ final class PassageWindowSolverTests: XCTestCase {
     }
 
     func testReportedBottleneckTimeIsArrivalAtTheConstriction() async throws {
-        // Six nautical miles at six knots put the limiting second waypoint one
-        // hour after the recommended departure.
+        // Sechs Seemeilen bei sechs Knoten: Der begrenzende zweite Wegpunkt wird
+        // eine Stunde nach der empfohlenen Abfahrt erreicht.
         let solution = await solve(
             lottiefe: 1.45,
             meanTidalRange: 2.4,
@@ -205,12 +205,11 @@ final class PassageWindowSolverTests: XCTestCase {
         XCTAssertTrue(solution.bottlenecks.isEmpty)
     }
 
-    // MARK: - The performance guarantee
+    // MARK: - Begrenzung der Datenabrufe
 
-    /// The permanent lock against the return of the brute-force scan: the old
-    /// implementation recalculated the whole route for every candidate time,
-    /// which meant up to 217 tide lookups **per waypoint**. One lookup per
-    /// waypoint is the whole point of the solver.
+    /// Prüft, dass Gezeitendaten nur einmal pro Wegpunkt geladen werden.
+    /// Die frühere Suche berechnete die ganze Route für jede mögliche Abfahrt
+    /// neu und benötigte dadurch bis zu 217 Abrufe pro Wegpunkt.
     func testSolverResolvesTideDataOncePerWaypoint() async {
         let provider = MockTideDataProvider()
         provider.correctionsByStation[stationID] = manualCorrection()
@@ -224,7 +223,7 @@ final class PassageWindowSolverTests: XCTestCase {
                 name: "WP \(index + 1)",
                 lottiefe: 1.45,
                 meanTidalRange: 2.4,
-                manualHighWaterTime: nil     // forces a provider lookup
+                manualHighWaterTime: nil     // erzwingt einen Abruf beim Datenanbieter
             ))
         }
         let legs = (0 ..< 5).map { index in
@@ -254,7 +253,7 @@ final class PassageWindowSolverTests: XCTestCase {
         )
     }
 
-    // MARK: - Safety Margin, Completeness, and Window Selection (Regressions)
+    // MARK: - Regressionstests zu Sicherheitsabstand, Vollständigkeit und Fensterauswahl
 
     func testSafetyMarginExcludesBorderlineTimes() async {
         let first = makeWaypoint(name: "WP 1", lottiefe: 1.45, meanTidalRange: 2.4, manualHighWaterTime: highWater)
@@ -283,7 +282,7 @@ final class PassageWindowSolverTests: XCTestCase {
         XCTAssertEqual(window30.start, highWater.addingTimeInterval(-600))
         XCTAssertEqual(window30.end, highWater.addingTimeInterval(600))
 
-        // HW +/- 1 h (3600 s) is inside window0, but strictly excluded from window30.
+        // HW ± 1 h (3600 s) liegt in window0, wird von window30 aber ausgeschlossen.
         let oneHourBefore = highWater.addingTimeInterval(-3_600)
         XCTAssertTrue(window0.contains(oneHourBefore))
         XCTAssertFalse(window30.contains(oneHourBefore))
@@ -450,7 +449,7 @@ final class PassageWindowSolverTests: XCTestCase {
     func testCalendarDayIncludesBothNightAndDayTides() async {
         let calendar = AppDateFormatters.berlinCalendar
         let dayStart = calendar.startOfDay(for: highWater)
-        // Night HW at 02:30, Day HW at 14:30
+        // Nächtliches Hochwasser um 02:30, Tageshochwasser um 14:30
         let nightHW = calendar.date(bySettingHour: 2, minute: 30, second: 0, of: dayStart)!
         let dayHW = calendar.date(bySettingHour: 14, minute: 30, second: 0, of: dayStart)!
 
@@ -490,7 +489,7 @@ final class PassageWindowSolverTests: XCTestCase {
 
         let first = makeWaypoint(name: "Start", lottiefe: 1.45, meanTidalRange: 2.4, manualHighWaterTime: nil)
         let second = makeWaypoint(name: "Ziel", lottiefe: 10.0, meanTidalRange: 2.4, manualHighWaterTime: nil)
-        // 18 nm at 6 kn = 3 hours travel time -> departure ~20:30 means arrival ~23:30 (night)
+        // 18 sm bei 6 kn ergeben 3 h Fahrtdauer: Abfahrt etwa 20:30, Ankunft etwa 23:30.
         let leg = RouteLeg(id: UUID(), fromWaypointID: first.id, toWaypointID: second.id, distanceNm: 18,
                            courseDegrees: nil, speedThroughWaterKnots: 6, tidalCurrentKnots: 0)
         let route = RoutePlan(id: UUID(), date: dayStart, routeName: "Late Route", plannedStartTime: dayStart,
@@ -504,11 +503,11 @@ final class PassageWindowSolverTests: XCTestCase {
     }
 
     func testNegativeChartDepthCalculatesWindowCorrectly() async {
-        // MHW 2.80 m, chart depth -0.80 m (dries out 0.80 m above chart datum).
-        // At HW: water depth = 2.80 + (-0.80) = 2.00 m.
-        // With draft 1.10 m and safety margin 0.30 m:
-        // required depth = 1.40 m -> allows missing water up to 2.00 - 1.40 = 0.60 m.
-        // With MTH 2.40 m, 1/12 = 0.20 m, 3/12 = 0.60 m -> +/- 2 hours.
+        // MHW 2,80 m, Kartentiefe −0,80 m: Der Punkt fällt 0,80 m über Kartennull trocken.
+        // Zum Hochwasser: Wassertiefe = 2,80 + (−0,80) = 2,00 m.
+        // Mit 1,10 m Tiefgang und 0,30 m Sicherheitsabstand beträgt die erforderliche
+        // Tiefe 1,40 m. Zulässige Fehlmenge: 2,00 − 1,40 = 0,60 m.
+        // Bei MTH 2,40 m gilt 1/12 = 0,20 m und 3/12 = 0,60 m, also ± 2 Stunden.
         let wp1 = RouteWaypoint(
             id: UUID(), name: "Trockenfallend", latitude: 53.7, longitude: 7.2,
             tidalReferenceStation: "Testpegel", tidalReferenceStationID: stationID,
@@ -554,7 +553,7 @@ final class PassageWindowSolverTests: XCTestCase {
             return XCTFail("Fenster für trockenfallende Tiefe muss berechenbar sein")
         }
 
-        // 0.60 m allowable drop on MTH 2.40 (1/12 = 0.20 m, 3/12 = 0.60 m) corresponds to exactly +/- 2 hours (7200 s).
+        // 0,60 m zulässige Fehlmenge bei MTH 2,40 m (1/12 = 0,20 m, 3/12 = 0,60 m) entsprechen ± 2 Stunden (7200 s).
         XCTAssertEqual(window.start, highWater.addingTimeInterval(-7_200))
         XCTAssertEqual(window.end, highWater.addingTimeInterval(7_200))
         XCTAssertEqual(window.recommendedDeparture, highWater)
@@ -583,7 +582,7 @@ final class PassageWindowSolverTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(curve.height(at: lowWater)), 0.60, accuracy: 1e-9)
     }
 
-    func testAstronomicalCurveRejectsMissingEventHeightsLikeAndroid() throws {
+    func testAstronomicalCurveRejectsMissingEventHeights() throws {
         let lowWater = highWater.addingTimeInterval(6 * 3_600)
         let curve = AstronomicalTideCurve(
             events: [
@@ -601,7 +600,7 @@ final class PassageWindowSolverTests: XCTestCase {
         XCTAssertNil(curve.height(at: lowWater))
     }
 
-    // MARK: - Fixture
+    // MARK: - Testdaten
 
     private func manualCorrection() -> WaterLevelCorrectionResolution {
         WaterLevelCorrectionResolution(
@@ -687,8 +686,8 @@ extension PassageWindowSolverTests {
         model.startHarbourID = start.id
         model.destinationHarbourID = destination.id
         var plan = try XCTUnwrap(model.routePlan)
-        // Deterministic HW/NW input covering the entire scan and all arrivals.
-        // This is a calculation fixture, not a prediction for a real trip.
+        // Feste Hoch- und Niedrigwasserdaten decken den gesamten Suchbereich und alle Ankünfte ab.
+        // Dies sind Berechnungstestdaten, keine Vorhersage für einen tatsächlichen Törn.
         for index in plan.waypoints.indices {
             plan.waypoints[index].meanTidalRangeMeters = SourcedValue(value: 2.4, source: .manual, sourceNotes: nil)
             plan.waypoints[index].meanHighWaterMeters = SourcedValue(value: 2.8, source: .manual, sourceNotes: nil)
@@ -700,13 +699,13 @@ extension PassageWindowSolverTests {
             }
         }
         XCTAssertTrue(plan.waypoints.contains { ($0.chartDepthMeters?.value ?? .infinity) < 0 },
-                      "The assessment must include Android drying chart depths")
+                      "Die Bewertung muss trockenfallende Kartentiefen berücksichtigen.")
         let solution = await PassageWindowScanner().solve(
             route: plan, boatSettings: BoatSettings(draftMeters: 1.1, safetyMarginMeters: 0.3),
             tideDataProvider: provider
         )
-        // Depending on overlapping constrictions this route may have no safe
-        // window, but it must never be declared open throughout the scan.
+        // Je nach Überschneidung der Engstellen kann ein geeignetes Fenster fehlen.
+        // Die Route darf aber nie über den gesamten Suchbereich als befahrbar gelten.
         if let window = solution.routeWindow {
             XCTAssertLessThan(window.end.timeIntervalSince(window.start), 12 * 3_600)
             XCTAssertFalse(window.displayString.contains("00:00 – 23:59"))
@@ -731,7 +730,7 @@ extension PassageWindowSolverTests {
         scanner.scanSelectedDay = true
         let solution = await scanner.solve(
             route: plan, boatSettings: BoatSettings(draftMeters: 1.1, safetyMarginMeters: 0.3),
-            tideDataProvider: AndroidForecastFixtureProvider(events: events)
+            tideDataProvider: ForecastFixtureProvider(events: events)
         )
         XCTAssertTrue(solution.missingWaypointNames.isEmpty)
         XCTAssertFalse(solution.routeWindows.isEmpty)
@@ -742,18 +741,18 @@ extension PassageWindowSolverTests {
         XCTAssertTrue(solution.routeWindows.allSatisfy { $0.end.timeIntervalSince($0.start) < 12 * 3_600 })
     }
 
-    func testAndroidRelativeScanBoundsAndFirstBestTie() async throws {
+    func testRelativeScanBoundsAndFirstBestTie() async throws {
         let first = makeWaypoint(name: "Deep 1", lottiefe: 10, meanTidalRange: 2.4, manualHighWaterTime: nil)
         var second = first
         second.id = UUID()
         let provider = MockTideDataProvider()
-        // Constant heights deliberately keep every candidate safe and equal.
+        // Konstante Höhen machen alle geprüften Zeitpunkte geeignet und gleichwertig.
         provider.tidalEventsByStation[stationID] = (-4 ... 8).map { phase in
             TideEvent(time: highWater.addingTimeInterval(Double(phase) * 6 * 3_600),
                       heightMeters: 2.8, type: phase.isMultiple(of: 2) ? "HW" : "NW", phase: nil)
         }
         let route = RoutePlan(
-            id: UUID(), date: highWater, routeName: "Android bounds", plannedStartTime: highWater,
+            id: UUID(), date: highWater, routeName: "Suchgrenzen", plannedStartTime: highWater,
             waypoints: [first, second],
             legs: [RouteLeg(id: UUID(), fromWaypointID: first.id, toWaypointID: second.id,
                             distanceNm: 0, courseDegrees: nil, speedThroughWaterKnots: 6, tidalCurrentKnots: 0)],
@@ -772,7 +771,7 @@ extension PassageWindowSolverTests {
     }
 
     @MainActor
-    func testEmdenToNorderneyIncludesAndroidMemmertBottleneck() async throws {
+    func testEmdenToNorderneyIncludesMemmertBottleneck() async throws {
         let provider = MockTideDataProvider()
         let model = RoutePlannerViewModel(tideDataProvider: provider)
         model.departure = highWater
@@ -822,9 +821,9 @@ extension PassageWindowSolverTests {
 
 
 extension PassageWindowSolverTests {
-    /// Expected values emitted by the original Kotlin RuleOfTwelfths and
-    /// PassageWindowScanner (scripts/android_passage_reference.py).
-    func testMatchesExecutedKotlinScannerGoldenValues() async throws {
+    /// Prüft feste Referenzwerte für die Zwölftelregel und die Abfahrtssuche
+    /// bei unterschiedlichen Tiefgängen.
+    func testPassageScannerMatchesReferenceValues() async throws {
         var first = makeWaypoint(name: "start", lottiefe: 0, meanTidalRange: 2.4, manualHighWaterTime: nil)
         first.calculationMode = .meanHighWater
         first.chartDepthMeters = SourcedValue(value: -0.8, source: .manual, sourceNotes: nil)
@@ -837,7 +836,7 @@ extension PassageWindowSolverTests {
                       heightMeters: phase.isMultiple(of: 2) ? 2.8 : 0.4,
                       type: phase.isMultiple(of: 2) ? "HW" : "NW", phase: nil)
         }
-        let route = RoutePlan(id: UUID(), date: highWater, routeName: "Kotlin fixture", plannedStartTime: highWater,
+        let route = RoutePlan(id: UUID(), date: highWater, routeName: "Referenzwerte", plannedStartTime: highWater,
             waypoints: [first, second], legs: [RouteLeg(id: UUID(), fromWaypointID: first.id, toWaypointID: second.id,
                 distanceNm: 6, courseDegrees: nil, speedThroughWaterKnots: 6, tidalCurrentKnots: 0)],
             bshWaterLevelCorrectionMeters: 0, tidalStateLabel: "Test")
@@ -852,11 +851,11 @@ extension PassageWindowSolverTests {
                 [-43200, -39600, -43200], [-7200, 3600, -1800],
                 [36000, 46800, 41400], [79200, 86400, 84600]
             ] : []
-            XCTAssertEqual(actual, expected, "Kotlin parity at draft \(draft)")
+            XCTAssertEqual(actual, expected, "Referenzvergleich bei Tiefgang \(draft)")
         }
     }
 
-    func testMatchesExecutedKotlinAcrossBothDSTTransitions() throws {
+    func testTideInterpolationAcrossBothDSTTransitions() throws {
         let cases: [(String, [Double])] = [
             ("2026-03-29T00:00:00+01:00", [0.4, 0.5714285714285714, 1.342857142857143, 1.8571428571428572,
                                           2.3142857142857145, 2.628571428571428, 2.8]),
@@ -874,8 +873,8 @@ extension PassageWindowSolverTests {
     }
 }
 
-private final class AndroidForecastFixtureProvider: TideDataProvider {
-    var usesAndroidForecastLevels: Bool { true }
+private final class ForecastFixtureProvider: TideDataProvider {
+    var usesForecastWaterLevels: Bool { true }
     let events: [TideEvent]
     init(events: [TideEvent]) { self.events = events }
     func routeEvents(for waypoint: RouteWaypoint, covering span: ClosedRange<Date>) async throws -> [TideEvent] { events }
@@ -896,10 +895,10 @@ extension PassageWindowSolverTests {
             var event = TideEvent(time: highWater.addingTimeInterval(Double(phase) * 21_600),
                 heightMeters: phase.isMultiple(of: 2) ? 2.8 : 0.4,
                 type: phase.isMultiple(of: 2) ? "HW" : "NW", phase: nil)
-            event.androidCurrentTimestampIsISO8601 = false // BSH's space-separated timestamp
+            event.currentTimestampIsISO8601 = false // BSH-Zeitstempel mit Leerzeichen als Trennzeichen
             return event
         }
-        let provider = AndroidForecastFixtureProvider(events: events)
+        let provider = ForecastFixtureProvider(events: events)
         let boat = BoatSettings(draftMeters: 1.1, safetyMarginMeters: 0.3)
         var count = 0
         for from in HarbourOption.options {
@@ -932,24 +931,24 @@ extension PassageWindowSolverTests {
         XCTAssertEqual(count, 56)
     }
 
-    func testAndroidCurrentAndWholeSecondTravel() {
+    func testTidalCurrentAndWholeSecondTravel() {
         let events = [
             TideEvent(time: highWater, heightMeters: 0.4, type: "NW", phase: nil),
             TideEvent(time: highWater.addingTimeInterval(21_600), heightMeters: 2.8, type: "HW", phase: nil)
         ]
         let departure = highWater.addingTimeInterval(10_800)
-        let east = AndroidPassageLeg(distanceNm: 6, speedKnots: 6, courseDegrees: 90, events: events)
+        let east = TidalPassageLeg(distanceNm: 6, speedKnots: 6, courseDegrees: 90, events: events)
         XCTAssertEqual(east.speedOverGround(at: departure), 8.5, accuracy: 1e-12)
         XCTAssertEqual(east.arrival(after: departure).timeIntervalSince(departure), 2541)
-        let west = AndroidPassageLeg(distanceNm: 6, speedKnots: 6, courseDegrees: 270, events: events)
+        let west = TidalPassageLeg(distanceNm: 6, speedKnots: 6, courseDegrees: 270, events: events)
         XCTAssertEqual(west.speedOverGround(at: departure), 3.5, accuracy: 1e-12)
         let rawBSHEvents = events.map { event -> TideEvent in
             var event = event
-            event.androidCurrentTimestampIsISO8601 = false
+            event.currentTimestampIsISO8601 = false
             return event
         }
-        let raw = AndroidPassageLeg(distanceNm: 6, speedKnots: 6, courseDegrees: 90, events: rawBSHEvents)
-        XCTAssertEqual(raw.speedOverGround(at: departure), 6, "Match Android's direct ISO parser, not TideTimes")
+        let raw = TidalPassageLeg(distanceNm: 6, speedKnots: 6, courseDegrees: 90, events: rawBSHEvents)
+        XCTAssertEqual(raw.speedOverGround(at: departure), 6, "Zeitstempel ohne ISO-8601-Format werden nicht für die Strömung verwendet.")
     }
 }
 
@@ -980,7 +979,7 @@ extension PassageWindowSolverTests {
 }
 
 extension PassageWindowSolverTests {
-    func testAndroidForecastIgnoresLegacyFixedCurrentSetting() async {
+    func testForecastIgnoresLegacyFixedCurrentSetting() async {
         var first = makeWaypoint(name: "Start", lottiefe: 0, meanTidalRange: 2.4, manualHighWaterTime: nil)
         first.calculationMode = .meanHighWater
         first.chartDepthMeters = SourcedValue(value: -0.8, source: .manual, sourceNotes: nil)
@@ -991,14 +990,14 @@ extension PassageWindowSolverTests {
                 heightMeters: phase.isMultiple(of: 2) ? 2.8 : 0.4,
                 type: phase.isMultiple(of: 2) ? "HW" : "NW", phase: nil)
         }
-        let route = RoutePlan(id: UUID(), date: highWater, routeName: "Android current", plannedStartTime: highWater,
+        let route = RoutePlan(id: UUID(), date: highWater, routeName: "Gezeitenströmung", plannedStartTime: highWater,
             waypoints: [first, second], legs: [RouteLeg(id: UUID(), fromWaypointID: first.id,
                 toWaypointID: second.id, distanceNm: 0, courseDegrees: nil,
                 speedThroughWaterKnots: 6, tidalCurrentKnots: -100)],
             bshWaterLevelCorrectionMeters: 0, tidalStateLabel: "Test")
         let result = await PassageWindowScanner().solve(route: route,
             boatSettings: BoatSettings(draftMeters: 1.1, safetyMarginMeters: 0.3),
-            tideDataProvider: AndroidForecastFixtureProvider(events: events))
+            tideDataProvider: ForecastFixtureProvider(events: events))
         XCTAssertFalse(result.hasInvalidLeg)
         XCTAssertFalse(result.routeWindows.isEmpty)
     }

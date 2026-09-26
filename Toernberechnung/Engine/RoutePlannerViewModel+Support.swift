@@ -1,11 +1,6 @@
 import Foundation
 
-// MARK: - Weather assessment and display formatting
-//
-// Extracted from `RoutePlannerViewModel` to keep that type within the
-// 450-line limit. Everything here is either a pure static helper or a derived
-// display string with no state of its own, so the move is behaviour-neutral;
-// `WeatherKitMigrationTests` covers the weather thresholds.
+// MARK: - Wetterbewertung und Anzeigeformate
 
 extension RoutePlannerViewModel {
 
@@ -43,8 +38,8 @@ extension RoutePlannerViewModel {
         return assessRouteWeather(assessments)
     }
 
-    /// Aggregates all available weather samples without allowing a missing
-    /// secondary sample to mask a known storm or visibility hazard.
+    /// Fasst alle verfügbaren Wetterwerte zusammen. Ein fehlender weiterer Messwert
+    /// darf eine bekannte Sturm- oder Sichtgefahr nicht verdecken.
     static func assessRouteWeather(_ assessments: [MarineWeatherAssessment?]) -> WeatherStatus {
         guard !assessments.isEmpty else { return .incomplete }
         var result: WeatherStatus = .go
@@ -86,7 +81,7 @@ extension RoutePlannerViewModel {
         return .go
     }
 
-    // MARK: - Boat Settings
+    // MARK: - Bootseinstellungen
 
     static func parseDecimalString(_ raw: String?, default fallback: Double) -> Double {
         guard let raw, !raw.isEmpty else { return fallback }

@@ -5,24 +5,20 @@ import UIKit
 
 // MARK: - CompactMapView
 //
-// Two-tile-overlay nautical chart:
-//   1. OSM standard raster as the base map (`canReplaceMapContent=true`)
-//      — wipes Apple's basemap so the look stays consistent with paper
-//      sea charts and removes Apple POIs/labels we don't want.
-//   2. OpenSeaMap seamark tiles (transparent PNG) painted on top so the
-//      buoys, depth contours and harbour symbols sit above the OSM base.
+// Seekarte mit zwei Kachelebenen:
+//   1. OSM-Raster als Grundkarte (`canReplaceMapContent=true`).
+//      Ersetzt Apples Grundkarte samt deren zusätzlichen Ortsmarkierungen.
+//   2. Transparente OpenSeaMap-Kacheln mit Seezeichen über der Grundkarte.
 //
-// The planned-route polyline follows the user-selected stops through
-// `NauticalRouteService`. Its `PathSmoother` validates the smoothed route
-// against the sea mask before the map draws the resulting coordinates.
+// Die geplante Routenlinie verbindet die gewählten Stopps über
+// `NauticalRouteService`. `PathSmoother` prüft die geglättete Route
+// gegen die Wassermaske, bevor ihre Koordinaten gezeichnet werden.
 //
-// Protected zones from the Befahrensverordnung Nationalpark are drawn
-// as red semi-transparent polygons so the skipper can see why the route
-// detours; the same polygons are what the router avoids.
+// Schutzgebiete der Befahrensverordnung erscheinen als rote, durchscheinende
+// Polygone. Die Routenführung verwendet dieselben Gebiete zur Umfahrung.
 //
-// OSM tile usage: this consumer-style raster source is rate-limited by
-// the OSMF and only acceptable for low-volume apps. Switch to a paid
-// tile host (MapTiler, Stadia) once traffic warrants it.
+// Die OSMF begrenzt die Nutzung der OSM-Rasterkacheln. Bei größerem
+// Abrufvolumen muss ein geeigneter Kachelanbieter verwendet werden.
 
 struct CompactMapView: UIViewRepresentable {
 
@@ -30,14 +26,13 @@ struct CompactMapView: UIViewRepresentable {
     let destination: HarbourOption?
     var routePlan: RoutePlan?
     var waypointResults: [WaypointCalculationResult]?
-    /// `true` while an `ActiveVoyageManager` is recording. Switches the map
-    /// into a "follow me" state with heading-up rotation and shows the
-    /// user-location dot.
+    /// `true` während der Törnaufzeichnung mit `ActiveVoyageManager`.
+    /// Die Karte folgt der Position und Kompassrichtung und zeigt den Standortpunkt.
     var voyageActive: Bool = false
-    /// Real-time breadcrumb trail of the currently recording voyage.
-    /// Drawn on top of the planned polyline as a thin orange line.
+    /// Aktueller Fahrtverlauf des aufgezeichneten Törns.
+    /// Liegt als dünne orange Linie über der geplanten Route.
     var breadcrumbCoordinates: [CLLocationCoordinate2D] = []
-    /// Optional coordinate to center and highlight (e.g. from a maritime warning).
+    /// Optionale Koordinate zum Zentrieren und Hervorheben, z. B. aus einer nautischen Warnung.
     var focusCoordinate: CLLocationCoordinate2D?
     var focusWarning: MaritimeWarning?
     var onSelectWarning: ((MaritimeWarning) -> Void)?
@@ -56,7 +51,7 @@ struct CompactMapView: UIViewRepresentable {
         Self.installBaseAndSeamarkOverlays(on: map)
         Self.installProtectedZoneOverlays(on: map)
 
-        // Initial center.
+        // Anfänglicher Mittelpunkt.
         let center: CLLocationCoordinate2D
         if let start, let destination {
             center = CLLocationCoordinate2D(
@@ -89,18 +84,18 @@ struct CompactMapView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    // MARK: - Tile + zone setup (shared by makeUIView and re-add path)
+    // MARK: - Gemeinsamer Aufbau der Kachel- und Gebietsebenen
 
     fileprivate static func installBaseAndSeamarkOverlays(on map: MKMapView) {
-        // OSM standard raster — replaces Apple basemap so labels / POIs
-        // disappear and the look matches OpenSeaMap on the web.
+        // OSM-Raster ersetzt Apples Grundkarte samt Ortsmarkierungen
+        // und entspricht dadurch der OpenSeaMap-Darstellung im Web.
         let base = IdentifiedMapTileOverlay(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
         base.canReplaceMapContent = true
         base.maximumZ = 19
         base.minimumZ = 0
         map.addOverlay(base, level: .aboveRoads)
 
-        // OpenSeaMap seamark symbols on top.
+        // OpenSeaMap-Seezeichen darüber anzeigen.
         let seamark = IdentifiedMapTileOverlay(urlTemplate: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png")
         seamark.canReplaceMapContent = false
         seamark.maximumZ = 18
@@ -114,14 +109,14 @@ struct CompactMapView: UIViewRepresentable {
             let polygon = MKPolygon(coordinates: &coords, count: coords.count)
             polygon.title = zone.name
             polygon.subtitle = zone.seasonal ? "seasonal" : "year_round"
-            // Above roads (so basemap is visible through the fill) but
-            // below labels (so the route polyline drawn .aboveLabels reads
-            // crisply over the zone).
+            // Oberhalb von Straßen, damit die Grundkarte durch die Füllung sichtbar bleibt,
+            // aber unterhalb der Beschriftungen. Die Route auf .aboveLabels bleibt
+            // so klar über dem Gebiet erkennbar.
             map.addOverlay(polygon, level: .aboveRoads)
         }
     }
 
-    // MARK: - Coordinator (MKMapViewDelegate)
+    // MARK: - Koordinator (MKMapViewDelegate)
 
     final class Coordinator: NSObject, MKMapViewDelegate {
 
@@ -129,7 +124,7 @@ struct CompactMapView: UIViewRepresentable {
         private var lastFocusCoordinate: CLLocationCoordinate2D?
         var onSelectWarning: ((MaritimeWarning) -> Void)?
 
-        /// Retained so a SeaMask-ready notification can re-run the last draw.
+        /// Gespeichert, damit nach Fertigstellung der SeaMask die letzte Route neu gezeichnet werden kann.
         private weak var lastMap: MKMapView?
         private var lastInputs: DrawInputs?
 
@@ -158,15 +153,14 @@ struct CompactMapView: UIViewRepresentable {
             NotificationCenter.default.removeObserver(self)
         }
 
-        /// Re-runs the most recent draw once the SeaMask finishes building.
-        /// Until the mask is ready `calculateMultiStopRoute` returns straight
-        /// `[start, end]` fallbacks; this redraw replaces them with the real
-        /// A* route (mirrors the reactive `SeaMask.isReady` redraw).
+        /// Zeichnet die letzte Route nach Aufbau der SeaMask erneut. Zuvor kann
+        /// `calculateMultiStopRoute` ersatzweise gerade Verbindungen `[start, end]`
+        /// liefern. Die Aktualisierung ersetzt sie durch die A*-Route.
         @objc private func seaMaskDidBecomeReady() {
-            // Posted on the main thread from `NauticalRouteService.buildSeaMask`.
+            // Wird von `NauticalRouteService.buildSeaMask` auf dem Hauptthread gemeldet.
             MainActor.assumeIsolated {
                 guard let map = lastMap, let inputs = lastInputs else { return }
-                lastRouteKey = "" // force the route polyline to rebuild
+                lastRouteKey = "" // Neubau der Routenlinie auslösen
                 update(
                     map: map,
                     start: inputs.start,
@@ -182,7 +176,7 @@ struct CompactMapView: UIViewRepresentable {
             }
         }
 
-        // MARK: Renderer
+        // MARK: Darstellung
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let tile = overlay as? MKTileOverlay {
@@ -191,9 +185,9 @@ struct CompactMapView: UIViewRepresentable {
                 return renderer
             }
             if let polygon = overlay as? MKPolygon {
-                // Protected zones — red fill so the no-go area is visible at
-                // a glance; dashed outline for "Allgemeines Schutzgebiet"
-                // (saisonal), solid for ganzjährige Sperren.
+                // Schutzgebiete mit roter Füllung, damit die Sperrfläche erkennbar bleibt.
+                // Saisonale allgemeine Schutzgebiete erhalten einen gestrichelten Rand,
+                // ganzjährige Sperrungen einen durchgezogenen Rand.
                 let renderer = MKPolygonRenderer(polygon: polygon)
                 let isSeasonal = polygon.subtitle == "seasonal"
                 renderer.fillColor = UIColor.systemRed.withAlphaComponent(isSeasonal ? 0.10 : 0.18)
@@ -204,13 +198,13 @@ struct CompactMapView: UIViewRepresentable {
             }
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                // The segment status is shuttled through the polyline's
-                // `title` (MKPolyline conforms to MKAnnotation) because
-                // MKPolyline cannot be reliably subclassed in Swift.
+                // Der Abschnittsstatus wird über `title` der Routenlinie weitergegeben.
+                // MKPolyline erfüllt MKAnnotation und lässt sich in Swift nicht
+                // zuverlässig durch eine eigene Unterklasse erweitern.
                 if polyline.title == "breadcrumb" {
                     renderer.strokeColor = UIColor.systemOrange.withAlphaComponent(0.85)
                     renderer.lineWidth = 3
-                    renderer.lineDashPattern = [2, 4] // dashed track marks
+                    renderer.lineDashPattern = [2, 4] // gestrichelte Fahrtspur
                 } else {
                     let status: WaypointStatus = polyline.title.flatMap(WaypointStatus.init(rawValue:)) ?? .go
                     renderer.strokeColor = Self.routeUIColor(for: status)
@@ -223,7 +217,7 @@ struct CompactMapView: UIViewRepresentable {
             return MKOverlayRenderer(overlay: overlay)
         }
 
-        // MARK: Annotation Views
+        // MARK: Ansichten für Kartenmarkierungen
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MKUserLocation { return nil }
@@ -267,10 +261,9 @@ struct CompactMapView: UIViewRepresentable {
             }
         }
 
-        // MARK: Update entrypoint
+        // MARK: Einstieg zur Aktualisierung
 
         @MainActor
-        // swiftlint:disable:next function_parameter_count function_body_length
         func update(
             map: MKMapView,
             start: HarbourOption?,
@@ -284,8 +277,8 @@ struct CompactMapView: UIViewRepresentable {
             onSelectWarning: ((MaritimeWarning) -> Void)? = nil
         ) {
             self.onSelectWarning = onSelectWarning
-            // Remember the latest inputs so a SeaMask-ready notification can
-            // redraw the route once the mask finishes building.
+            // Letzte Eingaben speichern, damit die Route nach Fertigstellung
+            // der SeaMask erneut gezeichnet werden kann.
             lastMap = map
             lastInputs = DrawInputs(
                 start: start,
@@ -298,7 +291,7 @@ struct CompactMapView: UIViewRepresentable {
                 focusWarning: focusWarning
             )
 
-            // Center on warning coordinate if provided
+            // Falls vorhanden, auf die Koordinate der Warnung zentrieren
             if let focus = focusCoordinate, focusWarning != nil {
                 let isNew = lastFocusCoordinate == nil ||
                     abs(lastFocusCoordinate!.latitude - focus.latitude) > 0.0001 ||
@@ -330,8 +323,8 @@ struct CompactMapView: UIViewRepresentable {
                 }
             }
 
-            // Apply voyage-driven map state on every update so it picks up
-            // mid-session transitions instantly.
+            // Den vom Törn bestimmten Kartenzustand bei jeder Aktualisierung anwenden,
+            // damit Änderungen während der Sitzung sofort sichtbar werden.
             map.showsUserLocation = voyageActive
             let hasReliableUserLocation = map.userLocation.location.map {
                 $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 100
@@ -341,9 +334,9 @@ struct CompactMapView: UIViewRepresentable {
                 map.setUserTrackingMode(targetMode, animated: true)
             }
 
-            // The breadcrumb chunk grows monotonically while a voyage is
-            // active. Re-draw the breadcrumb polyline every refresh; bail
-            // out of the heavier route redraw only when nothing changed.
+            // Der Fahrtverlauf wächst während des aktiven Törns. Seine Linie bei jeder
+            // Aktualisierung neu zeichnen. Die aufwendigere Neuzeichnung der geplanten
+            // Route nur auslassen, wenn ihre Eingaben unverändert sind.
             let wpKey = routePlan?.waypoints
                 .map { "\($0.name):\($0.latitude ?? 0):\($0.longitude ?? 0)" }
                 .joined(separator: "|") ?? ""
@@ -355,7 +348,7 @@ struct CompactMapView: UIViewRepresentable {
             guard key != lastRouteKey else { return }
             lastRouteKey = key
 
-            // Wipe previous polylines + annotations (keep the tile + zone overlays).
+            // Bisherige Linien und Markierungen entfernen; Kachel- und Gebietsebenen behalten.
             let tileOverlays = map.overlays.compactMap { $0 as? MKTileOverlay }
             let polylines    = map.overlays.compactMap { $0 as? MKPolyline }
             map.removeOverlays(polylines)
@@ -367,13 +360,13 @@ struct CompactMapView: UIViewRepresentable {
                 map.addAnnotations(preservedWarningPins)
             }
 
-            // Re-add tile overlays only if MapKit dropped them (rare).
+            // Kachelebenen nur erneut ergänzen, wenn MapKit sie entfernt hat.
             if tileOverlays.count < 2 {
                 map.removeOverlays(tileOverlays)
                 CompactMapView.installBaseAndSeamarkOverlays(on: map)
             }
-            // Ensure the protected-zone polygons are present (they sit
-            // beneath everything except the basemap).
+            // Schutzgebietspolygone erhalten. Sie liegen über der Grundkarte
+            // und unter den übrigen Ebenen.
             let hasZones = map.overlays.contains { $0 is MKPolygon }
             if !hasZones {
                 CompactMapView.installProtectedZoneOverlays(on: map)
@@ -381,7 +374,7 @@ struct CompactMapView: UIViewRepresentable {
 
             guard let start, let destination else { return }
 
-            // 1. Build the route polyline from the FULL Dijkstra node list.
+            // 1. Routenlinie aus der vollständigen Dijkstra-Wegpunktliste aufbauen.
             let routeCoords = Self.routeCoordinates(
                 for: routePlan,
                 start: start,
@@ -389,9 +382,9 @@ struct CompactMapView: UIViewRepresentable {
             )
             guard !routeCoords.isEmpty else { return }
 
-            // 2. Segment polyline by per-WP status so each leg can carry a
-            //    different colour (green/orange/red). Falls back to a single
-            //    `.go` polyline when no per-WP status is available.
+            // 2. Routenlinie nach Wegpunktstatus aufteilen, damit Abschnitte
+            //    grün, orange oder rot dargestellt werden können. Ohne Einzelstatus
+            //    wird eine gemeinsame Linie mit `.go` verwendet.
             let segments = Self.colouredSegments(
                 routeCoords: routeCoords,
                 routePlan: routePlan,
@@ -404,7 +397,7 @@ struct CompactMapView: UIViewRepresentable {
                 map.addOverlay(line, level: .aboveLabels)
             }
 
-            // 3. Breadcrumb trail (actual sailed track).
+            // 3. Tatsächlich aufgezeichneten Fahrtverlauf zeichnen.
             if breadcrumbCoordinates.count > 1 {
                 var crumbs = breadcrumbCoordinates
                 let trail = MKPolyline(coordinates: &crumbs, count: crumbs.count)
@@ -412,7 +405,7 @@ struct CompactMapView: UIViewRepresentable {
                 map.addOverlay(trail, level: .aboveLabels)
             }
 
-            // 4. Pins — only user-selected harbours.
+            // 4. Nur gewählte Häfen markieren.
             map.addAnnotations(Self.harbourPins(
                 start: start,
                 destination: destination,
@@ -420,10 +413,9 @@ struct CompactMapView: UIViewRepresentable {
                 waypointResults: waypointResults
             ))
 
-            // 5. Fit visible region around the route — only when NOT in
-            //    follow-me mode (the tracking mode handles centering for
-            //    us during the voyage and a manual setVisibleMapRect call
-            //    would fight against it).
+            // 5. Sichtbaren Bereich an die Route anpassen, solange die Karte nicht
+            //    der Position folgt. Während des Törns übernimmt die Standortverfolgung
+            //    die Zentrierung; setVisibleMapRect würde ihr entgegenwirken.
             if !voyageActive || !hasReliableUserLocation {
                 let polyline = MKPolyline(coordinates: routeCoords, count: routeCoords.count)
                 let padding = voyageActive
@@ -437,28 +429,24 @@ struct CompactMapView: UIViewRepresentable {
             }
         }
 
-        // MARK: - Route coordinates
+        // MARK: - Routenkoordinaten
 
-        /// Builds the drawn polyline EXACTLY like the original implementation: the user's
-        /// harbours (start, intermediate stops, destination) are routed through
-        /// `NauticalRouteService` — grid A* over the SeaMask, Douglas-Peucker +
-        /// Chaikin smoothing and land-validation against the mask — and the
-        /// resulting coordinates are drawn verbatim.
+        /// Erstellt die dargestellte Linie aus den gewählten Häfen.
+        /// `NauticalRouteService` verbindet sie mit A* im SeaMask-Raster,
+        /// Vereinfachung nach Douglas-Peucker, Glättung nach Chaikin und Prüfung auf
+        /// Landkontakt. Die daraus entstandenen Koordinaten werden unverändert gezeichnet.
         ///
-        /// Crucially, NO further Douglas-Peucker simplification or Chaikin pass
-        /// is applied on top. The previous chain
+        /// Es folgt keine weitere Vereinfachung oder Glättung. Die frühere Kette
         /// (`NauticalRouter.route` → `simplify(epsilon: 100)` → `smooth(2×)`)
-        /// re-straightened the carefully land-avoiding path and cut corners
-        /// back across land / Ruhezonen / Schutzgebiete.
+        /// kürzte bereits geprüfte Kurven erneut ab und konnte Land oder Schutzgebiete kreuzen.
         private static func routeCoordinates(
             for routePlan: RoutePlan?,
             start: HarbourOption,
             destination: HarbourOption
         ) -> [CLLocationCoordinate2D] {
-            // Ordered list of USER stops only. The auto-inserted "Fahrwasser"
-            // waypoints from RouteExpander are NOT used for the drawn geometry —
-            // the v2 router re-derives the fairway path itself, identically to
-            // See `NauticalRouterV2.calculateMultiStopRoute`.
+            // Nur die geordnete Liste der gewählten Stopps verwenden. Zusätzliche
+            // Fahrwasserpunkte aus RouteExpander bestimmen nicht die gezeichnete Linie.
+            // Die Routenführung berechnet den Fahrwasserpfad aus diesen Stopps.
             var stops: [CLLocationCoordinate2D] = [
                 CLLocationCoordinate2D(latitude: start.latitude, longitude: start.longitude)
             ]
@@ -476,12 +464,11 @@ struct CompactMapView: UIViewRepresentable {
             return NauticalRouteService.shared.calculateMultiStopRoute(stops: stops).coordinates
         }
 
-        // MARK: - Coloured segments
+        // MARK: - Farbige Abschnitte
         //
-        // Walks the smoothed coordinate list and switches polyline colour at
-        // each user-WP boundary. Because Chaikin doubles the point count
-        // every iteration we project each user WP onto the nearest smoothed
-        // point.
+        // Durchläuft die geglätteten Koordinaten und wechselt die Farbe an jedem
+        // gewählten Wegpunkt. Da Chaikin die Punktzahl pro Durchlauf verdoppelt,
+        // wird jeder Wegpunkt dem nächsten geglätteten Punkt zugeordnet.
 
         private struct Segment {
             var coords: [CLLocationCoordinate2D]
@@ -496,7 +483,7 @@ struct CompactMapView: UIViewRepresentable {
             guard let waypointResults, !waypointResults.isEmpty else {
                 return [Segment(coords: routeCoords, status: .go)]
             }
-            // Project each waypoint onto the closest index in routeCoords.
+            // Jeden Wegpunkt dem nächstgelegenen Index in routeCoords zuordnen.
             let wpCoordsWithStatus: [(CLLocationCoordinate2D, WaypointStatus)] =
                 waypointResults.compactMap { wp in
                     guard let lat = wp.waypoint.latitude, let lon = wp.waypoint.longitude
@@ -526,7 +513,7 @@ struct CompactMapView: UIViewRepresentable {
                 : segments
         }
 
-        // MARK: - Pins
+        // MARK: - Kartenmarkierungen
 
         private static func harbourPins(
             start: HarbourOption,
@@ -539,7 +526,7 @@ struct CompactMapView: UIViewRepresentable {
                 uniqueKeysWithValues: (waypointResults ?? []).map { ($0.waypoint.id, $0) }
             )
 
-            // 1. Start pin
+            // 1. Startmarkierung
             let startSub: String? = {
                 if let plan = routePlan {
                     return "Abfahrt: \(AppDateFormatters.hourMinute.string(from: plan.plannedStartTime)) Uhr"
@@ -554,7 +541,7 @@ struct CompactMapView: UIViewRepresentable {
                 status: .go
             ))
 
-            // 2. Destination pin
+            // 2. Zielmarkierung
             let destResult = routePlan?.waypoints.last.flatMap { resultsByWPID[$0.id] }
             let destSub: String? = {
                 var parts: [String] = []
@@ -576,7 +563,7 @@ struct CompactMapView: UIViewRepresentable {
 
             guard let routePlan, routePlan.waypoints.count > 2 else { return pins }
 
-            // 3. Intermediate waypoints & bottlenecks along route
+            // 3. Zwischenpunkte und Engstellen entlang der Route
             let intermediates = routePlan.waypoints.dropFirst().dropLast()
             for wp in intermediates {
                 guard let lat = wp.latitude, let lon = wp.longitude else { continue }
@@ -613,7 +600,7 @@ struct CompactMapView: UIViewRepresentable {
             return pins
         }
 
-        // MARK: - Drawing helpers
+        // MARK: - Hilfsfunktionen zum Zeichnen
 
         private static func distSq(
             _ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D
@@ -709,7 +696,7 @@ struct CompactMapView: UIViewRepresentable {
     }
 }
 
-// MARK: - Route Pin Annotation
+// MARK: - Routenmarkierung
 
 final class RoutePinAnnotation: NSObject, MKAnnotation {
     enum Kind: String { case start, destination, stop, bottleneck }
@@ -738,7 +725,7 @@ final class RoutePinAnnotation: NSObject, MKAnnotation {
     }
 }
 
-// MARK: - Warning Pin Annotation
+// MARK: - Warnungsmarkierung
 
 final class WarningPinAnnotation: NSObject, MKAnnotation {
     let coordinate: CLLocationCoordinate2D
@@ -759,7 +746,7 @@ final class WarningPinAnnotation: NSObject, MKAnnotation {
     }
 }
 
-/// Identifies TideNode to the community tile servers and respects their cache headers.
+/// Kennzeichnet TideNode gegenüber den Kachelservern und beachtet deren Vorgaben zum Zwischenspeichern.
 private final class IdentifiedMapTileOverlay: MKTileOverlay {
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
@@ -787,7 +774,7 @@ private final class IdentifiedMapTileOverlay: MKTileOverlay {
     }
 }
 
-/// Compact, tappable source information. The licence credits stay visible on the map.
+/// Kompakte, antippbare Quelleninformation. Lizenzangaben bleiben auf der Karte sichtbar.
 struct MapAttributionView: View {
     @State private var showingSources = false
 

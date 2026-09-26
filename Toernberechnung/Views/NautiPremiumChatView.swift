@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import AVFAudio
 
 struct NautiPremiumChatOverlay: View {
     @Binding var mode: NautiDashboardMode
@@ -13,6 +14,7 @@ struct NautiPremiumChatOverlay: View {
     let onRetryAvailability: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var modelContext
     @State private var editorError: String?
@@ -41,6 +43,24 @@ struct NautiPremiumChatOverlay: View {
                 .environment(\.locale, Locale(identifier: "de_DE"))
         }
         .animation(NautiDashboardGeometry.animation(reduceMotion: reduceMotion), value: mode)
+        .onChange(of: mode) { _, mode in
+            if mode != .chat { viewModel.speechInput.cancel() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { viewModel.speechInput.cancel() }
+        }
+        .onDisappear { viewModel.speechInput.cancel() }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notice in
+            guard let type = notice.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  type == AVAudioSession.InterruptionType.began.rawValue else { return }
+            interruptSpeech()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { notice in
+            guard let reason = notice.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue
+                    || reason == AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue else { return }
+            interruptSpeech()
+        }
         .alert("Chat umbenennen", isPresented: renameAlertPresented) {
             TextField("Titel", text: $renameDraft)
             Button("Abbrechen", role: .cancel) {
@@ -88,11 +108,13 @@ struct NautiPremiumChatOverlay: View {
             Divider().opacity(0.12)
             MessageInputView(
                 draft: $viewModel.draft,
+                speech: viewModel.speechInput,
                 canSend: viewModel.canSend,
                 isSending: viewModel.isSending,
                 focusDismissTrigger: focusDismissTrigger,
                 onSend: send,
-                onStop: viewModel.cancelCurrentInference
+                onStop: viewModel.cancelCurrentInference,
+                onSpeechToggle: toggleSpeech
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -386,6 +408,23 @@ struct NautiPremiumChatOverlay: View {
         }
     }
 
+    private func toggleSpeech() {
+        Task {
+            switch viewModel.speechInput.state {
+            case .idle: await viewModel.startSpeechInput()
+            case .preparing: viewModel.speechInput.cancel()
+            case .recording: await viewModel.speechInput.stop()
+            case .finalizing: break
+            }
+        }
+    }
+
+    private func interruptSpeech() {
+        guard viewModel.speechInput.isActive else { return }
+        viewModel.speechInput.cancel()
+        viewModel.speechInput.errorMessage = NautiSpeechInputError.audioInterrupted.localizedDescription
+    }
+
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         withAnimation(.easeOut(duration: 0.22)) {
             proxy.scrollTo("bottom", anchor: .bottom)
@@ -539,12 +578,14 @@ private struct NautiHistoryList: View {
 
 private struct MessageInputView: View {
     @Binding var draft: String
+    @Bindable var speech: NautiSpeechInputController
 
     let canSend: Bool
     let isSending: Bool
     let focusDismissTrigger: Int
     let onSend: () -> Void
     let onStop: () -> Void
+    let onSpeechToggle: () -> Void
 
     @FocusState private var inputFocused: Bool
 
@@ -557,7 +598,8 @@ private struct MessageInputView: View {
                     .focused($inputFocused)
                     .submitLabel(.send)
                     .onSubmit(send)
-                    .disabled(isSending)
+                    .disabled(isSending || speech.isActive)
+                    .accessibilityIdentifier("NautiMessageDraft")
                     .padding(.leading, 13)
                     .padding(.vertical, 10)
 
@@ -574,6 +616,20 @@ private struct MessageInputView: View {
                     .padding(.trailing, 4)
                     .padding(.bottom, 4)
                 } else {
+                    Button {
+                        inputFocused = false
+                        onSpeechToggle()
+                    } label: {
+                        Image(systemName: speech.isActive ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(speech.isActive ? Color.red : Color.appPrimary)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(speech.state == .finalizing)
+                    .accessibilityLabel(speech.isActive ? "Spracheingabe stoppen" : "Spracheingabe starten")
+                    .accessibilityIdentifier("NautiSpeechButton")
+                    .padding(.bottom, 4)
                     Button(action: send) {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 15, weight: .bold))
@@ -584,6 +640,7 @@ private struct MessageInputView: View {
                     .buttonStyle(.plain)
                     .disabled(!sendEnabled)
                     .accessibilityLabel("Senden")
+                    .accessibilityIdentifier("NautiSendButton")
                     .padding(.trailing, 4)
                     .padding(.bottom, 4)
                 }
@@ -595,6 +652,29 @@ private struct MessageInputView: View {
                         inputFocused ? Color.appPrimary.opacity(0.85) : Color.primary.opacity(0.12),
                         lineWidth: inputFocused ? 1.3 : 0.8
                     )
+            }
+            if speech.isActive {
+                HStack(spacing: 7) {
+                    if speech.state == .recording {
+                        Image(systemName: "waveform").foregroundStyle(.red)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(speechStatus).font(.caption)
+                    if case let .downloading(progress?) = speech.preparation, speech.state == .preparing {
+                        Text(progress, format: .percent.precision(.fractionLength(0))).font(.caption)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("NautiSpeechStatus")
+            }
+            if let error = speech.errorMessage {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(error).font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("NautiSpeechError")
+                    Button("Schließen") { speech.clearError() }.font(.caption)
+                }
             }
         }
         .frame(maxWidth: 760)
@@ -611,14 +691,23 @@ private struct MessageInputView: View {
     }
 
     private var sendEnabled: Bool {
-        canSend && !isSending
+        canSend && !isSending && !speech.isActive
+    }
+
+    private var speechStatus: String {
+        switch speech.state {
+        case .idle: return ""
+        case .preparing: return speech.preparation.message
+        case .recording: return "Sprachaufnahme läuft …"
+        case .finalizing: return "Letzte Wörter werden verarbeitet …"
+        }
     }
 
     private func send() {
         guard sendEnabled else { return }
         onSend()
-        // The window-wide tap-to-dismiss recogniser also fires for this button,
-        // so without re-focusing, sending would collapse the keyboard mid-chat.
+        // Die Tipp-Erkennung zum Schließen der Tastatur erfasst auch diesen Button.
+        // Den Eingabefokus erneut setzen, damit Senden die Tastatur nicht schließt.
         inputFocused = true
     }
 

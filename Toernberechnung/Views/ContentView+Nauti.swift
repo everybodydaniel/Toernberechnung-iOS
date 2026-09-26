@@ -2,10 +2,10 @@ import SwiftUI
 import CoreLocation
 
 extension ContentView {
-    // MARK: - TideNode proactive assistance
+    // MARK: - Proaktive TideNode-Unterstützung
 
-    /// These states deliberately come from the deterministic route and weather
-    /// calculation. Nauti only explains them; it does not decide seaworthiness.
+    /// Diese Zustände stammen aus der festen Routen- und Wetterberechnung.
+    /// Nauti erläutert sie und entscheidet nicht über die Befahrbarkeit.
     var proactiveNautiIssue: NautiProactiveIssue? {
         NautiProactiveIssueResolver.resolve(
             routeStatus: viewModel.combinedStatus,
@@ -403,6 +403,7 @@ extension ContentView {
     }
 
     func closeNautiChat() {
+        nautiViewModel.speechInput.cancel()
         guard nautiDashboardMode.isExpanded else { return }
         nautiFocusDismissTrigger &+= 1
         withAnimation(NautiDashboardGeometry.animation(reduceMotion: reduceMotion)) {

@@ -2,10 +2,10 @@ import Foundation
 import XCTest
 @testable import Toernberechnung
 
-/// The strongest parity evidence available: a **filled** reference sheet from
-/// the tool's authors — "Excel-Tool-Törnberechnung - Beispiel 2 - Emden-Norderney".
+/// Vergleich mit dem ausgefüllten Referenzblatt der Werkzeugautoren:
+/// "Excel-Tool-Törnberechnung - Beispiel 2 - Emden-Norderney".
 ///
-/// Inputs (global): Tiefgang 1,10 m · BSH-Wasserstand +0,30 m · Tide "Mt".
+/// Gemeinsame Eingaben: Tiefgang 1,10 m · BSH-Wasserstand +0,30 m · Tide "Mt".
 ///
 /// | Sp. | WP | Bezugsort | HW | Versatz | Ankunft | MTH | Modus | Niveau | Kartentiefe |
 /// |---|---|---|---|---|---|---|---|---|---|
@@ -14,7 +14,7 @@ import XCTest
 /// | X  | Wattenhoch Memmert | Norderney | 15:19 | 0    | 15:19 | 2,6 | MHW      | 3,10 | −0,80 |
 /// | AD | Norderney Hafen    | Norderney | 15:19 | 0    | 16:19 | 2,5 | MHW      | 3,10 | +1,20 |
 ///
-/// Legs: 17,0 sm @ 6 kn −1 kn · 11,5 sm @ 6 kn · 6,0 sm @ 6 kn.
+/// Streckenabschnitte: 17,0 sm bei 6 kn und −1 kn Strömung · 11,5 sm bei 6 kn · 6,0 sm bei 6 kn.
 final class ExcelParityReferenceSheetTests: XCTestCase {
 
     private let accuracy = 1e-6
@@ -22,14 +22,14 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
     private let stationBorkum = "101P"
     private let stationNorderney = "111P"
 
-    /// Midnight of the sheet's date; every time below is an offset in seconds.
+    /// Mitternacht am Datum des Referenzblatts. Alle weiteren Zeiten sind Abstände in Sekunden.
     private let midnight = Date(timeIntervalSince1970: 1_623_369_600)
 
     private func time(_ hours: Int, _ minutes: Int) -> Date {
         midnight.addingTimeInterval(Double(hours) * 3_600 + Double(minutes) * 60)
     }
 
-    // MARK: - Travel block (Excel O61…AM71)
+    // MARK: - Fahrtdauerberechnung (Excel O61…AM71)
 
     func testReferenceSheetTravelBlockMatches() {
         let legs = [
@@ -47,7 +47,7 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         XCTAssertEqual(results[1].speedOverGroundKnots, 6, accuracy: accuracy)
         XCTAssertEqual(results[2].speedOverGroundKnots, 6, accuracy: accuracy)
 
-        // O71 / U71 / AA71, converted from Excel day fractions to hours
+        // O71 / U71 / AA71, von Excel-Tagesbruchteilen in Stunden umgerechnet
         XCTAssertEqual(results[0].travelTimeHours, 0.141_666_666_666_666_66 * 24, accuracy: accuracy)
         XCTAssertEqual(results[1].travelTimeHours, 0.079_861_111_111_111_12 * 24, accuracy: accuracy)
         XCTAssertEqual(results[2].travelTimeHours, 0.041_666_666_666_666_664 * 24, accuracy: accuracy)
@@ -66,7 +66,7 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         )
     }
 
-    // MARK: - Depth chain (Excel L35…L57)
+    // MARK: - Tiefenberechnung (Excel L35…L57)
 
     func testReferenceSheetDepthChainMatches() async {
         let result = await calculateReferenceSheet()
@@ -86,30 +86,26 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
             base: 1.65, tideHeight: nil, availableDepth: 1.95, clearance: 0.85
         )
 
-        // Spalte X — Wattenhoch Memmert, Ankunft exakt zum Hochwasser.
+        // Spalte X: Wattenhoch Memmert, Ankunft genau zum Hochwasser.
         //
-        // The only cell where the app and the reference sheet disagree, and the
-        // sheet is the one with the artefact:
+        // Hier unterscheiden sich App und Referenzblatt durch Rundung:
         //
-        //   X29 (HW, typed)      = 0.638194444444444_4
-        //   X31 (arrival, chain) = 0.638194444444444_51   (L31 + O71 + U71)
-        //   ⇒ X37 = 2,66e-15 h  = 9,59 Pikosekunden
+        //   X29 (eingegebenes HW)     = 0.638194444444444_4
+        //   X31 (berechnete Ankunft)  = 0.638194444444444_51   (L31 + O71 + U71)
+        //   ⇒ X37 = 2,66e-15 h = 9,59 Pikosekunden
         //
-        // Excel's `IF(X37=0,"keine Fehlmenge",…)` compares against a literal
-        // zero with no tolerance, so those picoseconds fall through into the
-        // first bucket and are charged a *full* twelfth — 0,2167 m. The sheet
-        // therefore reports WuK 1,28 m instead of 1,50 m.
+        // Excel vergleicht in `IF(X37=0,"keine Fehlmenge",…)` ohne Toleranz mit 0.
+        // Die winzige Abweichung fällt damit in den ersten Stundenbereich und
+        // ergibt ein volles Zwölftel Fehlmenge: 0,2167 m. Das Blatt zeigt dadurch
+        // 1,28 m Wasser unter Kiel statt 1,50 m.
         //
-        // The author clearly intended an arrival exactly at high water (that is
-        // how a Wattenhoch is crossed), and `TwelfthsRuleStrategy.hwEpsilonHours`
-        // (0,01 h = 36 s) recognises it as such. Column AD is the counter-proof
-        // that this is Excel noise and not a rule: there Excel's own deviation
-        // reads 1.000000000000001_8 h, yet its `<=1` comparison still selects
-        // one twelfth — the same bucket the app picks. The two comparisons in
-        // the same formula behave inconsistently.
+        // `TwelfthsRuleStrategy.hwEpsilonHours` erkennt mit 0,01 h (36 s) Toleranz
+        // die geplante Ankunft zum Hochwasser. In Spalte AD beträgt die berechnete
+        // Abweichung 1.000000000000001_8 h; Excel wählt dort trotzdem über `<=1`
+        // ein Zwölftel, ebenso wie die App. Die Rundung wirkt also uneinheitlich.
         //
-        // Reproducing the artefact would mean charging a twelfth for an
-        // arbitrarily small deviation, so the app deliberately does not.
+        // Die App übernimmt deshalb keine zusätzliche Fehlmenge für eine beliebig
+        // kleine Rundungsabweichung.
         assertColumn(
             result.waypointResults[2], name: "X",
             oneTwelfth: 0.216_666_7, deviation: 0, missingWater: 0,
@@ -128,8 +124,8 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         XCTAssertEqual(result.totalDistanceNm, 34.5, accuracy: accuracy)
     }
 
-    /// Pins the reasoning behind the single divergence in column X, so a later
-    /// change to `hwEpsilonHours` cannot silently reintroduce Excel's artefact.
+    /// Sichert die Begründung der Abweichung in Spalte X ab, damit eine Änderung
+    /// an `hwEpsilonHours` den Excel-Rundungsfehler nicht unbemerkt wieder einführt.
     func testPicosecondDeviationIsTreatedAsExactHighWater() {
         let strategy = TwelfthsRuleStrategy()
         let excelNoiseHours = 2.664_535_259_100_375_7e-15
@@ -141,11 +137,11 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         XCTAssertEqual(atNoise.fmwMeters, 0, accuracy: 1e-12)
         XCTAssertEqual(atNoise.messages, ["keine Fehlmenge"])
 
-        // Excel would have charged a full twelfth for those picoseconds.
+        // Excel würde für diese Pikosekunden ein volles Zwölftel Fehlmenge berechnen.
         XCTAssertEqual(2.6 / 12, 0.216_666_666_666_666_67, accuracy: 1e-12)
 
-        // Just outside the tolerance the staircase engages as normal, so the
-        // epsilon only ever absorbs noise — never a real deviation.
+        // Direkt außerhalb der Toleranz gilt wieder die normale Staffel.
+        // Die Toleranz fängt nur kleine Abweichungen nahe dem Hochwasser ab.
         let justOutside = strategy.missingWater(
             deviationHours: 0.02,
             meanTidalRangeMeters: 2.6
@@ -153,7 +149,7 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         XCTAssertEqual(justOutside.fmwMeters, 2.6 / 12, accuracy: 1e-12)
     }
 
-    // MARK: - Fixture
+    // MARK: - Testdaten
 
     private func calculateReferenceSheet() async -> RouteCalculationResult {
         let waypoints = [
@@ -206,8 +202,8 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
             tidalStateLabel: "Mt"
         )
 
-        // Excel $AD$13 = +0,30 m, delivered as an official local forecast so the
-        // status is not downgraded and the depth numbers stay visible.
+        // Excel $AD$13 = +0,30 m als amtliche lokale Vorhersage liefern, damit
+        // der Status nicht herabgesetzt wird und die Tiefenwerte sichtbar bleiben.
         let provider = MockTideDataProvider()
         for stationID in [stationEmden, stationBorkum, stationNorderney] {
             provider.correctionsByStation[stationID] = WaterLevelCorrectionResolution(
@@ -228,6 +224,7 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         )
     }
 
+    // Die Vergleichswerte entsprechen den Spalten des Referenzblatts.
     // swiftlint:disable:next function_parameter_count
     private func assertColumn(
         _ waypoint: WaypointCalculationResult,
@@ -295,6 +292,7 @@ final class ExcelParityReferenceSheetTests: XCTestCase {
         )
     }
 
+    // Die Vergleichswerte entsprechen den Spalten des Referenzblatts.
     // swiftlint:disable:next function_parameter_count
     private func makeWaypoint(
         name: String,

@@ -202,10 +202,9 @@ final class NautiConversationPersistenceTests: XCTestCase {
             380,
             accuracy: 0.001
         )
-        // Previously this returned the full 380pt floor, leaving only 10pt of
-        // the container — enough to push the chat header up behind the
-        // AppHeader. The panel is hard-clipped, so it now reserves 76pt of
-        // header clearance instead.
+        // Die frühere Mindesthöhe von 380 pt ließ nur 10 pt im Container frei
+        // und schob die Chat-Kopfzeile hinter AppHeader. Da der Bereich an seiner
+        // Grenze abgeschnitten wird, hält er nun 76 pt Platz für die Kopfzeile frei.
         XCTAssertEqual(
             NautiDashboardGeometry.panelHeight(availableHeight: 390),
             314,
@@ -213,10 +212,10 @@ final class NautiConversationPersistenceTests: XCTestCase {
         )
     }
 
-    /// With the keyboard up, `availableHeight` shrinks and the panel must stay
-    /// inside it so the chat input is never clipped away.
+    /// Bei geöffneter Tastatur wird `availableHeight` kleiner. Der Bereich muss
+    /// darin bleiben, damit die Chat-Eingabe nicht abgeschnitten wird.
     func testInlineDashboardHeightLeavesRoomForKeyboardAndHeader() {
-        // iPhone 17 (874pt) minus a ~336pt German keyboard, 8pt bottom inset.
+        // iPhone 17 (874 pt) abzüglich etwa 336 pt für die deutsche Tastatur und 8 pt unterem Abstand.
         let withKeyboard = NautiDashboardGeometry.panelHeight(
             availableHeight: 538,
             bottomInset: 8
@@ -224,7 +223,7 @@ final class NautiConversationPersistenceTests: XCTestCase {
         XCTAssertLessThanOrEqual(withKeyboard, 538 - 8 - 76)
         XCTAssertGreaterThanOrEqual(withKeyboard, 220)
 
-        // The floor still wins over an absurdly small container.
+        // Bei einem extrem kleinen Container gilt weiterhin die Mindesthöhe.
         XCTAssertEqual(
             NautiDashboardGeometry.panelHeight(availableHeight: 200, bottomInset: 8),
             220,

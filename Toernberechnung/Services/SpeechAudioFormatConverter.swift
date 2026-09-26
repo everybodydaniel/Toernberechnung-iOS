@@ -1,26 +1,25 @@
 import AVFAudio
 import Foundation
 
-/// Converts microphone buffers into the format a speech recogniser asks for.
+/// Wandelt Mikrofonpuffer in das benötigte Format der Spracherkennung um.
 ///
-/// `AVAudioInputNode.installTap(onBus:bufferSize:format:)` only accepts the
-/// bus's own hardware format — passing anything else raises an Objective-C
-/// exception (`format.sampleRate == hwFormat.sampleRate`) that Swift cannot
-/// catch, which crashes the process. So the tap runs at the hardware rate
-/// (typically 48 kHz) and every buffer is resampled here to whatever the
-/// analyzer wants (typically 16 kHz mono) before it is handed on.
+/// `AVAudioInputNode.installTap(onBus:bufferSize:format:)` akzeptiert nur das
+/// Hardwareformat des Eingangs. Ein anderes Format kann eine Objective-C-Ausnahme
+/// auslösen, die Swift nicht abfangen kann. Die Aufnahme verwendet deshalb die
+/// Hardware-Abtastrate, meist 48 kHz. Hier wird jeder Puffer vor der Weitergabe
+/// in das Analyseformat umgerechnet, meist 16 kHz mono.
 ///
-/// `@unchecked Sendable`: an instance is built on the main actor and then used
-/// exclusively from the single audio-tap thread. `AVAudioConverter` is not
-/// thread-safe, but it is never touched concurrently.
+/// `@unchecked Sendable`: Die Instanz entsteht auf dem MainActor und wird danach
+/// nur vom einzelnen Aufnahme-Thread verwendet. `AVAudioConverter` wird nicht
+/// gleichzeitig aus mehreren Threads aufgerufen.
 final class SpeechAudioFormatConverter: @unchecked Sendable {
     let inputFormat: AVAudioFormat
     let outputFormat: AVAudioFormat
 
     private let converter: AVAudioConverter?
 
-    /// Returns `nil` when the two formats cannot be bridged at all — the
-    /// caller should then surface a recoverable error instead of recording.
+    /// Gibt `nil` zurück, wenn die Formate nicht umgewandelt werden können.
+    /// Der Aufrufer soll dann einen behandelbaren Fehler anzeigen statt aufzuzeichnen.
     init?(from inputFormat: AVAudioFormat, to outputFormat: AVAudioFormat) {
         guard inputFormat.sampleRate.isFinite, inputFormat.sampleRate > 0, inputFormat.channelCount > 0,
               outputFormat.sampleRate.isFinite, outputFormat.sampleRate > 0, outputFormat.channelCount > 0 else {
@@ -44,16 +43,16 @@ final class SpeechAudioFormatConverter: @unchecked Sendable {
         converter == nil
     }
 
-    /// Resamples one capture buffer. Returns `nil` if the conversion fails or
-    /// produced no frames; callers should simply drop that buffer.
+    /// Rechnet einen Aufnahmepuffer auf die gewünschte Abtastrate um. Gibt `nil`
+    /// bei Fehlern oder fehlenden Ausgabeframes zurück; der Aufrufer verwirft den Puffer.
     ///
-    /// Must be called from a single thread — in practice the audio tap's
-    /// realtime callback, which is already serialised.
+    /// Nur von einem einzelnen Thread aufrufen, üblicherweise vom bereits
+    /// seriellen Echtzeit-Rückruf der Audioaufnahme.
     func convert(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
         guard buffer.frameLength > 0, buffer.format == inputFormat else { return nil }
         guard let converter else {
-            // The engine reuses tap storage after the callback returns. Async
-            // consumers need their own buffer even when no resampling is needed.
+            // Die Engine verwendet den Aufnahmespeicher nach dem Rückruf erneut.
+            // Asynchrone Empfänger benötigen daher auch ohne Umrechnung einen eigenen Puffer.
             guard let copy = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: buffer.frameLength) else { return nil }
             copy.frameLength = buffer.frameLength
             let source = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: buffer.audioBufferList))
@@ -68,8 +67,8 @@ final class SpeechAudioFormatConverter: @unchecked Sendable {
         let ratio = outputFormat.sampleRate / inputFormat.sampleRate
         let scaled = (Double(buffer.frameLength) * ratio).rounded(.up)
         guard scaled.isFinite, scaled < Double(UInt32.max - 1_024) else { return nil }
-        // A little headroom: resamplers may emit slightly more frames than the
-        // plain ratio suggests while their filter delay line drains.
+        // Zusätzlichen Platz vorsehen, da beim Leeren des Konverterfilters
+        // etwas mehr Frames als nach dem reinen Abtastratenverhältnis entstehen können.
         let capacity = AVAudioFrameCount(max(scaled, 1)) + 1_024
 
         guard let output = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else {

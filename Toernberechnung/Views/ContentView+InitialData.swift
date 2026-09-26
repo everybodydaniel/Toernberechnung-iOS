@@ -8,8 +8,8 @@ extension ContentView {
         handleScreenshotLaunchEnvironment()
         #endif
 
-        // A route is deliberately not seeded. Weather and tides keep their
-        // own independent default locations until the skipper plans a trip.
+        // Es wird keine Route vorbelegt. Wetter und Gezeiten behalten ihre eigenen
+        // Standardorte, bis der Skipper einen Törn plant.
         await nautiViewModel.loadHistory()
         await aiAccess.refresh()
         await maritimeWeatherService.prepare()

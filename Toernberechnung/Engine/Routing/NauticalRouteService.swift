@@ -2,10 +2,9 @@ import Foundation
 import CoreLocation
 
 extension Notification.Name {
-    /// Posted on the main thread once `SeaMask` has finished building, so the
-    /// map can redraw a route that was first drawn as a straight-line fallback
-    /// while the mask was still unavailable (mirrors the reactive
-    /// `SeaMask.isReady` observation in `MapScreen`).
+    /// Wird nach dem Aufbau von `SeaMask` auf dem Hauptthread gemeldet.
+    /// Die Karte kann dann eine Route neu zeichnen, die während des Ladens
+    /// ersatzweise als gerade Linie erschien.
     static let seaMaskDidBecomeReady = Notification.Name("seaMaskDidBecomeReady")
 }
 

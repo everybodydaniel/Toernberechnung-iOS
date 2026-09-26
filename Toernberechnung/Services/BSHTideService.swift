@@ -77,12 +77,12 @@ struct TideReading: Equatable, Sendable {
 
 struct TideEvent: Identifiable, Equatable, Sendable {
     let time: Date
-    /// Event-specific astronomical height above chart datum (SKN).
-    /// Interpolated stations such as Juist and Baltrum intentionally return nil.
+    /// Astronomische Ereignishöhe über Kartennull (SKN).
+    /// Interpolierte Stationen wie Juist und Baltrum geben hier nil zurück.
     let heightMeters: Double?
     let type: String
     let phase: String?
-    var androidCurrentTimestampIsISO8601: Bool = true
+    var currentTimestampIsISO8601: Bool = true
     var usesAstronomicalPrediction: Bool = false
 
     var id: String { "\(time.timeIntervalSince1970)-\(type)" }
@@ -422,7 +422,7 @@ enum BSHDateParser {
         if let value = isoFormatter.date(from: raw.replacingOccurrences(of: " ", with: "T")) { return value }
         let fallback = ISO8601DateFormatter()
         if let value = fallback.date(from: raw.replacingOccurrences(of: " ", with: "T")) { return value }
-        // Android TideTimes: timestamps without an offset are Berlin local time.
+        // Zeitstempel ohne Zeitzonenversatz gelten als Berliner Ortszeit.
         let local = DateFormatter()
         local.locale = Locale(identifier: "en_US_POSIX")
         local.calendar = Calendar(identifier: .gregorian)

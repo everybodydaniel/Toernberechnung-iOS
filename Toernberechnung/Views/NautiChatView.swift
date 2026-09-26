@@ -1,10 +1,9 @@
 import SwiftUI
 
-// Shared Nauti chat building blocks used by the inline dashboard chat
-// (`NautiPremiumChatOverlay`) and by the action confirmation sheet.
+// Gemeinsame Nauti-Chat-Bausteine für den Chat im Kartenbereich
+// (`NautiPremiumChatOverlay`) und die modale Aktionsbestätigung.
 //
-// The former standalone `NautiChatOverlay` and `NautiPresenceBubble` lived
-// here too; both had no remaining call sites and were removed.
+
 
 struct NautiActionConfirmationSheet: View {
     let pendingAction: NautiPendingAction
@@ -454,11 +453,12 @@ struct NautiSymbolAvatar: View {
     }
 }
 
-/// Render emphasis and preserve paragraph spacing, including older chat replies.
+/// Hervorhebungen darstellen und Absatzabstände auch in älteren Chatantworten erhalten.
 enum NautiAnswerFormatting {
     static func attributed(_ text: String) -> AttributedString {
-        // Repair inline numbered headings emitted by earlier prompts. Require
-        // bold heading syntax so decimals, times and ordinary numbers stay intact.
+        // Nummerierte Überschriften älterer Antworten in eigene Zeilen setzen.
+        // Nur fett markierte Überschriften berücksichtigen, damit Dezimalzahlen,
+        // Uhrzeiten und gewöhnliche Zahlen unverändert bleiben.
         let spaced = text.replacingOccurrences(
             of: #"[ \t]+(?=\d{1,2}\.[ \t]+\*\*)"#,
             with: "\n\n",

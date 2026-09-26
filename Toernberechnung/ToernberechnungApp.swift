@@ -63,26 +63,24 @@ final class CalculationRecord {
     var notes: String = ""
     var createdAt: Date
 
-    // MARK: - Voyage fields
+    // MARK: - Törndaten
     //
-    // Filled in by `ActiveVoyageManager.stopVoyageAndSaveLogbook` when a
-    // live tracked trip ends. For planning-only entries these stay at
-    // their default zero / empty values, so the model stays backwards-
-    // compatible with previously saved records.
+    // Werden beim Ende einer aufgezeichneten Fahrt durch
+    // `ActiveVoyageManager.stopVoyageAndSaveLogbook` gefüllt. Reine Planungseinträge
+    // behalten leere Werte oder 0. So bleiben zuvor gespeicherte Datensätze kompatibel.
 
-    /// True when the record represents an actually sailed voyage (not a
-    /// planning-only calculation).
+    /// True, wenn der Eintrag einen tatsächlich gefahrenen Törn statt nur eine Planung darstellt.
     var isActualVoyage: Bool = false
-    /// GPS-measured distance in nautical miles.
+    /// Per GPS gemessene Strecke in Seemeilen.
     var actualDistanceNM: Double = 0
-    /// Mean speed-over-ground in knots, averaged over GPS samples.
+    /// Mittlere Fahrt über Grund in Knoten aus den GPS-Messungen.
     var averageSOGKnots: Double = 0
-    /// Peak SOG observed during the voyage.
+    /// Höchste gemessene Fahrt über Grund während des Törns.
     var maxSOGKnots: Double = 0
-    /// Voyage duration in seconds (`arrivalAt − departureAt`).
+    /// Törndauer in Sekunden (`arrivalAt − departureAt`).
     var voyageDurationSeconds: Double = 0
-    /// JSON-encoded breadcrumb trail: an array of `{lat,lon,ts}` triples.
-    /// Stored as text so the SwiftData schema stays trivial.
+    /// Fahrtverlauf als JSON-Liste aus `{lat,lon,ts}`-Werten.
+    /// Als Text gespeichert, um das SwiftData-Schema einfach zu halten.
     var breadcrumbJSON: String = ""
 
     init(
@@ -213,8 +211,8 @@ final class CrewMemberRecord {
     }
 }
 
-/// Locally planned crew appointment. Everything lives on the device; there is
-/// no account, no sync and no sharing.
+/// Lokal geplanter Crew-Termin. Die Daten liegen auf dem Gerät;
+/// ein Konto und eine automatische Synchronisierung sind nicht vorgesehen.
 @Model
 final class CrewEventRecord {
     var title: String
@@ -222,13 +220,13 @@ final class CrewEventRecord {
     var endsAt: Date
     var location: String = ""
     var notes: String = ""
-    /// Raw value of `CrewEventCategory`. Stored as text so adding a category
-    /// later stays a lightweight schema change.
+    /// Rohwert von `CrewEventCategory`. Als Text gespeichert, damit das spätere
+    /// Ergänzen einer Kategorie eine einfache Schemaänderung bleibt.
     var category: String = CrewEventCategory.other.rawValue
     var isAllDay: Bool = false
-    /// Names of the crew members assigned to this appointment. Plain strings
-    /// rather than a relationship — a deleted crew member should not silently
-    /// rewrite an already planned appointment.
+    /// Namen der diesem Termin zugeordneten Crew-Mitglieder. Als einfache Zeichenketten
+    /// gespeichert, damit das Löschen eines Crew-Mitglieds einen geplanten Termin
+    /// nicht nachträglich verändert.
     var attendees: [String] = []
     var createdAt: Date
 
@@ -269,8 +267,8 @@ struct ToernberechnungApp: App {
         return try! ModelContainer(for: schema, configurations: [configuration])
     }()
 
-    /// Live GPS service.  Shared across every tab so the background
-    /// recording survives navigation away from the Map tab.
+    /// Gemeinsamer GPS-Dienst für alle Bereiche. Die Hintergrundaufzeichnung
+    /// bleibt dadurch beim Verlassen der Kartenansicht aktiv.
     @State private var locationService: LocationService
     @State private var navigationTracker: NavigationTracker
     @State private var voyageManager: ActiveVoyageManager
@@ -295,7 +293,7 @@ struct ToernberechnungApp: App {
         _navigationTracker = State(initialValue: tracker)
         _voyageManager = State(initialValue: voyage)
 
-        // Start SeaMask building asynchronously on launch
+        // Aufbau der SeaMask beim Start asynchron beginnen
         NauticalRouteService.shared.buildSeaMask()
     }
 
@@ -314,16 +312,16 @@ struct ToernberechnungApp: App {
                     .transition(.opacity)
                 }
             }
-                // Window-level tap recognizer so tapping next to a field
-                // closes the keyboard, in sheets as well as in the tabs.
+                // Tipp-Erkennung im Fenster, damit ein Tipp neben ein Feld
+                // die Tastatur auch in modalen Ansichten und Bereichen schließt.
                 .background(KeyboardDismissGestureInstaller())
                 .environment(locationService)
                 .environment(navigationTracker)
                 .environment(voyageManager)
                 .environment(\.maritimeWeatherService, weatherService)
-                // Force German locale + Berlin timezone for every native
-                // SwiftUI control (DatePicker, formatted dates, …) so the
-                // UI never falls back to en_US / UTC.
+                // Deutsche Sprache und Berliner Zeitzone für alle nativen SwiftUI-Elemente
+                // wie DatePicker und Datumsanzeigen vorgeben, damit sie nicht auf en_US
+                // oder UTC zurückfallen.
                 .environment(\.locale, Locale(identifier: "de_DE"))
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin") ?? .current)
                 .environment(\.calendar, {
@@ -496,9 +494,9 @@ struct TideNodeOnboardingView: View {
                             .foregroundStyle(safetyNoticeAccepted ? selection.accent : Color.secondary)
                             .contentTransition(.symbolEffect(.replace))
 
-                        // Shown in full. The page above is top-aligned in its
-                        // scroll view, so the slack there absorbs the extra
-                        // height without pushing any copy off screen.
+                        // Vollständig anzeigen. Der Inhalt darüber ist in der Scrollansicht oben
+                        // ausgerichtet. Der freie Platz nimmt die zusätzliche Höhe auf,
+                        // ohne Text aus dem sichtbaren Bereich zu schieben.
                         Text(
                             "Ich habe verstanden, dass TideNode nur eine Planungshilfe ist und keine " +
                                 "amtlichen nautischen Veröffentlichungen, aktuellen Bekanntmachungen, " +
@@ -789,9 +787,9 @@ private struct OnboardingIllustration: View {
         .shadow(color: Color(hex: 0x083B66).opacity(0.5), radius: 4, y: 2)
     }
 
-    // The weather card sizes to its own content and is pinned to the top, so
-    // the card never grows into the container edge — that keeps the same
-    // breathing room below the illustration as on the route and crew pages.
+    // Die Wetterkarte richtet ihre Höhe nach dem Inhalt und bleibt oben ausgerichtet.
+    // Dadurch bleibt unter der Abbildung der gleiche Abstand wie auf den
+    // Routen- und Crew-Seiten.
     private var weatherIllustration: some View {
         VStack(spacing: 0) {
             weatherCard
@@ -949,8 +947,8 @@ private struct OnboardingIllustration: View {
                 let pulse = reduceMotion || !isActive ? CGFloat.zero : CGFloat((sin(Date().timeIntervalSinceReferenceDate * 2.0) + 1) * 0.5)
 
                 ZStack {
-                    // Both chips float on one line just above the avatars and
-                    // share the same offset, so they stay level with each other.
+                    // Beide Markierungen stehen in einer Zeile über den Avataren.
+                    // Der gleiche Versatz hält sie auf derselben Höhe.
                     planningChip("Sa · 14:00", icon: "calendar", tint: Color.appPrimary)
                         .position(x: size.width * 0.31, y: size.height * 0.20 - pulse * 3)
 

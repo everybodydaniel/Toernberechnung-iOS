@@ -346,7 +346,7 @@ final class WeatherRevierUITests: XCTestCase {
             }
         }
 
-        // 1. Map Tab with calculated route
+        // 1. Kartenbereich mit berechneter Route
         let planPill = app.buttons["MapPlanningPill"]
         if planPill.waitForExistence(timeout: 8) {
             planPill.tap()
@@ -381,12 +381,12 @@ final class WeatherRevierUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2.5)
         saveScreenshot(name: "01_map_tab")
 
-        // 2. Weather Tab
+        // 2. Wetterbereich
         selectTab("Wetter")
         Thread.sleep(forTimeInterval: 2.0)
         saveScreenshot(name: "02_weather_tab")
 
-        // 3. Tides Sub-section
+        // 3. Gezeitenbereich
         let tidesButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Gezeiten")).firstMatch
         if tidesButton.waitForExistence(timeout: 5) {
             tidesButton.tap()
@@ -394,11 +394,11 @@ final class WeatherRevierUITests: XCTestCase {
             saveScreenshot(name: "03_tides_tab")
         }
 
-        // 4. Crew Tab & Terminkalender
+        // 4. Crew-Bereich und Terminkalender
         selectTab("Crewspace")
         Thread.sleep(forTimeInterval: 1.5)
 
-        // Switch to Terminkalender (Planung)
+        // Zum Terminkalender (Planung) wechseln
         let planungBtn = app.buttons["CrewspaceSectionPlanung"]
         if planungBtn.waitForExistence(timeout: 3) {
             planungBtn.tap()
@@ -435,7 +435,7 @@ final class WeatherRevierUITests: XCTestCase {
             saveScreenshot(name: "04_calendar_tab")
         }
 
-        // Switch to Crew section
+        // Zum Crew-Bereich wechseln
         let crewSectionBtn = app.buttons["CrewspaceSectionCrew"]
         if crewSectionBtn.waitForExistence(timeout: 3) {
             crewSectionBtn.tap()
@@ -443,11 +443,11 @@ final class WeatherRevierUITests: XCTestCase {
             saveScreenshot(name: "05_crew_tab")
         }
 
-        // 6. Map Tab for Nauti KI & Maritime Warnings
+        // 6. Kartenbereich für Nauti und nautische Warnungen
         selectTab("Karte")
         Thread.sleep(forTimeInterval: 1.5)
 
-        // Nauti KI Assistant
+        // Nauti-KI-Assistent
         let nautiBtn = app.buttons["Nauti Chat öffnen"]
         if nautiBtn.waitForExistence(timeout: 4) {
             nautiBtn.tap()
@@ -461,7 +461,7 @@ final class WeatherRevierUITests: XCTestCase {
             }
         }
 
-        // Maritime Warnings
+        // Nautische Warnungen
         let bell = app.buttons["AppHeaderWarningsButton"]
         if bell.waitForExistence(timeout: 3) {
             bell.tap()
@@ -475,7 +475,7 @@ final class WeatherRevierUITests: XCTestCase {
             }
         }
 
-        // 7. Logbook Tab
+        // 7. Logbuchbereich
         selectTab("Logbuch")
         Thread.sleep(forTimeInterval: 2.0)
         saveScreenshot(name: "08_logbook_tab")
@@ -536,7 +536,7 @@ final class WeatherRevierUITests: XCTestCase {
         XCTAssertTrue(seekarteButton.waitForExistence(timeout: 6))
         seekarteButton.tap()
 
-        // Wait for sheet dismissal and map callout card appearance
+        // Warten, bis die modale Ansicht geschlossen und die Warnungskarte sichtbar ist
         let closeButton = app.buttons["Warnung schließen"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 8))
 
@@ -550,7 +550,7 @@ final class WeatherRevierUITests: XCTestCase {
         let path = "\(targetDir)/warning_map_callout.png"
         try? data.write(to: URL(fileURLWithPath: path))
 
-        // Also test closing the callout card via close button
+        // Auch das Schließen der Warnungskarte über den Schließen-Button prüfen
         closeButton.tap()
         Thread.sleep(forTimeInterval: 1.5)
         XCTAssertFalse(closeButton.exists)

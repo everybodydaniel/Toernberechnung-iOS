@@ -1,6 +1,6 @@
-# SwiftLint Configuration
+# SwiftLint-Konfiguration
 
-# Paths to exclude from linting
+# Pfade, die von der Prüfung ausgeschlossen werden
 excluded:
   - Pods
   - Carthage
@@ -8,7 +8,7 @@ excluded:
   - .build
   - Scripts
 
-# Opt-in rules to enable useful but not overly strict checks
+# Zusätzliche Regeln für nützliche, nicht zu strenge Prüfungen
 opt_in_rules:
   - empty_count
   - explicit_init
@@ -20,7 +20,7 @@ opt_in_rules:
   - toggle_bool
   - vertical_parameter_alignment_on_call
 
-# Disabled rules that are commonly noisy in mixed codebases
+# Deaktivierte Regeln, die in gemischten Projekten häufig unnötige Meldungen erzeugen
 disabled_rules:
   - line_length
   - type_body_length
@@ -32,7 +32,7 @@ disabled_rules:
   - identifier_name
   - nesting
 
-# Custom rule configurations
+# Einstellungen einzelner Regeln
 line_length:
   warning: 120
   error: 150

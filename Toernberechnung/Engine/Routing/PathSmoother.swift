@@ -20,7 +20,7 @@ enum PathSmoother {
         return validateAndFix(smoothed: result, fallback: simplified)
     }
 
-    // MARK: - Douglas-Peucker Simplification
+    // MARK: - Vereinfachung nach Douglas-Peucker
 
     static func simplify(
         _ points: [CLLocationCoordinate2D],
@@ -99,7 +99,7 @@ enum PathSmoother {
         return GridConfig.approxMeters(from: point, to: projection)
     }
 
-    // MARK: - Chaikin Subdivision
+    // MARK: - Unterteilung nach Chaikin
 
     private static func chaikinIteration(
         _ points: [CLLocationCoordinate2D]
@@ -130,7 +130,7 @@ enum PathSmoother {
         return result
     }
 
-    // MARK: - Validation
+    // MARK: - Prüfung
 
     private static func validateAndFix(
         smoothed: [CLLocationCoordinate2D],
@@ -145,8 +145,8 @@ enum PathSmoother {
             if i > 0 {
                 let previous = smoothed[i - 1]
                 let segmentDist = GridConfig.approxMeters(from: previous, to: current)
-                // 1:1 mit Original: mindestens 2 Schritte und
-                // geschlossener Bereich `1...steps` (inkl. Endpunkt bei t = 1.0).
+                // Prüft mindestens zwei Schritte und den
+                // geschlossenen Bereich `1...steps` einschließlich des Endpunkts bei t = 1.0.
                 // Das vorherige `max(1,…)` + `1..<sampleCount` ließ kurze
                 // Segmente ungeprüft und übersprang den Endpunkt — dadurch
                 // rutschten Land-Querungen durch die Validierung.

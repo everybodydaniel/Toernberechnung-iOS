@@ -1,8 +1,8 @@
 import Foundation
 
-/// Swift port of Android PassageWindowScanner: sample every ten minutes,
-/// join consecutive safe candidates, then select the current/next/last window.
-/// Tide inputs are resolved once; every candidate checks every route waypoint.
+/// Prüft mögliche Abfahrten alle zehn Minuten,
+/// verbindet aufeinanderfolgende geeignete Zeitpunkte und wählt das aktuelle, nächste oder letzte Fenster.
+/// Gezeitendaten werden einmal geladen; jeder Zeitpunkt wird an allen Wegpunkten geprüft.
 struct PassageWindowSolver {
     struct BottleneckWindow: Identifiable, Equatable {
         let id: UUID
@@ -31,7 +31,7 @@ struct PassageWindowSolver {
     }
 
     struct Configuration: Equatable {
-        // Retained for callers that explicitly request a relative search.
+        // Für Aufrufer, die ausdrücklich einen relativen Suchbereich anfordern.
         var searchBackwardHours: Double = 12
         var searchForwardHours: Double = 24
         var sweepIncrementSeconds: TimeInterval = 600
@@ -59,7 +59,7 @@ struct PassageWindowSolver {
             return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: true)
         }
         let legs = RouteCalculationService.calculateLegResults(startTime: route.plannedStartTime, legs: route.legs)
-        let validLegs = tideDataProvider.usesAndroidForecastLevels
+        let validLegs = tideDataProvider.usesForecastWaterLevels
             ? route.legs.allSatisfy { $0.distanceNm.isFinite && $0.distanceNm >= 0 &&
                 $0.speedThroughWaterKnots.isFinite && $0.speedThroughWaterKnots > 0 }
             : legs.allSatisfy(\.isValid)
@@ -75,7 +75,7 @@ struct PassageWindowSolver {
         guard start <= upper else { return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: false) }
         let span = start ... upper
         let offsets: [Double]
-        if tideDataProvider.usesAndroidForecastLevels {
+        if tideDataProvider.usesForecastWaterLevels {
             var elapsed = 0.0
             offsets = [0] + route.legs.map { leg in
                 elapsed += leg.distanceNm / leg.speedThroughWaterKnots
@@ -90,18 +90,18 @@ struct PassageWindowSolver {
             return Solution(routeWindow: nil, bottlenecks: [], hasInvalidLeg: false, missingWaypointNames: missing)
         }
         var contexts = resolved.compactMap { $0 }
-        if tideDataProvider.usesAndroidForecastLevels {
+        if tideDataProvider.usesForecastWaterLevels {
             let models = route.legs.indices.map { index in
-                AndroidPassageLeg(distanceNm: route.legs[index].distanceNm,
+                TidalPassageLeg(distanceNm: route.legs[index].distanceNm,
                     speedKnots: route.legs[index].speedThroughWaterKnots,
-                    courseDegrees: AndroidPassageLeg.course(from: route.waypoints[index], to: route.waypoints[index + 1]),
+                    courseDegrees: TidalPassageLeg.course(from: route.waypoints[index], to: route.waypoints[index + 1]),
                     events: contexts[index].forecastEvents)
             }
-            for index in contexts.indices { contexts[index].androidTravelLegs = Array(models.prefix(index)) }
+            for index in contexts.indices { contexts[index].tidalTravelLegs = Array(models.prefix(index)) }
         }
         let (pieces, hasGaps) = findPieces(for: contexts, span: span, margin: boatSettings.safetyMarginMeters)
-        // Preserve every connected safe interval. Selection is independent of
-        // the list returned to the UI, as in Android findSafeWindows/findSafeWindow.
+        // Alle zusammenhängenden geeigneten Zeitfenster behalten. Die Auswahl ist von
+        // der Liste für die Oberfläche unabhängig.
         let clampedSelected = selectRelevantWindow(from: pieces, around: route.plannedStartTime)
         let anchor = clampedSelected?.recommendedDeparture ?? route.plannedStartTime
         let bottlenecks = contexts.map { context -> BottleneckWindow in
@@ -161,8 +161,8 @@ struct PassageWindowSolver {
         var hasGaps = false
         var candidate = span.lowerBound
 
-        // Matches Android's inclusive scan, 1 cm tolerance, strict missing-data
-        // rule, and first-best tie handling. Never interpolate between samples.
+        // Grenzen einschließen, 1 cm Toleranz verwenden, fehlende Daten
+        // ausschließen und bei Gleichstand den ersten besten Wert wählen. Zwischenwerte werden nicht interpoliert.
         while candidate <= span.upperBound {
             guard !Task.isCancelled else { return ([], true) }
             if let values = clearances(contexts, at: candidate) {
@@ -187,7 +187,7 @@ struct PassageWindowSolver {
     private func resolveContexts(_ route: RoutePlan, _ boat: BoatSettings, _ offsets: [Double],
                                  _ span: ClosedRange<Date>, _ provider: TideDataProvider,
                                  _ comparisons: [String: String]) async -> [WaypointTideContext?] {
-        // Sequential resolution intentionally reuses the actor's station cache and avoids request storms.
+        // Nacheinander auflösen, um den Stationszwischenspeicher des Actors zu nutzen und viele gleichzeitige Anfragen zu vermeiden.
         var result: [WaypointTideContext?] = []
         for (index, waypoint) in route.waypoints.enumerated() {
             let context = await WaypointTideContext.resolve(

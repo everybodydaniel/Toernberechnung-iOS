@@ -15,6 +15,7 @@ final class NautiChatViewModel {
     var crewspaceEditor: NautiCrewspaceEditorRequest?
 
     var isSending = false
+    let speechInput: NautiSpeechInputController
     var errorMessage: String?
     var persistenceWarning: String?
 
@@ -27,13 +28,15 @@ final class NautiChatViewModel {
 
     init(
         inferenceClient: any LocalAIInferenceClient = LocalAIInferenceManager.shared,
-        repository: any NautiConversationRepository = FileNautiConversationRepository.shared
+        repository: any NautiConversationRepository = FileNautiConversationRepository.shared,
+        speechClient: (any NautiSpeechInputClient)? = nil
     ) {
         let initialConversation = NautiConversation()
         self.conversations = [initialConversation]
         self.activeConversationID = initialConversation.id
         self.inferenceClient = inferenceClient
         self.repository = repository
+        self.speechInput = NautiSpeechInputController(client: speechClient)
     }
 
     var sortedConversations: [NautiConversation] {
@@ -69,7 +72,21 @@ final class NautiChatViewModel {
     }
 
     var canSend: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && !speechInput.isActive
+    }
+
+    func startSpeechInput() async {
+        guard !isSending, !speechInput.isActive else { return }
+        let conversationID = activeConversationID
+        let existingDraft = draft
+        speechInput.onTranscript = { [weak self] transcript in
+            guard let self else { return }
+            self.updateConversation(conversationID) {
+                $0.draft = NautiSpeechDraft.appending(transcript, to: existingDraft)
+            }
+            self.schedulePersistence()
+        }
+        await speechInput.start()
     }
 
     var isGeneratingActiveConversation: Bool {
@@ -97,6 +114,7 @@ final class NautiChatViewModel {
 
     @discardableResult
     func createConversation() -> UUID {
+        speechInput.cancel()
         let conversation = NautiConversation()
         conversations.append(conversation)
         activeConversationID = conversation.id
@@ -107,6 +125,7 @@ final class NautiChatViewModel {
 
     func selectConversation(_ id: UUID) {
         guard conversations.contains(where: { $0.id == id }) else { return }
+        if activeConversationID != id { speechInput.cancel() }
         activeConversationID = id
         errorMessage = nil
     }
@@ -134,6 +153,7 @@ final class NautiChatViewModel {
     }
 
     func deleteConversation(_ id: UUID) {
+        if activeConversationID == id { speechInput.cancel() }
         if generatingConversationID == id {
             cancelCurrentInference()
         }
@@ -150,6 +170,7 @@ final class NautiChatViewModel {
     }
 
     func sendCurrentDraft(when accessState: AIAccessState = .available) async -> NautiActionDispatch? {
+        guard !speechInput.isActive else { return nil }
         let conversationID = activeConversationID
 
         let userText = draft.trimmingCharacters(in: .whitespacesAndNewlines)

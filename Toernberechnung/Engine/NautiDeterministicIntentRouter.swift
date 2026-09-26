@@ -1,8 +1,8 @@
 import Foundation
 
-/// Routes high-confidence maritime data commands without asking the language
-/// model to reinterpret them. It also sanitizes generated trip plans against
-/// the latest user sentence so old context cannot leak into a new command.
+/// Leitet eindeutige nautische Datenanfragen direkt weiter, ohne sie vom Sprachmodell
+/// neu auslegen zu lassen. Erzeugte Törnpläne werden mit der aktuellen Anfrage
+/// abgeglichen, damit frühere Angaben nicht in einen neuen Auftrag einfließen.
 enum NautiDeterministicIntentRouter {
     private enum DataIntent {
         case weather
@@ -21,9 +21,9 @@ enum NautiDeterministicIntentRouter {
     }
 
     static func route(_ request: NautiInferenceRequest) -> NautiInferenceResult? {
-        // Explanatory questions belong to the model even when they contain
-        // data keywords such as "Gezeiten" or "Wetter". Mixed requests also
-        // reach the model so it can choose the appropriate structured intent.
+        // Erklärungsfragen gehen auch dann an das Modell, wenn sie Begriffe wie
+        // "Gezeiten" oder "Wetter" enthalten. Gemischte Anfragen gehen ebenfalls
+        // an das Modell, damit es die passende strukturierte Aktion auswählen kann.
         if let latest = request.messages.last(where: { $0.role == .user })?.text,
            asksForAdvice(latest) {
             return nil

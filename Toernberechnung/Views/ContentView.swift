@@ -82,8 +82,8 @@ struct ContentView: View {
     @State var nautiFocusDismissTrigger = 0
     @State var mapPlanningShown = false
     @State var intermediateStopPickerShown = false
-    /// Drives the map dashboard's bottom inset so the Nauti chat input keeps
-    /// sitting directly above the software keyboard instead of behind it.
+    /// Steuert den unteren Abstand des Kartenbereichs, damit die Nauti-Eingabe
+    /// direkt über der Bildschirmtastatur bleibt.
     @State var keyboardVisible = false
     @State var pendingNautiAction: NautiPendingAction?
     @State var pendingNautiConversationID: UUID?
@@ -141,8 +141,8 @@ struct ContentView: View {
         mainContent
     }
 
-    // Split from `mainContent` purely so the Swift type checker can cope: the
-    // combined presentation + lifecycle chain exceeded its budget.
+    // Aus `mainContent` aufgeteilt, damit die Swift-Typprüfung die kombinierte
+    // Kette aus Darstellung und Ereignisbehandlung verarbeiten kann.
     private var presentationSurface: some View {
         appNavigation
         .background(Color.appBackground.ignoresSafeArea())
@@ -199,8 +199,8 @@ struct ContentView: View {
             .presentationBackground(Color.clear)
             .presentationCornerRadius(30)
         }
-        // Action confirmations stay modal; the conversation itself lives inline
-        // in the map dashboard.
+        // Aktionsbestätigungen bleiben modal; das Gespräch erscheint direkt
+        // im Kartenbereich.
         .sheet(item: $pendingNautiAction) { action in
             NautiActionConfirmationSheet(
                 pendingAction: action,
@@ -292,14 +292,14 @@ struct ContentView: View {
         }
     }
 
-    // A third segment, again only to keep each modifier chain inside the type
-    // checker's budget.
+    // Weiterer Abschnitt, damit jede Modifier-Kette für die Typprüfung überschaubar bleibt.
     private var mainContent: some View {
         dataLifecycleSurface
         .onChange(of: proactiveNautiIssue?.id) { _, _ in
             dismissedNautiIssueID = nil
         }
         .onChange(of: nautiDashboardMode) { oldMode, newMode in
+            if newMode != .chat { nautiViewModel.speechInput.cancel() }
             if oldMode.isExpanded, newMode == .dashboard {
                 revealRouteDashboardIfPending()
             }
@@ -342,11 +342,10 @@ struct ContentView: View {
 
     @MainActor
     private func handleScenePhaseChange(_ phase: ScenePhase) {
-        if phase != .active {
-        }
-        // When the app comes back to the foreground, re-check the BSH peak
-        // forecast for whatever the user is currently looking at. Cache TTL
-        // keeps the actual network calls cheap.
+        if phase == .background { nautiViewModel.speechInput.cancel() }
+        // Beim Wechsel in den Vordergrund die BSH-Hochwasservorhersage des aktuell
+        // gezeigten Orts erneut prüfen. Die Gültigkeitsdauer des Zwischenspeichers
+        // vermeidet unnötige Netzwerkaufrufe.
         guard phase == .active else { return }
         Task {
             await aiAccess.refresh()
@@ -355,9 +354,9 @@ struct ContentView: View {
             if selectedTab == .map {
                 await loadWaterLevelForecast(for: destinationHarbour.tideStationID, force: false)
             }
-            // Weather used to be revalidated only on tab entry, so a long
-            // background stint left a stale forecast on screen. The TTL cache
-            // makes this free when the data is still fresh.
+            // Wetter auch bei Rückkehr aus dem Hintergrund aktualisieren, damit keine
+            // veraltete Vorhersage sichtbar bleibt. Solange die Daten frisch sind,
+            // verhindert der Zwischenspeicher einen neuen Abruf.
             if selectedTab == .conditions, selectedConditionsSection == .weather {
                 await loadWeather(userInitiated: false)
             }
@@ -448,11 +447,10 @@ struct ContentView: View {
     private func screen(for tab: AppTab, @ViewBuilder content: @escaping () -> some View) -> some View {
         if tab == .map {
             ZStack(alignment: .top) {
-                // `.container` only — the bare `.ignoresSafeArea()` also
-                // covers the `.keyboard` region, which opted the whole map
-                // tab (and with it the Nauti chat input) out of keyboard
-                // avoidance. The chart itself still bleeds edge to edge via
-                // its own `.ignoresSafeArea()` inside `calculatorTab()`.
+                // Nur `.container` verwenden. `.ignoresSafeArea()` ohne Einschränkung würde
+                // auch den Tastaturbereich ignorieren und die Nauti-Eingabe verdecken.
+                // Die Karte selbst reicht durch ihr eigenes `.ignoresSafeArea()`
+                // in `calculatorTab()` weiterhin bis an die Bildschirmränder.
                 content()
                     .ignoresSafeArea(.container)
 

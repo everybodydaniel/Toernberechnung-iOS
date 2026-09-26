@@ -1,44 +1,37 @@
 import SwiftUI
 
-// MARK: - Liquid Glass Style System
+// MARK: - Liquid-Glass-Gestaltung
 //
-// Central set of view modifiers that switch between the iOS 26 Liquid
-// Glass APIs and a hand-tuned iOS 18 fallback. Every UI surface in the
-// app routes through these helpers — there are no raw `.glassEffect`
-// calls anywhere else in the code. That gives us one place to evolve
-// the design language and guarantees a clean fallback on iOS 18/25.
+// Zentrale View-Modifier für Liquid Glass ab iOS 26 und eine angepasste
+// Darstellung für ältere iOS-Versionen. Gemeinsame Hilfsfunktionen halten
+// das Erscheinungsbild der Flächen einheitlich.
 //
-// Apple guidance baked in:
-//   • Glass cannot sample other glass. We only put Glass on top-level
-//     navigation/container surfaces — never on nested cards inside them.
-//   • Group multiple glass shapes that sit close to each other inside
-//     a `GlassEffectContainer` so the morphing animation is consistent.
-//   • Use `.tint(...)` for semantic glass colour (prominent action),
-//     never just for decoration.
-//   • NEVER apply interactive glass inside a `Button` label. The
-//     `.interactive()` effect installs its own press handling and
-//     swallows the tap as soon as a scroll view or a UIKit map sits
-//     underneath the control. Put the glass modifier OUTSIDE the button
-//     and make `.contentShape(...)` the last modifier inside the label
-//     (see `tideHero` in ContentView+Tides.swift for the reference
-//     shape). Every `interactive:` parameter below therefore defaults
-//     to `false`.
+// Grundregeln:
+//   • Glas nur auf äußeren Navigations- und Containerflächen verwenden,
+//     nicht auf darin eingebetteten Karten.
+//   • Nahe Glasformen in einem `GlassEffectContainer` gruppieren,
+//     damit Übergangsanimationen zusammenpassen.
+//   • `.tint(...)` für die Bedeutung einer Aktion einsetzen,
+//     nicht allein als Dekoration.
+//   • Interaktives Glas außerhalb des `Button` anwenden. Innerhalb des Inhalts
+//     kann `.interactive()` Tipps abfangen, wenn eine Scrollansicht oder
+//     UIKit-Karte darunter liegt. `.contentShape(...)` bleibt der letzte
+//     Modifier im Button-Inhalt. `tideHero` in ContentView+Tides.swift
+//     zeigt dieses Muster. `interactive:` ist deshalb standardmäßig `false`.
 //
-// All helpers are non-mutating extensions on `View` and `ButtonStyle`,
-// so existing call sites stay compact and the fallback path is invisible
-// to consumers.
+// Die Hilfsfunktionen sind zustandslose Erweiterungen von `View` und
+// `ButtonStyle`. Die Aufrufstellen brauchen keine eigene Versionsprüfung.
 
-// MARK: - Card Surface
+// MARK: - Kartenfläche
 //
-// The hero surface used by the calculator cards, tide cards and any
-// other top-level grouping. On iOS 26 this is a translucent Liquid Glass
-// panel that lenses the gradient app background; on iOS 18 it's the
-// existing `Color.cardBackground` with the same shadow.
+// Äußere Fläche für Berechnungs- und Gezeitenkarten sowie andere Gruppen.
+// Ab iOS 26 ein durchscheinender Liquid-Glass-Bereich, der den Hintergrund
+// bricht. Unter älteren Versionen bleibt `Color.cardBackground` mit Schatten.
 
 extension View {
 
-    /// Top-level card surface. Pass the same corner radius you used
-    /// before; the modifier handles background, clipping and shadow.
+    /// Äußere Kartenfläche mit dem bisherigen Eckenradius.
+    /// Der Modifier setzt Hintergrund, Zuschnitt und Schatten.
     @ViewBuilder
     func appCardSurface(cornerRadius: CGFloat = 22) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -59,18 +52,17 @@ extension View {
 
 }
 
-// MARK: - Field Surface
+// MARK: - Eingabefläche
 //
-// Secondary surface for small inline controls (pickers embedded in a
-// card, info chips, dashboard tiles). These sit INSIDE a glass card, so
-// they must NOT also become glass (Apple: "glass cannot sample other
-// glass"). We render them as a flat `Color.fieldBackground` on both OS
-// versions for a clean, calm hierarchy.
+// Fläche für kleine Elemente innerhalb einer Karte, etwa Auswahlfelder,
+// Hinweismarkierungen und Messwertkacheln. Sie liegt innerhalb einer
+// Glasfläche und bleibt deshalb auf allen Versionen ohne eigenen Glaseffekt
+// bei `Color.fieldBackground`.
 
 extension View {
 
-    /// Inline field/pill surface. Always flat — even on iOS 26 — because
-    /// it sits inside a glass card.
+    /// Eingebettete Feld- oder Schaltfläche ohne eigenen Glaseffekt,
+    /// da sie bereits innerhalb einer Glaskarte liegt.
     func appFieldSurface(cornerRadius: CGFloat = 14) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
@@ -80,13 +72,11 @@ extension View {
     }
 }
 
-// MARK: - Floating Overlay
+// MARK: - Schwebende Ebene
 //
-// Used by edge-to-edge overlays such as the AppHeader, the navigation
-// top-bar pills and the bottom dashboard inside `FullScreenNavigationView`.
-// On iOS 26 each overlay becomes its own Liquid Glass panel; on iOS 18
-// it falls back to `.ultraThinMaterial` so the look already approximates
-// the design language.
+// Für AppHeader, obere Navigationsschaltflächen und den unteren Bereich
+// in `FullScreenNavigationView`. Ab iOS 26 erhält jede Ebene Liquid Glass;
+// ältere Versionen verwenden `.ultraThinMaterial`.
 
 extension View {
 
@@ -105,9 +95,9 @@ extension View {
         }
     }
 
-    /// Circular floating button used by the AppHeader and the FullScreen
-    /// top-bar. Apply it OUTSIDE the `Button`, with `.contentShape(Circle())`
-    /// as the last modifier inside the label.
+    /// Runder schwebender Button für AppHeader und die Vollbildnavigation.
+    /// Außerhalb von `Button` anwenden; `.contentShape(Circle())` bleibt
+    /// der letzte Modifier im Inhalt.
     @ViewBuilder
     func appCircularGlass(diameter: CGFloat = 44, tint: Color? = nil, interactive: Bool = false) -> some View {
         if #available(iOS 26.0, *) {
@@ -127,9 +117,9 @@ extension View {
         }
     }
 
-    /// Dark, high-contrast Liquid Glass for controls floating over charts
-    /// and nautical maps. The dark tint keeps white SF Symbols legible over
-    /// bright chart details without turning the control into an opaque chip.
+    /// Dunkles Liquid Glass für Bedienelemente über Seekarten. Die Tönung
+    /// hält weiße SF Symbols über hellen Kartendetails lesbar, ohne die
+    /// Fläche vollständig zu decken.
     @ViewBuilder
     func appDarkCircularLiquidGlass(diameter: CGFloat = 44, interactive: Bool = false) -> some View {
         let tint = Color(hex: 0x08243A).opacity(0.78)
@@ -147,8 +137,8 @@ extension View {
         }
     }
 
-    /// Interactive route control over the map. iOS 26 deliberately stays
-    /// untinted so the system can refract and adapt to the chart underneath.
+    /// Interaktives Routenelement über der Karte. Ab iOS 26 ohne eigene Tönung,
+    /// damit das System die darunterliegende Karte brechen und berücksichtigen kann.
     @ViewBuilder
     func appDarkFloatingOverlay(cornerRadius: CGFloat = 18, interactive: Bool = false) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -165,8 +155,8 @@ extension View {
         }
     }
 
-    /// Dark marine Liquid Glass for dashboard data placed on the light app
-    /// canvas. The tint creates hierarchy without resorting to opaque cards.
+    /// Dunkles Liquid Glass für Messwerte vor dem hellen App-Hintergrund.
+    /// Die Tönung hebt die Ebene hervor, ohne deckende Karten zu verwenden.
     @ViewBuilder
     func appMarineDashboardGlass(cornerRadius: CGFloat = 24, tint: Color = Color(hex: 0x073A5B)) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -183,8 +173,8 @@ extension View {
         }
     }
 
-    /// Main map dashboard. This is the only glass layer around its contents;
-    /// nested rows stay flat so Liquid Glass samples the map directly.
+    /// Hauptbereich der Kartenübersicht mit einer einzigen Glasfläche.
+    /// Innere Zeilen bleiben ohne Material, damit das Glas direkt die Karte aufnimmt.
     @ViewBuilder
     func appGraphiteMapOverlay(cornerRadius: CGFloat = 24) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -201,8 +191,8 @@ extension View {
         }
     }
 
-    /// Clear Liquid Glass shared by the complete Revier surface. Weather and
-    /// tide animations remain visible without adding an opaque colour layer.
+    /// Gemeinsame klare Glasfläche für den Revierbereich. Wetter- und
+    /// Gezeitenanimationen bleiben ohne zusätzliche deckende Farbschicht sichtbar.
     @ViewBuilder
     func appWeatherLiquidGlass(cornerRadius: CGFloat = 22, interactive: Bool = false) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -223,9 +213,8 @@ extension View {
         }
     }
 
-    /// Single clear-glass surface for a presented weather detail. Its child
-    /// panels intentionally stay flat so the system never composites glass
-    /// directly on top of another glass layer.
+    /// Eine klare Glasfläche für Wetterdetails. Untergeordnete Bereiche
+    /// bleiben ohne Glaseffekt, damit keine Glasflächen übereinander liegen.
     @ViewBuilder
     func appWeatherDetailSheetGlass(cornerRadius: CGFloat = 32) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -239,7 +228,7 @@ extension View {
         }
     }
 
-    /// Flat grouping used inside the weather detail's single glass surface.
+    /// Inhaltsgruppe ohne eigenen Glaseffekt innerhalb der Wetterdetailfläche.
     func appWeatherDetailInset(cornerRadius: CGFloat = 20) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
@@ -247,9 +236,9 @@ extension View {
             .overlay(shape.stroke(Color.primary.opacity(0.10), lineWidth: 0.7))
     }
 
-    /// Flat content grouping inside the map dashboard. On iOS 26 the parent
-    /// already provides Liquid Glass, so another material here would block
-    /// refraction. iOS 18 keeps the established inset-card fallback.
+    /// Inhaltsgruppe innerhalb der Kartenübersicht. Ab iOS 26 liefert die äußere
+    /// Fläche bereits Liquid Glass; ein weiteres Material würde die Brechung
+    /// verdecken. Unter iOS 18 bleibt die bisherige eingebettete Karte.
     @ViewBuilder
     func appMapDashboardInset(cornerRadius: CGFloat = 18) -> some View {
         if #available(iOS 26.0, *) {
@@ -263,11 +252,11 @@ extension View {
     }
 }
 
-// MARK: - Icon Background
+// MARK: - Symbolhintergrund
 
 extension View {
 
-    /// Transparent Liquid Glass background for small circular icons.
+    /// Transparenter Liquid-Glass-Hintergrund für kleine runde Symbole.
     @ViewBuilder
     func appGlassIconBackground() -> some View {
         if #available(iOS 26.0, *) {
@@ -281,13 +270,12 @@ extension View {
 }
 
 
-// MARK: - Button Styles
+// MARK: - Button-Stile
 //
-// `.appProminentButton(tint:)` is the equivalent of the prominent
-// CTAs ("Berechnen & speichern", "Fahrt starten", "Fahrt beenden"). On
-// iOS 26 we lean on `.buttonStyle(.glassProminent)` with a semantic tint;
-// on iOS 18 we recreate the existing solid/gradient look so nothing
-// regresses visually.
+// `.appProminentButton(tint:)` gestaltet hervorgehobene Aktionen wie
+// "Berechnen & speichern", "Fahrt starten" und "Fahrt beenden".
+// Ab iOS 26 verwendet es `.buttonStyle(.glassProminent)` mit passender
+// Tönung, unter iOS 18 die bisherige Farb- oder Verlaufsdarstellung.
 
 private struct LegacyProminentButtonStyle: ButtonStyle {
     let tint: Color
@@ -325,7 +313,7 @@ private struct LegacyGlassButtonStyle: ButtonStyle {
 
 extension View {
 
-    /// Prominent CTA. iOS 26 = `.glassProminent`, iOS 18 = solid tint.
+    /// Hervorgehobene Aktion: ab iOS 26 `.glassProminent`, unter iOS 18 deckende Tönung.
     @ViewBuilder
     func appProminentButton(tint: Color = .appPrimary) -> some View {
         if #available(iOS 26.0, *) {
@@ -339,8 +327,8 @@ extension View {
         }
     }
 
-    /// Secondary action wrapped in glass. iOS 26 = `.glass`, iOS 18 =
-    /// ultraThinMaterial capsule.
+    /// Weitere Aktion: ab iOS 26 `.glass`, unter iOS 18
+    /// eine Kapsel mit ultraThinMaterial.
     @ViewBuilder
     func appGlassButton(tint: Color = Color(hex: 0x3C82FF)) -> some View {
         if #available(iOS 26.0, *) {
@@ -353,13 +341,12 @@ extension View {
     }
 }
 
-// MARK: - Sheet / Cover background
+// MARK: - Hintergrund modaler und Vollbildansichten
 //
-// iOS 26 sheets adopt Liquid Glass automatically as long as the inner
-// content does NOT paint an opaque background. The `LinearGradient` we
-// used to put behind the SettingsSheet would block that. This modifier
-// keeps the gradient on iOS 18 and hides it on iOS 26 so the system can
-// render its own glass.
+// Ab iOS 26 erhalten modale Ansichten automatisch Liquid Glass, wenn ihr
+// Inhalt keinen deckenden Hintergrund setzt. Der frühere `LinearGradient`
+// der Einstellungen würde dies verdecken. Der Modifier behält ihn für
+// iOS 18 und blendet ihn ab iOS 26 aus.
 
 extension View {
 

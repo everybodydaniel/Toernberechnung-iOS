@@ -1,8 +1,8 @@
 # ──────────────────────────────────────────────────────────────
-# GitHub Actions CI – Toernberechnung iOS
+# GitHub Actions – automatische Prüfung von Toernberechnung iOS
 # ──────────────────────────────────────────────────────────────
-# Trigger: Push & Pull Request auf main
-# Jobs:    1. SwiftLint   2. Build, Test & Coverage   3. UI Tests (XCUITest)   4. SonarCloud   5. DocC
+# Auslöser: Push und Pull Request auf main
+# Aufgaben: 1. SwiftLint   2. Erstellen, Tests und Testabdeckung   3. Oberflächentests (XCUITest)   4. SonarCloud   5. DocC
 # ──────────────────────────────────────────────────────────────
 
 name: CI
@@ -22,7 +22,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   XCODE_PROJECT: Toernberechnung.xcodeproj
   XCODE_SCHEME: Toernberechnung
-  SIMULATOR_DEVICE: iPhone 16
 
 jobs:
 
@@ -43,7 +42,7 @@ jobs:
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
 
   # ────────────────────────────────────────────
-  # 2. Build, Unit-Tests, Coverage
+  # 2. Erstellen, Komponententests und Testabdeckung
   # ────────────────────────────────────────────
   build-and-test:
     name: 🏗️ Build, Test & Coverage
@@ -65,6 +64,7 @@ jobs:
       - name: Setup Ruby & Bundler
         uses: ruby/setup-ruby@v1
         with:
+          ruby-version: '3.3'
           bundler-cache: true
 
       - name: Resolve Swift Packages
@@ -75,16 +75,44 @@ jobs:
 
       - name: Boot Simulator
         run: |
-          # Find available iPhone simulator name and boot it
-          SIM_NAME=$(xcrun simctl list devices available | grep -v 'Unavailable' | grep -oE 'iPhone [0-9a-zA-Z ]+' | head -n 1)
-          echo "Booting $SIM_NAME..."
-          xcrun simctl boot "$SIM_NAME" || true
+          # Verfügbaren iPhone-Simulator ermitteln und starten
+          SIMULATOR_UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted(devices, key=lambda key: tuple(map(int, re.findall(r"\d+", key))), reverse=True)
+          print(next(device["udid"] for runtime in runtimes if "iOS" in runtime
+                     for device in devices[runtime] if device["name"].startswith("iPhone") and device["isAvailable"]))
+          ')
+          echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
 
       - name: Run Unit Tests (with Coverage)
-        run: bundle exec fastlane test
+        run: |
+          set -o pipefail
+          mkdir -p build/test-results
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/test-results/unit-tests.xcresult \
+            -enableCodeCoverage YES \
+            -only-testing:ToernberechnungTests \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            | tee build/test-results/unit-tests.log
 
       - name: Generate Coverage Reports (Cobertura + SonarQube + HTML)
-        run: bundle exec fastlane coverage
+        run: |
+          bundle exec slather coverage \
+            --build-directory build/DerivedData --scheme "$XCODE_SCHEME" \
+            --output-directory build/coverage/cobertura --cobertura-xml "$XCODE_PROJECT"
+          bundle exec slather coverage \
+            --build-directory build/DerivedData --scheme "$XCODE_SCHEME" \
+            --output-directory build/coverage/sonarqube --sonarqube-xml "$XCODE_PROJECT"
+          bundle exec slather coverage \
+            --build-directory build/DerivedData --scheme "$XCODE_SCHEME" \
+            --output-directory build/coverage/html --html "$XCODE_PROJECT"
 
       - name: Debug – List Coverage Files
         if: always()
@@ -92,12 +120,12 @@ jobs:
           echo "=== Contents of build/coverage/ ==="
           find build/coverage/ -type f 2>/dev/null || echo "Directory not found"
 
-      - name: Upload JUnit Test Results
+      - name: Upload Unit Test Results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: junit-test-results
-          path: fastlane/test_output/
+          name: unit-test-results
+          path: build/test-results/
           retention-days: 14
 
       - name: Upload Coverage Reports
@@ -113,12 +141,12 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: xcresult-bundle
-          path: fastlane/test_output/*.xcresult
+          path: build/test-results/*.xcresult
           retention-days: 7
 
   # ────────────────────────────────────────────
   # 3. GUI-Tests (XCUITest)
-  #    Optional deaktivieren mit Repository Variable UI_TESTS_DISABLED=true.
+  #    Bei Bedarf mit der Repository-Variable UI_TESTS_DISABLED=true deaktivieren.
   # ────────────────────────────────────────────
   ui-tests:
     name: 📱 UI Tests (XCUITest)
@@ -135,11 +163,6 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
 
-      - name: Setup Ruby & Bundler
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-
       - name: Resolve Swift Packages
         run: |
           xcodebuild -resolvePackageDependencies \
@@ -148,24 +171,42 @@ jobs:
 
       - name: Boot Simulator
         run: |
-          # Find available iPhone simulator name and boot it
-          SIM_NAME=$(xcrun simctl list devices available | grep -v 'Unavailable' | grep -oE 'iPhone [0-9a-zA-Z ]+' | head -n 1)
-          echo "Booting $SIM_NAME..."
-          xcrun simctl boot "$SIM_NAME" || true
+          # Verfügbaren iPhone-Simulator ermitteln und starten
+          SIMULATOR_UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted(devices, key=lambda key: tuple(map(int, re.findall(r"\d+", key))), reverse=True)
+          print(next(device["udid"] for runtime in runtimes if "iOS" in runtime
+                     for device in devices[runtime] if device["name"].startswith("iPhone") and device["isAvailable"]))
+          ')
+          echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
 
       - name: Run UI Tests
-        run: bundle exec fastlane ui_tests
+        run: |
+          set -o pipefail
+          mkdir -p build/ui-test-results
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme ToernberechnungUITests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/ui-test-results/ui-tests.xcresult \
+            -only-testing:ToernberechnungUITests \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            | tee build/ui-test-results/ui-tests.log
 
       - name: Upload UI Test Results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ui-test-results
-          path: fastlane/ui_test_output/
+          path: build/ui-test-results/
           retention-days: 14
 
   # ────────────────────────────────────────────
-  # 4. SonarCloud (Code-Qualität + Coverage)
+  # 4. SonarCloud (Codequalität und Testabdeckung)
   # ────────────────────────────────────────────
   sonarcloud:
     name: 📊 SonarCloud Scan
@@ -176,12 +217,6 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
-
-      - name: Download JUnit Test Results
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
-        with:
-          name: junit-test-results
-          path: fastlane/test_output/
 
       - name: Download Coverage Reports
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
@@ -201,7 +236,7 @@ jobs:
           SONAR_HOST_URL: https://sonarcloud.io
 
   # ────────────────────────────────────────────
-  # 5. DocC Deployment (GitHub Pages)
+  # 5. DocC veröffentlichen (GitHub Pages)
   # ────────────────────────────────────────────
   deploy-docs:
     name: 📚 Deploy DocC

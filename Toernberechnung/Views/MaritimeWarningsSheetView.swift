@@ -49,13 +49,13 @@ public struct MaritimeWarningsSheetView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    // MARK: Official Bulletins Header Section
+                    // MARK: Kopfbereich für amtliche Meldungen
                     officialBulletinsSection
 
-                    // MARK: Filter Bar
+                    // MARK: Filterleiste
                     filterSection
 
-                    // MARK: Warnings List
+                    // MARK: Warnungsliste
                     warningsListSection
                 }
                 .padding(.horizontal, 16)
@@ -94,7 +94,7 @@ public struct MaritimeWarningsSheetView: View {
         }
     }
 
-    // MARK: - Official Bulletins Section
+    // MARK: - Amtliche Meldungen
 
     private var officialBulletinsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -181,7 +181,7 @@ public struct MaritimeWarningsSheetView: View {
         }
     }
 
-    // MARK: - Filter Bar
+    // MARK: - Filterleiste
 
     private var filterSection: some View {
         Picker("Filter", selection: $selectedFilter) {
@@ -192,7 +192,7 @@ public struct MaritimeWarningsSheetView: View {
         .pickerStyle(.segmented)
     }
 
-    // MARK: - Warnings List
+    // MARK: - Warnungsliste
 
     private var warningsListSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -226,7 +226,7 @@ public struct MaritimeWarningsSheetView: View {
         }
     }
 
-    // MARK: - Warning Card
+    // MARK: - Warnungskarte
 
     @ViewBuilder
     private func warningCard(_ warning: MaritimeWarning) -> some View {
@@ -235,7 +235,7 @@ public struct MaritimeWarningsSheetView: View {
 
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                // Severity Badge Icon
+                // Symbol für den Schweregrad
                 Image(systemName: warning.severity.systemImage)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(severityColor(warning.severity))
@@ -269,14 +269,14 @@ public struct MaritimeWarningsSheetView: View {
                 }
             }
 
-            // Description
+            // Beschreibung
             Text(warning.details)
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(Color.secondary)
                 .lineLimit(isExpanded ? nil : 3)
                 .lineSpacing(2)
 
-            // Actions & Coordinates
+            // Aktionen und Koordinaten
             HStack(spacing: 8) {
                 if let coord = warning.coordinate {
                     Button {
@@ -377,7 +377,7 @@ public struct MaritimeWarningsSheetView: View {
     }
 }
 
-// MARK: - Safari Sheet View
+// MARK: - Modale Safari-Ansicht
 
 struct SafariSheetView: UIViewControllerRepresentable {
     let url: URL

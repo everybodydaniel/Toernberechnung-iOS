@@ -2,49 +2,48 @@ import Foundation
 import CoreLocation
 import Observation
 
-// MARK: - Navigation Tracker
+// MARK: - Navigation während des Törns
 //
-// Computes per-fix navigation derivatives for the active voyage:
+// Berechnet Navigationswerte für jede Positionsmessung:
 //
-//   • activeWaypointName   — next USER harbour we are heading to
-//   • distanceToWaypointNm — along-route distance to that harbour
-//   • distanceToFinalNm    — along-route distance to the destination
-//   • dynamicETA           — ETA at the destination based on current SOG;
-//                            falls back to the planned speed when SOG < 1 kn
-//   • crossTrackError      — perpendicular distance to the active route line
-//   • isOffCourse          — XTE > 150 m  (skipper-defined threshold)
-//   • bearingToWaypoint    — true bearing in degrees
+//   • activeWaypointName   — nächster vom Nutzer gewählter Hafen
+//   • distanceToWaypointNm — Strecke entlang der Route bis zu diesem Hafen
+//   • distanceToFinalNm    — Strecke entlang der Route bis zum Ziel
+//   • dynamicETA           — Ankunftszeit aus der aktuellen Fahrt über Grund;
+//                            unter 1 kn wird die geplante Geschwindigkeit verwendet
+//   • crossTrackError      — senkrechter Abstand zur aktiven Routenlinie
+//   • isOffCourse          — Routenabweichung über 150 m
+//   • bearingToWaypoint    — rechtweisende Peilung in Grad
 //
-// The tracker is deliberately stateless beyond the active route — every
-// update finds the closest segment from scratch. That keeps the maths
-// transparent and avoids state-machine bugs when the user manually
-// re-routes mid-voyage.
+// Abgesehen von der aktiven Route wird kein Verlauf gespeichert. Jede Messung
+// sucht den nächsten Streckenabschnitt neu. So bleibt die Berechnung nachvollziehbar
+// und kann eine während des Törns geänderte Route direkt berücksichtigen.
 
 @Observable
 @MainActor
 final class NavigationTracker {
 
-    // MARK: - Configuration
+    // MARK: - Konfiguration
 
-    /// XTE threshold in metres beyond which `isOffCourse` flips to true.
+    /// Grenze der Routenabweichung in Metern, ab der `isOffCourse` true wird.
     var offCourseThresholdMeters: Double = 150
 
-    /// Planned speed in knots (skipper's cruising speed). Used as the ETA
-    /// denominator when the live SOG is below `minimumSOGKnots`.
+    /// Geplante Geschwindigkeit in Knoten. Wird für die Ankunftszeit verwendet,
+    /// wenn die aktuelle Fahrt über Grund unter `minimumSOGKnots` liegt.
     var plannedSpeedKnots: Double = 6
 
-    /// Below this SOG the boat is considered drifting / moored and we
-    /// substitute `plannedSpeedKnots` to avoid an "infinite ETA" display.
+    /// Unterhalb dieser Fahrt über Grund gilt das Boot als treibend oder festliegend.
+    /// `plannedSpeedKnots` verhindert dann eine unendliche berechnete Fahrtdauer.
     private let minimumSOGKnots: Double = 1.0
 
-    // MARK: - Active route binding
+    // MARK: - Zuordnung der aktiven Route
 
     private(set) var activeRoute: RoutePlan?
-    /// Stable IDs of the USER waypoints inside the expanded route. Used to
-    /// skip Dijkstra fairway nodes when reporting the "next harbour".
+    /// Stabile Kennungen der vom Nutzer gewählten Wegpunkte in der erweiterten Route.
+    /// Beim Anzeigen des nächsten Hafens werden zusätzliche Fahrwasserpunkte übersprungen.
     private var userWaypointIDs: Set<UUID> = []
 
-    // MARK: - Outputs (read by UI)
+    // MARK: - Werte für die Oberfläche
 
     private(set) var activeWaypointName: String?
     private(set) var activeWaypointIndex: Int?
@@ -54,12 +53,12 @@ final class NavigationTracker {
     private(set) var crossTrackErrorMeters: Double?
     private(set) var bearingToWaypointDegrees: Double?
     private(set) var isOffCourse: Bool = false
-    /// The route is "complete" once we are within 50 m of the final WP.
+    /// Die Route gilt als beendet, sobald das Boot höchstens 50 m vom Zielwegpunkt entfernt ist.
     private(set) var hasArrived: Bool = false
 
-    // MARK: - Bindings
+    // MARK: - Routenzuordnung
 
-    /// Bind a new route plan. Resets all outputs.
+    /// Ordnet einen neuen Routenplan zu und setzt alle Ausgabewerte zurück.
     func setRoute(_ route: RoutePlan, userWaypointIDs: [UUID], plannedSpeedKnots: Double) {
         self.activeRoute = route
         self.userWaypointIDs = Set(userWaypointIDs)
@@ -79,7 +78,7 @@ final class NavigationTracker {
         hasArrived = false
     }
 
-    // MARK: - Per-fix update
+    // MARK: - Aktualisierung je Positionsmessung
 
     func update(location: CLLocation, speedKnots: Double) {
         guard let route = activeRoute, route.waypoints.count >= 2 else { return }
@@ -90,7 +89,7 @@ final class NavigationTracker {
         }
         guard coords.count >= 2 else { return }
 
-        // 1. Find the closest segment (smallest perpendicular distance).
+        // 1. Streckenabschnitt mit dem kleinsten senkrechten Abstand suchen.
         let user = location.coordinate
         var bestSegment = 0
         var bestXTE = Double.infinity
@@ -105,13 +104,13 @@ final class NavigationTracker {
         let endWP = route.waypoints[segmentEndIndex]
         activeWaypointIndex = segmentEndIndex
 
-        // 2. Project to the next USER harbour at or after segmentEndIndex.
+        // 2. Nächsten vom Nutzer gewählten Hafen ab segmentEndIndex ermitteln.
         let nextHarbourIndex = (segmentEndIndex ..< route.waypoints.count).first { idx in
             userWaypointIDs.contains(route.waypoints[idx].id)
         } ?? (route.waypoints.count - 1)
         activeWaypointName = route.waypoints[nextHarbourIndex].name
 
-        // 3. Along-route distance to active harbour.
+        // 3. Strecke entlang der Route zum nächsten Hafen berechnen.
         let toHarbourMeters = Self.alongRouteDistanceMeters(
             from: location,
             startIndex: segmentEndIndex,
@@ -120,7 +119,7 @@ final class NavigationTracker {
         )
         distanceToWaypointNm = toHarbourMeters / 1852.0
 
-        // 4. Along-route distance to destination.
+        // 4. Strecke entlang der Route zum Ziel berechnen.
         let lastIndex = coords.count - 1
         let toFinalMeters = Self.alongRouteDistanceMeters(
             from: location,
@@ -130,7 +129,7 @@ final class NavigationTracker {
         )
         distanceToFinalNm = toFinalMeters / 1852.0
 
-        // 5. Dynamic ETA with SOG fallback.
+        // 5. Ankunftszeit mit Ersatzwert bei geringer Fahrt über Grund berechnen.
         let effectiveSpeedKnots = speedKnots >= minimumSOGKnots
             ? speedKnots
             : plannedSpeedKnots
@@ -141,24 +140,24 @@ final class NavigationTracker {
             dynamicETA = nil
         }
 
-        // 6. XTE + off-course flag.
+        // 6. Routenabweichung und Überschreitung der Grenze bestimmen.
         crossTrackErrorMeters = bestXTE
         isOffCourse = bestXTE > offCourseThresholdMeters
 
-        // 7. True bearing to the next Dijkstra waypoint.
+        // 7. Rechtweisende Peilung zum nächsten Dijkstra-Wegpunkt bestimmen.
         bearingToWaypointDegrees = Self.bearing(from: user, to: coords[segmentEndIndex])
 
-        // 8. Arrival latch.
+        // 8. Ankunft dauerhaft vormerken.
         let finalLoc = CLLocation(latitude: coords[lastIndex].latitude,
                                   longitude: coords[lastIndex].longitude)
         hasArrived = location.distance(from: finalLoc) <= 50
-        _ = endWP   // silence unused warning; reserved for future use
+        _ = endWP   // Warnung für ungenutzten Wert vermeiden; für spätere Verwendung vorgesehen
     }
 
-    // MARK: - Geometry helpers (static / pure)
+    // MARK: - Geometrische Hilfsfunktionen ohne Zustandsänderung
 
-    /// Cumulative great-circle distance starting at `from`, hitting every
-    /// coord from `startIndex` through `endIndex`.
+    /// Gesamte Großkreisentfernung ab `from` über alle Koordinaten
+    /// von `startIndex` bis einschließlich `endIndex`.
     nonisolated static func alongRouteDistanceMeters(
         from origin: CLLocation,
         startIndex: Int,
@@ -180,10 +179,9 @@ final class NavigationTracker {
         return total
     }
 
-    /// Planar perpendicular distance from `point` to the segment a→b.
-    /// Uses a local equirectangular approximation (cos-of-midlatitude
-    /// scaling) which is accurate to a few cm at marine speeds and
-    /// avoids the cost of full spherical projection per fix.
+    /// Senkrechter Abstand von `point` zum Abschnitt a→b in einer Ebene.
+    /// Verwendet eine lokale Näherung mit Skalierung über den Kosinus der mittleren Breite.
+    /// So ist keine vollständige Kugelprojektion für jede Positionsmessung nötig.
     nonisolated static func perpendicularDistance(
         point p: CLLocationCoordinate2D,
         segA a: CLLocationCoordinate2D,
@@ -217,7 +215,7 @@ final class NavigationTracker {
         return (ex * ex + ey * ey).squareRoot()
     }
 
-    /// True initial bearing in degrees from `a` to `b` (0…360).
+    /// Rechtweisende Anfangspeilung in Grad von `a` nach `b` (0…360).
     nonisolated static func bearing(
         from a: CLLocationCoordinate2D,
         to b: CLLocationCoordinate2D

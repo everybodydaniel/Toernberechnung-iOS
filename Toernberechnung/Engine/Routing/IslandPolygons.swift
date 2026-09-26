@@ -315,7 +315,7 @@ enum IslandPolygons {
         CLLocationCoordinate2D(latitude: 53.6000, longitude: 8.1500)
     ]
 
-    // MARK: - Backstop Polygons
+    // MARK: - Ergänzende Polygone
 
     static let festlandBackstopNord: [CLLocationCoordinate2D] = [
         CLLocationCoordinate2D(latitude: 53.4000, longitude: 7.0000),
@@ -352,7 +352,7 @@ enum IslandPolygons {
         CLLocationCoordinate2D(latitude: 53.7050, longitude: 7.9500)
     ]
 
-    // MARK: - Water Override Corridors
+    // MARK: - Korridore zum Überschreiben der Wassermaske
 
     static let emdenEmsKorridor: [CLLocationCoordinate2D] = [
         CLLocationCoordinate2D(latitude: 53.3000, longitude: 7.2200),
@@ -383,7 +383,7 @@ enum IslandPolygons {
         CLLocationCoordinate2D(latitude: 53.6200, longitude: 8.1100)
     ]
 
-    // MARK: - Manual Fairway Routes (LineStrings)
+    // MARK: - Manuelle Fahrwasserrouten (LineStrings)
 
     static let wangeroogeFahrwasserOst: [CLLocationCoordinate2D] = [
         CLLocationCoordinate2D(latitude: 53.77485124022699, longitude: 7.867251072413869),
@@ -408,7 +408,7 @@ enum IslandPolygons {
         CLLocationCoordinate2D(latitude: 53.7050, longitude: 8.0500)
     ]
 
-    // MARK: - Aggregate Collections
+    // MARK: - Zusammengefasste Sammlungen
 
     static let waterOverrides: [[CLLocationCoordinate2D]] = [
         emdenEmsKorridor,

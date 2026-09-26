@@ -22,18 +22,15 @@ enum CellType: UInt8, CaseIterable {
     }
 
     var isBlocked: Bool {
-        // 1:1 mit Original: nur LAND und RESTRICTED sind
-        // blockiert. RUHEZONE ist NICHT blockiert, sondern teuer befahrbar
-        // (Kosten 2.0) — A* meidet Ruhezonen/Schutzgebiete dadurch, kann sie
-        // aber in Engstellen durchfahren, statt gar keinen Weg zu finden und
-        // auf eine Gerade durch Land zurückzufallen.
+        // Land und gesperrte Bereiche sind nicht befahrbar. Ruhezonen erhalten
+        // höhere Kosten. Die Suche meidet sie, kann sie aber an Engstellen durchfahren.
         self == .land || self == .restricted
     }
 
-    /// The connected open sailing network: open sea, marked fairways and
-    /// Wattfahrwasser. Used as the preferred snap target so a harbour pin is
-    /// never snapped into an enclosed HARBOUR basin (which can be disconnected
-    /// from the sea in the rasterised mask and would leave A* with no path).
+    /// Zusammenhängendes befahrbares Netz aus offener See und markierten Fahrwassern.
+    /// Bevorzugtes Ziel für die Zuordnung von Hafenmarkierungen. Verhindert, dass
+    /// sie einem abgeschlossenen HARBOUR-Becken der Rastermaske zugeordnet werden,
+    /// aus dem A* keinen Weg ins offene Wasser findet.
     var isThroughWater: Bool {
         self == .openSea || self == .fairway || self == .wattfahrwasser
     }

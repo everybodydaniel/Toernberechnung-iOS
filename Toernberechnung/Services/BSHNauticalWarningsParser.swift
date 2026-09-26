@@ -2,13 +2,13 @@ import Foundation
 import CoreLocation
 import PDFKit
 
-/// Parser for official German Nautische Warnnachrichten (NWN) from BSH (Seewarndienst Emden).
-/// Source PDF: `https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf`
+/// Liest die amtlichen nautischen Warnnachrichten (NWN) des BSH-Seewarndienstes Emden.
+/// PDF-Quelle: `https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf`
 public enum BSHNauticalWarningsParser {
 
     private static let bshPdfURL = URL(string: "https://www2.bsh.de/aktdat/nwn/nwn-nord.pdf")!
 
-    /// Parses text extracted from the BSH NWN PDF document into an array of MaritimeWarning objects.
+    /// Wandelt den aus dem BSH-NWN-PDF gelesenen Text in eine Liste von MaritimeWarning-Objekten um.
     public static func parse(pdfDocument: PDFDocument) -> [MaritimeWarning] {
         var fullText = ""
         for i in 0..<pdfDocument.pageCount {
@@ -19,15 +19,15 @@ public enum BSHNauticalWarningsParser {
         return parse(text: fullText)
     }
 
-    /// Parses raw BSH NWN plain text into structured `MaritimeWarning` entities.
+    /// Wandelt den BSH-NWN-Rohtext in strukturierte `MaritimeWarning`-Einträge um.
     public static func parse(text: String) -> [MaritimeWarning] {
         guard !text.isEmpty else { return [] }
 
         var results: [MaritimeWarning] = []
         var seenIDs = Set<String>()
 
-        // 1. Numbered German Navigational Warnings
-        // Example header: "141100 utc sep 26\nnautische warnnachricht nr. 518\n..."
+        // 1. Nummerierte deutsche nautische Warnnachrichten
+        // Beispielkopf: "141100 utc sep 26\nnautische warnnachricht nr. 518\n..."
         let pattern = "(?i)(\\d{6}\\s+utc\\s+[a-z]{3}\\s+\\d{2})\\s*\\n\\s*nautische warnnachricht nr\\.\\s*(\\d+)\\s*\\n"
             + "([\\s\\S]*?)(?=\\d{6}\\s+utc|nautische warnnachrichten|navigational warning|eom|$)"
 
@@ -41,7 +41,7 @@ public enum BSHNauticalWarningsParser {
                 let number = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
                 let bodyRaw = nsString.substring(with: match.range(at: 3)).trimmingCharacters(in: .whitespacesAndNewlines)
 
-                // Skip raw Navtex index/summary broadcasts (e.g. "1. navtex- gebiet (s) warnungen gueltig ab...")
+                // Navtex-Verzeichnisse und Zusammenfassungen überspringen, z. B. "1. navtex- gebiet (s) warnungen gueltig ab..."
                 if bodyRaw.lowercased().contains("navtex- gebiet (s) warnungen") || bodyRaw.lowercased().contains("navtex- area (s) warnings") {
                     continue
                 }
@@ -76,7 +76,7 @@ public enum BSHNauticalWarningsParser {
             }
         }
 
-        // 2. Unnumbered Local / National Warnings (e.g. "lister tief 3 verloescht")
+        // 2. Lokale und nationale Warnungen ohne Nummer, z. B. "lister tief 3 verloescht"
         if let localWarning = parseLocalNationalWarning(from: text) {
             if !seenIDs.contains(localWarning.id) {
                 results.append(localWarning)
@@ -86,7 +86,7 @@ public enum BSHNauticalWarningsParser {
         return results
     }
 
-    // MARK: - Date Parsing
+    // MARK: - Datum einlesen
 
     private static let bshDateFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -101,9 +101,9 @@ public enum BSHNauticalWarningsParser {
         return bshDateFormatter.date(from: cleaned)
     }
 
-    // MARK: - Coordinate Parsing
+    // MARK: - Koordinaten einlesen
 
-    /// Matches BSH coordinates such as `54-22,0n 005-51,6e` or `53-46,7n 007-09,9e` or `53-43n 007-14e`.
+    /// Erkennt BSH-Koordinaten wie `54-22,0n 005-51,6e`, `53-46,7n 007-09,9e` oder `53-43n 007-14e`.
     public static func parseCoordinate(from text: String) -> CLLocationCoordinate2D? {
         let pattern = "(?i)(\\d{2})-(\\d{1,2}(?:[,.]\\d+)?)[ns]\\s+(\\d{2,3})-(\\d{1,2}(?:[,.]\\d+)?)[ew]"
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
@@ -121,12 +121,12 @@ public enum BSHNauticalWarningsParser {
         let lat = latDeg + (latMin / 60.0)
         let lon = lonDeg + (lonMin / 60.0)
 
-        // Sanity check coordinates for North Sea / Baltic proximity
+        // Koordinaten auf einen plausiblen Bereich nahe Nord- und Ostsee prüfen
         guard (50.0...60.0).contains(lat) && (0.0...20.0).contains(lon) else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 
-    // MARK: - Severity Classification
+    // MARK: - Schweregrad zuordnen
 
     public static func classifySeverity(body: String) -> MaritimeWarningSeverity {
         let lower = body.lowercased()
@@ -154,7 +154,7 @@ public enum BSHNauticalWarningsParser {
         return .notice
     }
 
-    // MARK: - Title & Area Extraction
+    // MARK: - Titel und Gebiet auslesen
 
     private static func extractTitleAndArea(number: String, body: String) -> (title: String, area: String) {
         let lines = body.components(separatedBy: .newlines)
@@ -165,7 +165,7 @@ public enum BSHNauticalWarningsParser {
             return ("BSH Warnung Nr. \(number)", "Deutsche Bucht & Nordsee")
         }
 
-        // Area: usually first sentence / line
+        // Gebiet: meist erster Satz oder erste Zeile
         let cleanFirst = germanizeText(firstLine)
         let parts = cleanFirst.components(separatedBy: ".")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -178,13 +178,13 @@ public enum BSHNauticalWarningsParser {
             area = cleanFirst.capitalizedWords()
         }
 
-        // Title: Subject from second line or key sentence
+        // Titel: Thema aus der zweiten Zeile oder einem maßgeblichen Satz
         var title = "Nautische Warnnachricht Nr. \(number)"
         if lines.count > 1 {
             var subj = lines[1]
-            // Strip technical radio call sign noise like ", rz '9ha4953'"
+            // Technische Funkrufzeichen wie ", rz '9ha4953'" entfernen
             subj = subj.replacingOccurrences(of: "(?i),?\\s*rz\\s*['\"][^'\"]+['\"]", with: "", options: .regularExpression)
-            // Strip trailing location prefixes to keep title concise
+            // Angehängte Ortsangaben für einen kurzen Titel entfernen
             subj = subj.replacingOccurrences(of: "(?i)\\s+auf\\s+(ungefaehr|position).*", with: "", options: .regularExpression)
             subj = subj.replacingOccurrences(of: "(?i)\\s+zwischen.*", with: "", options: .regularExpression)
             subj = subj.replacingOccurrences(of: "(?i)\\s+im\\s+gebiet.*", with: "", options: .regularExpression)
@@ -199,7 +199,7 @@ public enum BSHNauticalWarningsParser {
         return (title, area)
     }
 
-    // MARK: - Local / National Unnumbered Warnings
+    // MARK: - Lokale und nationale Warnungen ohne Nummer
 
     private static func parseLocalNationalWarning(from text: String) -> MaritimeWarning? {
         let pattern = "(?i)-local warnings-[^)]*\\)\\s*([\\s\\S]*?)(?=\\n[a-z\\s]+islands|\\neom|$)"
@@ -245,7 +245,7 @@ public enum BSHNauticalWarningsParser {
         )
     }
 
-    // MARK: - Text Cleanup Helpers
+    // MARK: - Hilfsfunktionen zur Textbereinigung
 
     private static func formatDetails(_ text: String) -> String {
         let lines = text.components(separatedBy: .newlines)

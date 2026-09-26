@@ -1,7 +1,7 @@
 import Foundation
 
-/// Port of TideStationExtensions.tideHeightAt and RuleOfTwelfths.
-/// No extrapolation or replacement of missing event heights.
+/// Interpoliert Wasserstände zwischen Gezeitenereignissen mit der Zwölftelregel.
+/// Fehlende Ereignishöhen werden weder ersetzt noch über den Datenbereich hinaus berechnet.
 struct AstronomicalTideCurve: Equatable {
     struct Point: Equatable {
         let time: Date
@@ -40,8 +40,8 @@ struct AstronomicalTideCurve: Equatable {
             || (next > 0 && events[next - 1].usesAstronomicalPrediction)
     }
 
-    /// Android deliberately interpolates LocalDateTime in Europe/Berlin.
-    /// Retain that wall-clock arithmetic, including across a DST transition.
+    /// Interpoliert anhand der Ortszeit in Europe/Berlin.
+    /// Diese Zeitrechnung bleibt auch beim Wechsel der Sommerzeit erhalten.
     static func waterLevel(start: Date, heightStart: Double, end: Date,
                            heightEnd: Double, target: Date) -> Double {
         let zone = AppDateFormatters.berlinTimeZone
@@ -66,8 +66,8 @@ struct AstronomicalTideCurve: Equatable {
     }
 }
 
-/// Used only when a manual HW or a provider without NW events is supplied.
-/// No fictitious next tide is extrapolated beyond six hours from that HW.
+/// Wird nur bei manuellem Hochwasser oder ohne Niedrigwasserereignisse verwendet.
+/// Mehr als sechs Stunden nach diesem Hochwasser wird keine weitere Tide geschätzt.
 struct ContinuousTwelfthsStrategy: TidalHeightStrategy {
     func missingWater(deviationHours: Double, meanTidalRangeMeters: Double) -> TidalHeightResult {
         let hours = abs(deviationHours)
@@ -93,18 +93,18 @@ struct ContinuousTwelfthsStrategy: TidalHeightStrategy {
     }
 }
 
-/// Port of SimpleTidalCurrentProvider and VectorMath for a single route leg.
-/// The 2.5 kn / east-west axis is the Android reference's simplified model.
-struct AndroidPassageLeg: Equatable {
+/// Berechnet die Fahrzeit eines Streckenabschnitts mit einem vereinfachten Strömungsmodell.
+/// Die Gezeitenströmung wirkt mit bis zu 2,5 kn auf der Ost-West-Achse.
+struct TidalPassageLeg: Equatable {
     let distanceNm: Double
     let speedKnots: Double
     let courseDegrees: Double
     let events: [TideEvent]
 
     func speedOverGround(at time: Date) -> Double {
-        guard let next = events.firstIndex(where: { $0.androidCurrentTimestampIsISO8601 && $0.time > time }), next > 0 else { return speedKnots }
+        guard let next = events.firstIndex(where: { $0.currentTimestampIsISO8601 && $0.time > time }), next > 0 else { return speedKnots }
         let before = events[next - 1], after = events[next]
-        guard before.androidCurrentTimestampIsISO8601 else { return speedKnots }
+        guard before.currentTimestampIsISO8601 else { return speedKnots }
         let durationMinutes = after.time.timeIntervalSince(before.time) / 60
         let elapsedMinutes = time.timeIntervalSince(before.time) / 60
         let total = durationMinutes.rounded(.towardZero)

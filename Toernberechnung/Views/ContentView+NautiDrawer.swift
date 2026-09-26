@@ -9,14 +9,14 @@ enum NautiDashboardMode: Equatable {
 }
 
 enum NautiDashboardGeometry {
-    /// The panel is hard-clipped, so it must never be taller than what is
-    /// actually left above `bottomInset` — otherwise the chat input at its
-    /// bottom edge gets cut off once the keyboard shrinks the container.
+    /// Der Bereich wird an seinen Grenzen abgeschnitten und darf deshalb nicht
+    /// höher sein als der verfügbare Platz über `bottomInset`. Sonst würde
+    /// die Tastatur die Chat-Eingabe am unteren Rand verdecken.
     static func panelHeight(availableHeight: CGFloat, bottomInset: CGFloat = 0) -> CGFloat {
         let ideal = min(max(availableHeight * 0.56, 380), 520)
-        // `headerClearance` keeps the AppHeader visible above the panel; without
-        // it the 380pt floor can exceed what is left once the keyboard shrinks
-        // the container on smaller devices.
+        // `headerClearance` hält AppHeader oberhalb des Bereichs sichtbar.
+        // Ohne diesen Abstand könnte die Mindesthöhe von 380 pt den verfügbaren
+        // Platz bei geöffneter Tastatur auf kleinen Geräten überschreiten.
         let headerClearance: CGFloat = 76
         return max(min(ideal, availableHeight - bottomInset - headerClearance), 220)
     }
@@ -28,8 +28,8 @@ enum NautiDashboardGeometry {
     }
 }
 
-/// Content hosted directly inside the map dashboard's single graphite Glass
-/// surface. This view deliberately adds no material or Glass of its own.
+/// Inhalt direkt in der gemeinsamen dunkelgrauen Glasfläche des Kartenbereichs.
+/// Diese Ansicht fügt keinen eigenen Material- oder Glashintergrund hinzu.
 struct NautiInlineDashboardHost: View {
     @Binding var mode: NautiDashboardMode
     @Bindable var viewModel: NautiChatViewModel

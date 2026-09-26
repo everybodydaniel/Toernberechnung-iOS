@@ -12,8 +12,8 @@ struct CrewEventDraft: Equatable {
     var attendees: [String]
 }
 
-/// Bottom sheet for creating and editing an appointment. Styled with the app's
-/// own card/chip language rather than a system `Form` so it matches Crewspace.
+/// Untere modale Ansicht zum Erstellen und Bearbeiten eines Termins.
+/// Verwendet die Karten und Markierungen der App passend zu Crewspace.
 struct CrewEventEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \CrewMemberRecord.createdAt, order: .forward) private var crewMembers: [CrewMemberRecord]
@@ -140,7 +140,7 @@ struct CrewEventEditor: View {
         return "\(day) · \(start)–\(end) Uhr"
     }
 
-    // MARK: Cards
+    // MARK: Karten
 
     private var categoryPicker: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -340,7 +340,7 @@ struct CrewEventEditor: View {
             .foregroundStyle(Color.secondary)
     }
 
-    // MARK: Behaviour
+    // MARK: Verhalten
 
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -354,8 +354,8 @@ struct CrewEventEditor: View {
         }
     }
 
-    /// Switching the category also fills an empty title with its name, so the
-    /// common "Törnstart at 14:00" case needs a single tap.
+    /// Beim Wechsel der Kategorie einen leeren Titel mit deren Namen füllen.
+    /// So lässt sich ein üblicher Termin wie "Törnstart um 14:00" schnell anlegen.
     private func applyCategory(_ option: CrewEventCategory) {
         if trimmedTitle.isEmpty || trimmedTitle == category.rawValue, option != .other {
             title = option.rawValue
@@ -374,8 +374,8 @@ struct CrewEventEditor: View {
             isAllDay = event.isAllDay
             attendees = event.attendees
         } else {
-            // Default to the next full hour on the selected day so the picker
-            // never opens on an awkward "now + seconds" value.
+            // Nächste volle Stunde am gewählten Tag als Standard verwenden,
+            // damit die Auswahl nicht mit einem Sekundenwert öffnet.
             let calendar = AppDateFormatters.berlinCalendar
             let hour = calendar.component(.hour, from: .now) + 1
             let start = calendar.date(

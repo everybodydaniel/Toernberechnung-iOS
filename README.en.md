@@ -90,7 +90,7 @@ The application follows a cleanly decoupled **MVVM architecture** organized into
 | 🔍 | **Passage Window Solver** | Automatic search for the optimal safe departure window based on tidal and water level predictions |
 | 🌊 | **BSH Tidal Data** | Direct retrieval of astronomical high/low water predictions for all island gauges (Borkum, Juist, Norderney, Baltrum, Langeoog, Spiekeroog, Wangerooge, Emden) |
 | 🌤️ | **Apple WeatherKit** | Real-time weather, 48-hour wind forecasts, gust indicators, and 7-day outlook in nautical units (knots, Beaufort) |
-| ✨ | **Nauti On-Device** | Local skipper assistant powered by Apple Foundation Models on supported iOS 26 devices with text input — no external AI server upload |
+| ✨ | **Nauti On-Device** | Local skipper assistant powered by Apple Foundation Models on supported iOS 26 devices with text and local speech input — no audio upload; initial speech model download may require internet |
 | 🚦 | **Go / Warning / No-Go** | Clear composite recommendation combining depth over seabed, sea state, and weather conditions |
 | 🧭 | **Multi-Leg Routing** | Route planning with flexible intermediate stops and automatic leg calculation via the Wadden Sea catalog |
 | 📱 | **Responsive iPad Layout** | Adaptive interface with floating tab bar, wide multi-column controls, and optimized popovers for iPad and iPhone |
@@ -241,7 +241,7 @@ Toernberechnung-iOS/
 │   │   ├── RoutePlanModels.swift            # Data models for routes, segments, and results
 │   │   ├── WaypointDepthSolver.swift        # Dynamic depth resolution per waypoint
 │   │   ├── WaypointTideContext.swift        # Tidal context for waypoints
-│   │   ├── RuleOfTwelfths.swift             # Rule of Twelfths implementation
+│   │   ├── AstronomicalTideCurve.swift      # Tide curve between high and low water
 │   │   ├── TidalHeightStrategy.swift        # MHW and charted depth calculation strategies
 │   │   ├── HarbourCatalog.swift             # Island and mainland harbours with gauge mappings
 │   │   ├── NauticalRouter.swift             # Nautical routing and buoy validation
@@ -257,6 +257,10 @@ Toernberechnung-iOS/
 │   │   ├── WeatherKitManager.swift          # Apple WeatherKit manager with caching
 │   │   ├── LocalAIInferenceManager.swift    # On-device Foundation Models inference
 │   │   ├── NautiConversationRepository.swift # Local persistence of chat conversations
+│   │   ├── NautiSpeechInputManager.swift    # Local speech state and fallback handling
+│   │   ├── NautiSpeechAnalyzerBackend.swift # German recognition and speech models
+│   │   ├── NautiAudioCapture.swift          # Microphone capture and cleanup
+│   │   ├── SpeechAudioFormatConverter.swift # Audio buffer conversion
 │   │   ├── WaterLevelCorrectionSeries.swift # Time series interpolation for water levels
 │   │   └── LocationService.swift            # CoreLocation service for GPS tracking
 │   └── Resources/
@@ -264,7 +268,7 @@ Toernberechnung-iOS/
 │       ├── nordsbefv.geojson                # Protection zones of the North Sea Ordinance
 │       ├── east_frisia.geojson              # East Frisian coastline and islands
 │       └── PrivacyInfo.xcprivacy            # Apple Privacy Manifest
-├── ToernberechnungTests/                    # 15 test suites with 128 unit tests
+├── ToernberechnungTests/                    # Calculations, data sources, chat and speech tests
 │   ├── ExcelParityDepthChainTests.swift     # Parity tests with Excel calculation chain
 │   ├── ExcelParityRouteTests.swift          # Route verification and reference tests
 │   ├── PassageWindowSolverTests.swift       # Validation of the passage window solver
@@ -272,7 +276,8 @@ Toernberechnung-iOS/
 │   ├── BSHTideMigrationTests.swift          # BSH parser and gauge assignment
 │   └── ...
 ├── ToernberechnungUITests/                  # Automated XCUITest UI tests
-│   └── WeatherRevierUITests.swift           # UI tests, onboarding & screenshot generator
+│   ├── WeatherRevierUITests.swift           # UI tests, onboarding & screenshot generator
+│   └── NautiSpeechUITests.swift             # Microphone controls, drafts and manual sending
 ├── assets/screenshots/                     # High-resolution screenshots of the app
 ├── .github/workflows/ci.yml                 # CI pipeline (SwiftLint → Tests → SonarCloud → DocC)
 ├── project.yml                              # XcodeGen specification
@@ -327,7 +332,7 @@ Under *Signing & Capabilities* in the Xcode target **Toernberechnung**, ensure t
 
 ### Unit Tests
 
-The test suite includes **128 automated unit tests** verifying mathematical calculations, tidal interpolation, caching, and data parity:
+The test suite verifies mathematical calculations, tidal interpolation, caching, data parity, local chat and speech input:
 
 ```bash
 xcodebuild test \
@@ -358,6 +363,8 @@ swiftlint lint --config .swiftlint.yml
 ## ⚙️ CI/CD Pipeline
 
 The GitHub Actions pipeline (`.github/workflows/ci.yml`) automatically protects every commit and pull request on `main`:
+
+Unit and UI tests run directly through `xcodebuild`. Slather generates coverage reports; `Gemfile` and `Gemfile.lock` contain its Ruby dependencies. The pipeline uses Ruby 3.3. TestFlight builds are uploaded through the Xcode Organizer.
 
 ```mermaid
 graph LR

@@ -215,9 +215,9 @@ struct NautiInferenceRequest: Equatable, Sendable {
         self.requestedAt = requestedAt
     }
 
-    /// Character limits are conservative heuristics, not token counts. Leave
-    /// room for system instructions, the generated intent schema and output.
-    /// Keep the newest question whole: truncation could remove crucial details.
+    /// Zeichenlimits sind vorsichtige Schätzwerte und keine Tokenzahlen. Sie lassen
+    /// Platz für Systemanweisungen, das Aktionsschema und die Antwort. Die neueste Frage
+    /// bleibt vollständig, da beim Kürzen wichtige Angaben verloren gehen könnten.
     func preparedForLocalModel(historyCharacterLimit: Int = 1_200) throws -> NautiInferenceRequest {
         guard let latestIndex = messages.lastIndex(where: { $0.role == .user }) else {
             throw LocalAIInferenceError.generationFailed
@@ -229,7 +229,7 @@ struct NautiInferenceRequest: Equatable, Sendable {
         var remaining = max(0, historyCharacterLimit)
         var history: [NautiConversationMessage] = []
         for message in messages[..<latestIndex].suffix(4).reversed() {
-            // Retain a contiguous tail of complete messages, never fragments.
+            // Zusammenhängende Folge der neuesten vollständigen Nachrichten behalten, keine Fragmente.
             guard message.text.count <= remaining else { break }
             history.append(message)
             remaining -= message.text.count
@@ -466,7 +466,8 @@ enum AIAccessState: Equatable {
     case unavailable(LocalAIUnavailableReason)
 
     var canUseAssistant: Bool {
-        true
+        if case .available = self { return true }
+        return false
     }
 
     var noticeMessage: String? {
@@ -631,7 +632,7 @@ enum NautiPendingAction: Identifiable {
     }
 }
 
-/// A transient editor request; personal form data is never sent to inference.
+/// Vorübergehende Anfrage zum Öffnen des Editors. Persönliche Formulardaten werden nicht an das Modell gesendet.
 struct NautiCrewspaceEditorRequest: Identifiable {
     enum Kind { case crewMember, event }
     let id = UUID()

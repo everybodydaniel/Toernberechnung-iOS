@@ -1,24 +1,22 @@
 import Foundation
 import CoreLocation
 
-// MARK: - Route Expander
+// MARK: - Erweiterung der Route
 //
-// Inserts NauticalRouter fairway waypoints between user-selected waypoints so
-// the RouteCalculationService evaluates WuK at the actual shallow Watt-segments
-// (the bottlenecks), not just at the user's named harbours.
+// Fügt Fahrwasserpunkte aus NauticalRouter zwischen den vom Nutzer gewählten
+// Wegpunkten ein. So bewertet RouteCalculationService das Wasser unter Kiel
+// auch an flachen Wattabschnitten und nicht nur an den ausgewählten Häfen.
 //
-// Tide-station references (MHW, MTH, BSH gauge) for the inserted fairway
-// waypoints inherit from the *nearest* user waypoint. This is the correct
-// behaviour because the calculation engine treats Anschlussorte the same way —
-// it inherits the reference station and applies an HW offset (`hwOffsetMinutes`)
-// for points that lie between two reference gauges.
+// Die Gezeitenreferenz der zusätzlichen Punkte (MHW, MTH, BSH-Pegel) stammt
+// vom nächsten gewählten Wegpunkt. Anschlussorte übernehmen entsprechend
+// die Referenzstation und erhalten bei Bedarf einen Hochwasserversatz
+// über `hwOffsetMinutes`.
 
 enum RouteExpander {
 
-    /// Expand the user-supplied route by inserting Dijkstra-routed fairway
-    /// waypoints between every pair of consecutive user waypoints. The
-    /// resulting RoutePlan keeps the user's original waypoints (start, stops,
-    /// destination) and interleaves the fairway segments between them.
+    /// Erweitert die Route um Fahrwasserpunkte aus der Dijkstra-Suche zwischen
+    /// je zwei gewählten Wegpunkten. Der RoutePlan behält Start, Zwischenstopps
+    /// und Ziel des Nutzers und fügt die Fahrwasserpunkte dazwischen ein.
     static func expandWithFairwayWaypoints(_ plan: RoutePlan) -> RoutePlan {
         guard plan.waypoints.count >= 2 else { return plan }
 
@@ -31,32 +29,32 @@ enum RouteExpander {
             let toWP   = plan.waypoints[i + 1]
             let originalLeg = i < plan.legs.count ? plan.legs[i] : nil
 
-            // Append "from" only once (start of first leg or already trailed
-            // by previous segment).
+            // "from" nur einmal ergänzen: am Beginn des ersten Abschnitts
+            // oder bereits als Ende des vorherigen Abschnitts.
             if newWaypoints.isEmpty { newWaypoints.append(fromWP) }
 
-            // Resolve coordinates.
+            // Koordinaten ermitteln.
             let fromCoord = coordinate(for: fromWP)
             let toCoord   = coordinate(for: toWP)
 
-            // Dijkstra fairway path between the two harbours.
+            // Fahrwasserpfad zwischen den Häfen mit Dijkstra bestimmen.
             let fairwayPath = NauticalRouter.route(from: fromCoord, to: toCoord)
             guard !fairwayPath.isEmpty else {
-                // Do not silently evaluate only the two harbours when the
-                // connecting fairway cannot be resolved.
+                // Wenn das verbindende Fahrwasser fehlt, darf die Berechnung
+                // nicht stillschweigend auf die beiden Häfen beschränkt werden.
                 var incomplete = plan
                 incomplete.legs = []
                 return incomplete
             }
 
-            // Drop bookend fairway WPs that are essentially identical to the
-            // user-supplied endpoints (avoid doubling start/end markers).
+            // Fahrwasserpunkte entfernen, die nahezu mit den gewählten Endpunkten
+            // übereinstimmen, damit Start- und Zielmarkierungen nicht doppelt erscheinen.
             let interiorFairway = fairwayPath.filter { wp in
                 let coord = CLLocationCoordinate2D(latitude: wp.lat, longitude: wp.lon)
                 return !isClose(coord, fromCoord) && !isClose(coord, toCoord)
             }
 
-            // Build cumulative leg list:
+            // Zusammenhängende Liste der Streckenabschnitte erstellen:
             //   from → fairway[0] → fairway[1] → … → to
             var legPath: [RouteWaypoint] = []
             for fw in interiorFairway {
@@ -69,7 +67,7 @@ enum RouteExpander {
             }
             legPath.append(toWP)
 
-            // Emit waypoints + legs.
+            // Wegpunkte und Streckenabschnitte ausgeben.
             var previousWP = fromWP
             var previousCoord = fromCoord
             let tidalCurrent = originalLeg?.tidalCurrentKnots ?? 0
@@ -99,7 +97,7 @@ enum RouteExpander {
         return expanded
     }
 
-    // MARK: - Helpers
+    // MARK: - Hilfsfunktionen
 
     private static func coordinate(for wp: RouteWaypoint) -> CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: wp.latitude ?? 0, longitude: wp.longitude ?? 0)
@@ -120,8 +118,8 @@ enum RouteExpander {
         } ?? candidates[0]
     }
 
-    /// Convert a fairway waypoint into a fully-formed RouteWaypoint suitable
-    /// for the calculation engine. Sourced from the geographically closest BSH station (1:1 with Android).
+    /// Erstellt aus einem Fahrwasserpunkt einen vollständigen RouteWaypoint für die Berechnung.
+    /// Die Gezeitenreferenz stammt von der räumlich nächsten BSH-Station.
     private static func synthesizeFairwayWaypoint(
         fairway: NauticalRouter.Waypoint,
         inheritFrom anchor: RouteWaypoint,

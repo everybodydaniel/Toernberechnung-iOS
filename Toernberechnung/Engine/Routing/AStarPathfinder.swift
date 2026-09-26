@@ -122,16 +122,14 @@ final class AStarPathfinder {
         let r0 = GridConfig.latToRow(point.latitude)
         let c0 = GridConfig.lonToCol(point.longitude)
 
-        // Prefer the connected "through-water" network (open sea / fairway /
-        // Wattfahrwasser). Harbour pins sit on land or inside HARBOUR basins,
-        // and such basins can be enclosed pockets in the rasterised mask — if
-        // we snap there, A* finds no escape and the route degrades to a
-        // straight line through everything. Snapping to the nearest
-        // through-water cell instead puts start/end on the navigable network
-        // the route actually uses, so A* always finds a path.
+        // Das zusammenhängende befahrbare Netz aus offener See und Fahrwassern bevorzugen.
+        // Hafenmarkierungen liegen teils an Land oder in abgeschlossenen HARBOUR-Becken
+        // der Rastermaske. Dort könnte A* keinen Weg ins offene Wasser finden und auf
+        // eine gerade Verbindung zurückfallen. Die nächste zusammenhängende Wasserzelle
+        // ist daher das bevorzugte Ziel für die Zuordnung von Start und Ende.
         if SeaMask.shared.isThroughWater(row: r0, col: c0) { return (r0, c0) }
 
-        // Closest any-navigable cell, used only if no through-water is in range.
+        // Nächste befahrbare Zelle als Ersatz, falls keine Zelle des zusammenhängenden Wassernetzes in Reichweite liegt.
         var fallback: (Int, Int)? = SeaMask.shared.isNavigable(row: r0, col: c0) ? (r0, c0) : nil
 
         let maxRadius = 80
@@ -158,7 +156,7 @@ final class AStarPathfinder {
     }
 }
 
-// MARK: - Priority Queue (Min-Heap)
+// MARK: - Prioritätswarteschlange (Min-Heap)
 
 private struct AStarNode: Comparable {
     let row: Int

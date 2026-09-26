@@ -1,4 +1,4 @@
-# SwiftLint configuration for the TideNode workspace.
+# SwiftLint-Konfiguration für das TideNode-Projekt.
 
 included:
   - Toernberechnung

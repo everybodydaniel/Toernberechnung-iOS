@@ -2,9 +2,9 @@ import AVFAudio
 import XCTest
 @testable import Toernberechnung
 
-/// Guards the fix for the microphone crash: the audio tap must run at the
-/// hardware sample rate and be resampled to the analyzer format here, because
-/// `AVAudioEngine.installTap` aborts the process on a format mismatch.
+/// Sichert die Korrektur des Mikrofonabsturzes ab. Die Aufnahme läuft mit
+/// der Hardware-Abtastrate und wird hier ins Analyseformat umgerechnet,
+/// da `AVAudioEngine.installTap` bei falschem Format den Prozess abbricht.
 final class SpeechAudioFormatConverterTests: XCTestCase {
 
     private func format(_ sampleRate: Double, channels: AVAudioChannelCount = 1) throws -> AVAudioFormat {
@@ -43,8 +43,8 @@ final class SpeechAudioFormatConverterTests: XCTestCase {
 
         XCTAssertFalse(converter.isPassthrough)
 
-        // Enough buffers that the resampler's one-off priming delay (~950
-        // frames on this filter) stays a small fraction of the total.
+        // Genug Puffer verwenden, damit die anfängliche Filterverzögerung von
+        // etwa 950 Frames nur einen kleinen Teil der Gesamtdauer ausmacht.
         let bufferCount = 25
         let framesPerBuffer: AVAudioFrameCount = 4_800
         var producedFrames: AVAudioFrameCount = 0
@@ -56,9 +56,9 @@ final class SpeechAudioFormatConverterTests: XCTestCase {
             producedFrames += output.frameLength
         }
 
-        // 25 x 4800 frames at 48 kHz is 2.5 s, i.e. 40000 frames at 16 kHz.
-        // The output must be duration-preserving: never more than the input
-        // covers, and within a few percent of it once priming is amortised.
+        // 25 × 4800 Frames bei 48 kHz ergeben 2,5 s, also 40000 Frames bei 16 kHz.
+        // Die Ausgabe darf nicht länger als die Eingabe sein und soll nach
+        // Berücksichtigung der Filterverzögerung nur wenige Prozent davon abweichen.
         let theoretical = AVAudioFrameCount(bufferCount) * framesPerBuffer / 3
         XCTAssertLessThanOrEqual(producedFrames, theoretical)
         XCTAssertGreaterThan(

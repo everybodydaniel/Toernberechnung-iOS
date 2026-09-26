@@ -70,7 +70,7 @@ public final class MaritimeWarningsService {
         await refresh()
     }
 
-    // MARK: - Official Authorities Quick Access (Nordsee)
+    // MARK: - Schnellzugriff auf amtliche Quellen für die Nordsee
 
     public struct OfficialBulletin: Identifiable, Sendable {
         public let id: String
@@ -121,7 +121,7 @@ public final class MaritimeWarningsService {
         )
     ]
 
-    // MARK: - Fetching
+    // MARK: - Datenabruf
 
     public func refresh() async {
         guard !isLoading else { return }
@@ -146,7 +146,7 @@ public final class MaritimeWarningsService {
                 let liveWarnings = BSHNauticalWarningsParser.parse(pdfDocument: pdfDoc)
 
                 if !liveWarnings.isEmpty {
-                    // Sort: Hazards first, then warnings, then newest
+                    // Sortierung: zuerst Gefahren, dann Warnungen, innerhalb der Gruppen die neuesten Meldungen
                     let sorted = liveWarnings.sorted { first, second in
                         if first.severity != second.severity {
                             return severityRank(first.severity) < severityRank(second.severity)
@@ -163,7 +163,7 @@ public final class MaritimeWarningsService {
                 }
             }
 
-            // If BSH live parsing returned no items, maintain cached data
+            // Zwischengespeicherte Daten behalten, wenn der aktuelle BSH-Abruf keine Meldungen liefert
             if self.warnings.isEmpty {
                 loadCachedWarnings()
             }
@@ -185,7 +185,7 @@ public final class MaritimeWarningsService {
         }
     }
 
-    // MARK: - Read / Unread State Tracking
+    // MARK: - Gelesene und ungelesene Meldungen
 
     public func isRead(id: String) -> Bool {
         seenIDs.contains(id)
@@ -213,7 +213,7 @@ public final class MaritimeWarningsService {
         self.unreadCount = unread.count
     }
 
-    // MARK: - Offline Caching
+    // MARK: - Zwischenspeicherung für die Nutzung ohne Verbindung
 
     private let cacheFile = "maritime_warnings_cache.json"
 
@@ -227,7 +227,7 @@ public final class MaritimeWarningsService {
             let data = try JSONEncoder().encode(list)
             try data.write(to: file, options: .atomic)
         } catch {
-            // Non-critical cache error
+            // Nicht kritischer Fehler beim Zwischenspeichern
         }
     }
 
@@ -243,11 +243,11 @@ public final class MaritimeWarningsService {
                     return
                 }
             } catch {
-                // Ignore cache read failures
+                // Fehler beim Lesen des Zwischenspeichers übergehen
             }
         }
 
-        // Fallback baseline for German Bight & East Frisian Waters
+        // Ersatzdaten für die Deutsche Bucht und ostfriesische Gewässer
         self.warnings = Self.defaultCuratedWarnings
         self.updateUnreadCount()
     }

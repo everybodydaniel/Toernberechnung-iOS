@@ -1,8 +1,7 @@
 import Foundation
 
-/// Documented hydrographic soundings and survey records.
-/// Provides published sounding data (e.g. Wattsegler August 2026) with explicit
-/// reference system (MHW vs. SKN), sounding date, and source provenance.
+/// Dokumentierte hydrographische Lotungen und Vermessungen.
+/// Jeder Eintrag enthält Tiefenbezug, Datum der Lotung und Quelle.
 struct SurveyedDepthRecord: Equatable, Sendable {
     let identifier: String
     let name: String
@@ -41,7 +40,7 @@ enum SurveyedDepthCatalog {
         return AppDateFormatters.berlinCalendar.date(from: components) ?? august2026
     }()
 
-    /// Documented Wattsegler soundings (Stand: August 2026).
+    /// Dokumentierte Wattsegler-Lotungen (Stand: August 2026).
     static let records: [SurveyedDepthRecord] = [
         SurveyedDepthRecord(
             identifier: "borkum_east", name: "Borkumer Wattfahrwasser", depthMeters: 1.70,
@@ -204,18 +203,18 @@ enum SurveyedDepthCatalog {
         }.joined(separator: " ")
     }
 
-    /// Attaches a documented sounding to a waypoint if a matching record exists.
-    /// Waypoints without a documented sounding maintain `surveyedAt == nil`, signaling
-    /// that skipper verification is required (`.unverifiedDepth`).
+    /// Ordnet einem Wegpunkt eine dokumentierte Lotung zu, wenn ein passender Eintrag vorliegt.
+    /// Ohne dokumentierte Lotung bleibt `surveyedAt == nil`; `.unverifiedDepth` weist
+    /// auf die erforderliche Prüfung durch den Skipper hin.
     static func applying(to waypoint: RouteWaypoint, harbourID: String? = nil) -> RouteWaypoint {
         let key = harbourID ?? waypoint.name
         guard let record = record(for: key) else {
             return waypoint
         }
 
-        // Deep fairway channels (e.g. Ems channel at borkum_east with 4.0m LAT)
-        // must not be overwritten by shallow mudflat soundings that apply only
-        // to the drying Wattenhoch branch.
+        // Tiefe Fahrwasserrinnen, z. B. die Emsrinne bei borkum_east mit 4,0 m LAT,
+        // dürfen nicht durch flache Wattlotungen ersetzt werden, die nur für den
+        // trockenfallenden Abzweig über das Wattenhoch gelten.
         if (waypoint.chartDepthMeters?.value ?? 0) >= 3.0 && record.calculationMode == .lottiefe {
             return waypoint
         }
@@ -231,7 +230,7 @@ enum SurveyedDepthCatalog {
                 surveyedAt: record.surveyedAt,
                 sourceURL: record.sourceURL
             )
-            // Also maintain LAT chartDepth so both LAT arithmetic and Lottiefe reduction work
+            // Auch die Kartentiefe relativ zu LAT erhalten, damit LAT-Berechnung und Lottiefe-Reduktion funktionieren.
             if updated.chartDepthMeters == nil {
                 updated.chartDepthMeters = SourcedValue(
                     value: record.depthMeters - mhw,

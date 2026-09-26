@@ -2,8 +2,8 @@ import Foundation
 import XCTest
 @testable import Toernberechnung
 
-/// Proves that the depth chain of `RouteCalculationService` reproduces rows
-/// `L29`…`L57` of "Excel-Tool-Törnberechnung_V2.1".
+/// Prüft, ob die Tiefenberechnung von `RouteCalculationService` die Zeilen
+/// `L29`…`L57` des "Excel-Tool-Törnberechnung_V2.1" nachbildet.
 ///
 /// ```
 /// L29  HW am WP        = L23 ± M25/M27
@@ -17,24 +17,23 @@ import XCTest
 /// L57  WuK             = L53 - M55
 /// ```
 ///
-/// Every case drives the real `calculate(route:…)` entry point so the assertions
-/// cover the resolution chains as well, not just the arithmetic.
+/// Jeder Fall verwendet `calculate(route:…)`. Die Prüfungen erfassen dadurch
+/// auch die Auswahl der Eingabedaten und nicht nur die Rechenschritte.
 final class ExcelParityDepthChainTests: XCTestCase {
 
     private let accuracy = 1e-9
     private let stationID = "TEST"
-    /// Excel `L31` for waypoint 1 — the planned start time.
+    /// Excel `L31` für Wegpunkt 1: geplante Startzeit.
     private let startTime = Date(timeIntervalSince1970: 1_768_500_000)
 
-    // MARK: - Fixture
+    // MARK: - Testdaten
 
-    /// Builds a two-waypoint route whose legs take zero time, so both waypoints
-    /// are reached at `startTime` and the deviation is fully controlled by
-    /// `deviationHours`.
+    /// Erstellt eine Route mit zwei Wegpunkten und Fahrtdauer 0. Beide Punkte
+    /// werden zu `startTime` erreicht; `deviationHours` bestimmt allein den
+    /// Abstand zum Hochwasser.
     ///
-    /// The water level correction is supplied through the provider with
-    /// `.localOfficial` quality so this parity fixture isolates the Excel depth
-    /// chain from separate data-provenance advisories.
+    /// Der Anbieter liefert die Wasserstandskorrektur mit `.localOfficial`,
+    /// damit die Excel-Rechenschritte unabhängig von Quellenhinweisen geprüft werden.
     private func makeRoute(
         mode: WaypointCalculationMode,
         meanHighWaterMeters: Double? = nil,
@@ -48,8 +47,8 @@ final class ExcelParityDepthChainTests: XCTestCase {
             value.map { SourcedValue(value: $0, source: .manual, sourceNotes: nil) }
         }
 
-        // Excel L23: the reference high water. L29 adds the offset on top, so the
-        // reference is shifted back by the offset to land on the wanted deviation.
+        // Excel L23 enthält das Referenzhochwasser. L29 addiert den Wegpunktversatz.
+        // Die Referenzzeit wird entsprechend zurückgesetzt, damit der gewünschte Abstand entsteht.
         let referenceHighWater = startTime
             .addingTimeInterval(-deviationHours * 3_600)
             .addingTimeInterval(-Double(highWaterOffsetMinutes) * 60)
@@ -99,8 +98,8 @@ final class ExcelParityDepthChainTests: XCTestCase {
         )
     }
 
-    /// Excel `$AD$13` delivered as an official local forecast; this fixture
-    /// intentionally carries no separate data-provenance advisory.
+    /// Excel `$AD$13` als amtliche lokale Vorhersage liefern.
+    /// Diese Testdaten erzeugen keinen zusätzlichen Quellenhinweis.
     private func makeProvider(waterLevelCorrectionMeters: Double) -> MockTideDataProvider {
         let provider = MockTideDataProvider()
         provider.correctionsByStation[stationID] = WaterLevelCorrectionResolution(
@@ -132,10 +131,10 @@ final class ExcelParityDepthChainTests: XCTestCase {
         return result.waypointResults[0]
     }
 
-    // MARK: - Case A — MHW mode with a negative chart depth
+    // MARK: - Fall A: MHW-Modus mit negativer Kartentiefe
 
-    /// Wattenhoch Memmert values from `wadden_sea_catalog.json`.
-    /// A negative chart depth means the spot dries out above chart datum.
+    /// Werte des Wattenhochs Memmert aus `wadden_sea_catalog.json`.
+    /// Eine negative Kartentiefe bedeutet, dass der Punkt oberhalb des Kartennulls trockenfällt.
     func testMHWModeWithNegativeChartDepthMatchesExcelColumn() async {
         let route = makeRoute(
             mode: .meanHighWater,
@@ -159,7 +158,7 @@ final class ExcelParityDepthChainTests: XCTestCase {
         XCTAssertEqual(waypoint.status, .noGo)
     }
 
-    // MARK: - Case B — MHW mode, passable
+    // MARK: - Fall B: MHW-Modus mit ausreichender Tiefe
 
     func testMHWModePassableMatchesExcelColumn() async {
         let route = makeRoute(
@@ -188,7 +187,7 @@ final class ExcelParityDepthChainTests: XCTestCase {
         XCTAssertEqual(waypoint.status, .go)
     }
 
-    // MARK: - Case C — Lottiefe mode
+    // MARK: - Fall C: Lottiefe-Modus
 
     func testLottiefeModeLeavesTideHeightEmpty() async {
         let route = makeRoute(
@@ -203,15 +202,14 @@ final class ExcelParityDepthChainTests: XCTestCase {
         XCTAssertEqual(waypoint.baseWaterAtTideMeters ?? .nan, 1.65, accuracy: accuracy)       // L45
         XCTAssertEqual(waypoint.availableWaterDepthWTMeters ?? .nan, 1.80, accuracy: accuracy) // L53
         XCTAssertEqual(waypoint.clearanceUnderKeelWuKMeters ?? .nan, 0.70, accuracy: accuracy) // L57
-        // Excel L49 shows the literal text "leer" in Lottiefe mode.
+        // Excel L49 zeigt im Lottiefe-Modus den Text "leer".
         XCTAssertNil(waypoint.tideHeightHGMeters)
         XCTAssertNil(waypoint.chartDepthMetersApplied)
         XCTAssertEqual(waypoint.status, .go)
     }
 
-    /// Guards the deliberate decision that a chart depth is ignored in Lottiefe
-    /// mode ("nicht bei Lottiefe" in the Excel sheet). Setting one must not move
-    /// a single number.
+    /// Prüft, dass Kartentiefe im Lottiefe-Modus nicht angewendet wird
+    /// ("nicht bei Lottiefe" in Excel). Ein gesetzter Wert darf kein Ergebnis ändern.
     func testLottiefeModeIgnoresChartDepthEntirely() async {
         let withoutChartDepth = await calculate(
             makeRoute(
@@ -245,11 +243,11 @@ final class ExcelParityDepthChainTests: XCTestCase {
         XCTAssertEqual(withChartDepth.status, withoutChartDepth.status)
     }
 
-    // MARK: - Case D — beyond one tidal cycle
+    // MARK: - Fall D: Abstand über einen Gezeitenzyklus
 
-    /// Excel would continue here: `L39` becomes text, `L45` catches that via
-    /// `IFERROR` and falls back to `SUM(L41:Q44)` — a bare MHW, as if no water
-    /// were missing at all. The app refuses instead, which is the safer answer.
+    /// Excel rechnet hier weiter: `L39` wird Text, `L45` fängt ihn mit `IFERROR`
+    /// ab und verwendet `SUM(L41:Q44)`, also MHW ohne Fehlmenge.
+    /// Die App lehnt diese Berechnung ab.
     func testDeviationBeyondTidalCycleIsInvalidInsteadOfSilentlyIgnored() async {
         let route = makeRoute(
             mode: .meanHighWater,
@@ -266,7 +264,7 @@ final class ExcelParityDepthChainTests: XCTestCase {
         XCTAssertNil(waypoint.clearanceUnderKeelWuKMeters)
     }
 
-    // MARK: - Case E — the high water offset (Excel L29)
+    // MARK: - Fall E: Hochwasserversatz (Excel L29)
 
     /// Excel `L29 = IF(M25>0, L23+M25, IF(M27>0, L23-M27, L23))`.
     func testHighWaterOffsetShiftsTheWaypointHighWater() async {
@@ -280,8 +278,8 @@ final class ExcelParityDepthChainTests: XCTestCase {
         )
         let waypoint = await calculate(route, waterLevelCorrectionMeters: 0)
 
-        // The fixture compensates the offset, so the deviation stays at 2 h and
-        // the waypoint HW sits 45 min after the reference HW.
+        // Die Testdaten gleichen den Versatz aus. Der Abstand bleibt bei 2 h;
+        // das Wegpunkthochwasser liegt 45 Minuten nach dem Referenzhochwasser.
         XCTAssertEqual(waypoint.deviationHours ?? .nan, 2.0, accuracy: 1e-6)
         let waypointHighWater = try? XCTUnwrap(waypoint.relevantHighWaterTime)
         XCTAssertEqual(
@@ -291,7 +289,7 @@ final class ExcelParityDepthChainTests: XCTestCase {
         )
     }
 
-    // MARK: - Case F — status boundaries
+    // MARK: - Fall F: Statusgrenzen
 
     func testWaypointStatusBoundaries() {
         typealias Service = RouteCalculationService

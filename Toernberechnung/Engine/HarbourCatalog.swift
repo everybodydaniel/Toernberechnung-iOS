@@ -63,8 +63,8 @@ enum BSHTideStationArea: String, Codable, Sendable {
     }
 }
 
-/// Canonical station metadata shared by the tide UI and route calculation.
-/// IDs and names match the BSH station index published at
+/// Gemeinsame Stationsdaten für die Gezeitenansicht und die Routenberechnung.
+/// Kennungen und Namen entsprechen dem BSH-Stationsverzeichnis unter
 /// `https://gezeiten.bsh.de/data/tides_overview.json`.
 struct BSHTideStation: Identifiable, Hashable, Codable, Sendable {
     let id: String
@@ -89,10 +89,10 @@ struct BSHTideStation: Identifiable, Hashable, Codable, Sendable {
 }
 
 enum BSHTideStationCatalog {
-    /// Curated meteorological comparison gauges. The local station continues
-    /// to provide HW/NW timing; only the wind-driven residual is transferred.
-    /// These assignments are hydrologically explicit and must never be
-    /// replaced by an arbitrary straight-line nearest-neighbour choice.
+    /// Fest zugeordnete Vergleichspegel für den wetterbedingten Wasserstand.
+    /// Die lokale Station liefert weiterhin die Zeiten für Hoch- und Niedrigwasser.
+    /// Nur die wetterbedingte Abweichung wird übertragen. Diese fachlichen Zuordnungen
+    /// dürfen nicht durch eine reine Suche nach dem räumlich nächsten Pegel ersetzt werden.
     private static let requiredComparisonStationIDs: [String: String] = [
         "101P": "507P", // Borkum -> Emden (Ems)
         "794P": "111P", // Juist -> Norderney

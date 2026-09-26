@@ -1,19 +1,19 @@
 import Foundation
 import CoreLocation
 
-// MARK: - Protected Zone Catalog
+// MARK: - Schutzgebietskatalog
 //
-// Reads the bundled `nordsbefv_eastfrisia.geojson` (filtered + simplified
-// excerpt of the Befahrensverordnung Nationalpark Niedersächsisches
-// Wattenmeer / Nordsee). Provides two routing-time queries:
+// Liest die mitgelieferte Datei `nordsbefv_eastfrisia.geojson` als gefilterten
+// und vereinfachten Auszug der Befahrensverordnung für das niedersächsische
+// Wattenmeer. Stellt zwei Abfragen für die Routenführung bereit:
 //
-//   • `segmentBlocked(a:b:)` — true if the straight segment a→b crosses
-//     or terminates inside any protected polygon.
-//   • `polygons` — raw rings for map rendering.
+//   • `segmentBlocked(a:b:)` — true, wenn der Abschnitt a→b ein Schutzgebiet
+//     kreuzt oder ein Endpunkt darin liegt.
+//   • `polygons` — Koordinatenringe für die Kartendarstellung.
 //
-// Avoidance is conservative: every polygon is treated as closed. The
-// `seasonal` flag is preserved so the UI can later distinguish dashed
-// (saisonal) from solid (ganzjährig) overlays if needed.
+// Vorsorglich wird jedes Gebiet als gesperrt behandelt. Die Kennzeichnung
+// `seasonal` bleibt erhalten, damit die Oberfläche später saisonale und
+// ganzjährige Sperrungen unterschiedlich darstellen kann.
 
 enum ProtectedZoneCatalog {
 
@@ -22,16 +22,16 @@ enum ProtectedZoneCatalog {
         let typ: String
         let seasonal: Bool
         let outerRing: [CLLocationCoordinate2D]
-        /// Cached bounding box (minLon, minLat, maxLon, maxLat).
+        /// Gespeichertes Begrenzungsrechteck (minLon, minLat, maxLon, maxLat).
         let bbox: (minLon: Double, minLat: Double, maxLon: Double, maxLat: Double)
     }
 
     static let zones: [Zone] = loadZones()
 
-    // MARK: - Public query
+    // MARK: - Öffentliche Abfrage
 
-    /// Is the great-circle segment a→b blocked by any protected zone?
-    /// Treated as a planar segment for the local scale (10–100 km, error <1 m).
+    /// Prüft, ob ein Schutzgebiet den Abschnitt a→b sperrt.
+    /// Für den lokalen Bereich wird die Großkreisverbindung als ebener Abschnitt angenähert.
     static func segmentBlocked(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Bool {
         let segBox = (
             minLon: min(a.longitude, b.longitude),
@@ -44,7 +44,7 @@ enum ProtectedZoneCatalog {
             if segmentCrossesPolygon(a: a, b: b, ring: zone.outerRing) {
                 return true
             }
-            // Edge case: both endpoints inside polygon — no crossing but blocked.
+            // Sonderfall: Beide Endpunkte liegen im Gebiet. Auch ohne Grenzübertritt ist der Abschnitt gesperrt.
             if pointInRing(a, ring: zone.outerRing) || pointInRing(b, ring: zone.outerRing) {
                 return true
             }
@@ -52,7 +52,7 @@ enum ProtectedZoneCatalog {
         return false
     }
 
-    // MARK: - Geometry primitives
+    // MARK: - Geometrische Grundfunktionen
 
     private static func bboxOverlaps(
         _ a: (minLon: Double, minLat: Double, maxLon: Double, maxLat: Double),
@@ -62,8 +62,8 @@ enum ProtectedZoneCatalog {
           || a.maxLat < b.minLat || a.minLat > b.maxLat)
     }
 
-    /// Standard ray-casting point-in-polygon. Ring assumed closed
-    /// (first == last) — works either way.
+    /// Prüft mit einem gedachten Strahl, ob der Punkt im Polygon liegt.
+    /// Der Ring ist normalerweise geschlossen (erster == letzter Punkt); offene Ringe werden ebenfalls verarbeitet.
     private static func pointInRing(_ p: CLLocationCoordinate2D, ring: [CLLocationCoordinate2D]) -> Bool {
         guard ring.count >= 3 else { return false }
         var inside = false
@@ -79,7 +79,7 @@ enum ProtectedZoneCatalog {
         return inside
     }
 
-    /// Does segment a→b cross any edge of `ring`?
+    /// Prüft, ob der Abschnitt a→b eine Kante von `ring` kreuzt.
     private static func segmentCrossesPolygon(
         a: CLLocationCoordinate2D, b: CLLocationCoordinate2D,
         ring: [CLLocationCoordinate2D]
@@ -88,7 +88,7 @@ enum ProtectedZoneCatalog {
         for i in 0 ..< ring.count - 1 {
             if segmentsIntersect(a, b, ring[i], ring[i + 1]) { return true }
         }
-        // Close the ring if not closed.
+        // Offenen Ring schließen.
         if let first = ring.first, let last = ring.last,
            first.latitude != last.latitude || first.longitude != last.longitude {
             if segmentsIntersect(a, b, last, first) { return true }
@@ -108,7 +108,7 @@ enum ProtectedZoneCatalog {
             && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0)) {
             return true
         }
-        // Colinear-on-segment edge cases.
+        // Sonderfälle mit Punkten auf derselben Geraden prüfen.
         if d1 == 0, onSegment(p3, p4, p1) { return true }
         if d2 == 0, onSegment(p3, p4, p2) { return true }
         if d3 == 0, onSegment(p1, p2, p3) { return true }
@@ -130,7 +130,7 @@ enum ProtectedZoneCatalog {
             && min(a.latitude, b.latitude) <= c.latitude && c.latitude <= max(a.latitude, b.latitude)
     }
 
-    // MARK: - Bundle loading
+    // MARK: - Laden aus dem App-Bundle
 
     private struct RawCollection: Decodable {
         struct Feature: Decodable {

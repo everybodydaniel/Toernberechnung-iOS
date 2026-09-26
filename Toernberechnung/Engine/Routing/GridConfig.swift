@@ -18,7 +18,7 @@ enum GridConfig {
     private static let metersPerLatDeg = 111_320.0
     private static let metersPerLonDeg = metersPerLatDeg * cos(midLatRad)
 
-    // MARK: - Coordinate ↔ Grid Conversion
+    // MARK: - Umrechnung zwischen Koordinaten und Raster
 
     static func latToRow(_ lat: Double) -> Int {
         let row = Int((lat - minLat) / latStep)
@@ -38,7 +38,7 @@ enum GridConfig {
         minLon + (Double(col) + 0.5) * lonStep
     }
 
-    // MARK: - Bounds Checking
+    // MARK: - Prüfung der Bereichsgrenzen
 
     static func inBounds(row: Int, col: Int) -> Bool {
         (0..<rows).contains(row) && (0..<cols).contains(col)
@@ -48,13 +48,13 @@ enum GridConfig {
         (minLat...maxLat).contains(lat) && (minLon...maxLon).contains(lon)
     }
 
-    // MARK: - Indexing
+    // MARK: - Indizes
 
     static func index(row: Int, col: Int) -> Int {
         row * cols + col
     }
 
-    // MARK: - Distance Calculations
+    // MARK: - Entfernungsberechnungen
 
     static func approxMeters(
         lat1: Double, lon1: Double,

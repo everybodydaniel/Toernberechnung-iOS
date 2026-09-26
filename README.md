@@ -90,7 +90,7 @@ Die Anwendung folgt einer klar entkoppelten **MVVM-Architektur** mit vier harmon
 | 🔍 | **Passagefenster-Solver** | Automatische Suche nach dem optimalen und sicheren Abfahrtsfenster basierend auf Gezeiten und Wasserstandsvorhersage |
 | 🌊 | **BSH-Gezeitendaten** | Direkter Abruf astronomischer Hoch-/Niedrigwasservorhersagen für alle Inselpegel (Borkum, Juist, Norderney, Baltrum, Langeoog, Spiekeroog, Wangerooge, Emden) |
 | 🌤️ | **Apple WeatherKit** | Echtzeit-Wetter, 48-Stunden-Windprognose, Böenanzeige und 7-Tage-Vorhersage in nautischen Einheiten (Knoten, Bft) |
-| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten mit Texteingabe – vollständig offline ohne Server-Upload |
+| ✨ | **Nauti On-Device** | Lokale Skipper-Assistenz über Apple Foundation Models auf unterstützten iOS-26-Geräten mit Text- und lokaler Spracheingabe – nach dem Sprachmodell-Download ohne Audio-Upload |
 | 🚦 | **Go / Warning / No-Go** | Transparente Gesamteinschätzung aus Gezeitentiefe, Seegang und Wetterbedingungen zu einer klaren Passage-Empfehlung |
 | 🧭 | **Mehrstrecken-Routing** | Routenplanung mit flexiblen Zwischenstopps und automatischer Etappenberechnung über den Wattenmeer-Katalog |
 | 📱 | **Responsive iPad-Layout** | Adaptive Oberfläche mit schwebender Tab-Leiste, Mehrspalten-Controls und optimierten Popovers für iPad und iPhone |
@@ -241,7 +241,7 @@ Toernberechnung-iOS/
 │   │   ├── RoutePlanModels.swift            # Datenmodelle für Routen, Segmente und Resultate
 │   │   ├── WaypointDepthSolver.swift        # Dynamische Tiefenauflösung pro Wegpunkt
 │   │   ├── WaypointTideContext.swift        # Gezeitenkontext für Wegpunkte
-│   │   ├── RuleOfTwelfths.swift             # Zwölftelregel-Berechnung
+│   │   ├── AstronomicalTideCurve.swift      # Gezeitenkurve zwischen Hoch- und Niedrigwasser
 │   │   ├── TidalHeightStrategy.swift        # MHW- und Lottiefe-Berechnungsstrategien
 │   │   ├── HarbourCatalog.swift             # Insel- und Festlandshäfen mit Pegelzuordnung
 │   │   ├── NauticalRouter.swift             # Nautisches Routing und Tonnenabgleich
@@ -257,6 +257,10 @@ Toernberechnung-iOS/
 │   │   ├── WeatherKitManager.swift          # Apple WeatherKit Manager mit Caching
 │   │   ├── LocalAIInferenceManager.swift    # On-Device Foundation Models Inferenz
 │   │   ├── NautiConversationRepository.swift # Lokale Speicherung von Chatverläufen
+│   │   ├── NautiSpeechInputManager.swift    # Zustände und Ersatzverfahren der lokalen Spracheingabe
+│   │   ├── NautiSpeechAnalyzerBackend.swift # Deutsche Spracherkennung und Sprachmodelle
+│   │   ├── NautiAudioCapture.swift          # Aufnahme und Freigabe des Mikrofons
+│   │   ├── SpeechAudioFormatConverter.swift # Umrechnung der Audiopuffer
 │   │   ├── WaterLevelCorrectionSeries.swift # Zeitreihen-Interpolation für Wasserstände
 │   │   └── LocationService.swift            # CoreLocation-Dienst für GPS-Tracking
 │   └── Resources/
@@ -264,7 +268,7 @@ Toernberechnung-iOS/
 │       ├── nordsbefv.geojson                # Schutzzonen der Nordseebefundverordnung
 │       ├── east_frisia.geojson              # Ostfriesische Küstenlinie und Inseln
 │       └── PrivacyInfo.xcprivacy            # Apple Privacy Manifest
-├── ToernberechnungTests/                    # 15 Testsuiten mit 128 Unit-Tests
+├── ToernberechnungTests/                    # Tests für Berechnungen, Datenquellen, Chats und Sprache
 │   ├── ExcelParityDepthChainTests.swift     # Paritätstests zur Excel-Berechnungskette
 │   ├── ExcelParityRouteTests.swift          # Routenabgleich und Referenztests
 │   ├── PassageWindowSolverTests.swift       # Validierung des Passagefenster-Solvers
@@ -272,7 +276,8 @@ Toernberechnung-iOS/
 │   ├── BSHTideMigrationTests.swift          # BSH-Datenparser und Pegelzuordnung
 │   └── ...
 ├── ToernberechnungUITests/                  # Automatisierte XCUITest-Oberflächentests
-│   └── WeatherRevierUITests.swift           # UI-Tests, Onboarding & Screenshot-Generator
+│   ├── WeatherRevierUITests.swift           # UI-Tests, Onboarding & Screenshot-Generator
+│   └── NautiSpeechUITests.swift             # Mikrofonbedienung, Entwurfserhalt und manuelles Senden
 ├── assets/screenshots/                     # Hochauflösende Screenshots der App
 ├── .github/workflows/ci.yml                 # CI-Pipeline (SwiftLint → Tests → SonarCloud → DocC)
 ├── project.yml                              # XcodeGen-Spezifikation
@@ -327,7 +332,7 @@ Unter *Signing & Capabilities* im Xcode-Target **Toernberechnung** sicherstellen
 
 ### Unit-Tests
 
-Die Testsuite umfasst **128 automatisierte Tests**, die mathematische Berechnungen, Gezeiteninterpolation, Caching und Datenparität absichern:
+Die Testsuite prüft mathematische Berechnungen, Gezeiteninterpolation, Caching, Datenparität sowie lokale Chats und Spracheingabe:
 
 ```bash
 xcodebuild test \
@@ -358,6 +363,8 @@ swiftlint lint --config .swiftlint.yml
 ## ⚙️ CI/CD Pipeline
 
 Die GitHub Actions Pipeline (`.github/workflows/ci.yml`) sichert jeden Commit und Pull Request auf `main` vollautomatisch ab:
+
+Unit- und UI-Tests laufen direkt über `xcodebuild`. Slather erzeugt die Berichte zur Testabdeckung; `Gemfile` und `Gemfile.lock` enthalten dafür die Ruby-Abhängigkeiten. Die Pipeline verwendet Ruby 3.3. TestFlight-Builds werden über den Organizer in Xcode hochgeladen.
 
 ```mermaid
 graph LR

@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-// MARK: - Category
+// MARK: - Kategorie
 
 enum CrewEventCategory: String, CaseIterable, Identifiable, Codable, Sendable {
     case departure = "Törnstart"
@@ -58,10 +58,9 @@ private extension View {
     }
 }
 
-// MARK: - Planning
+// MARK: - Planung
 
-/// Local appointment planning for the crew. Everything is stored in SwiftData
-/// on this device — no account, no sync.
+/// Lokale Terminplanung für die Crew. SwiftData speichert alles auf dem Gerät.
 struct CrewPlanningView: View {
     @Binding var section: CrewspaceSection
     @Binding var headerVisible: Bool
@@ -155,8 +154,8 @@ struct CrewPlanningView: View {
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            // Avoid List's optimistic destructive-row animation;
-                            // SwiftData updates the row and summary together below.
+                            // Vorweggenommene Löschanimation der Liste vermeiden.
+                            // SwiftData aktualisiert die Zeile und Zusammenfassung gemeinsam.
                             Button {
                                 delete(event)
                             } label: {
@@ -191,7 +190,7 @@ struct CrewPlanningView: View {
     @MainActor
     private func prepareShare(_ event: CrewEventRecord) {
         do {
-            // Persist first so the exported UID uses the permanent store identity.
+            // Zuerst speichern, damit die exportierte UID die dauerhafte Speicherkennung verwendet.
             try modelContext.save()
             eventToShare = try CrewCalendarExport(event: event)
         } catch {
@@ -201,7 +200,7 @@ struct CrewPlanningView: View {
 
     private var calendar: Calendar { AppDateFormatters.berlinCalendar }
 
-    /// Days that carry at least one appointment — drives the dot in the grid.
+    /// Tage mit mindestens einem Termin erhalten einen Punkt im Kalender.
     private var markedDays: Set<Date> {
         Set(events.map { calendar.startOfDay(for: $0.startsAt) })
     }
@@ -345,7 +344,7 @@ struct CrewPlanningView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Persistence
+    // MARK: - Speicherung
 
     @MainActor
     private func insert(_ draft: CrewEventDraft) {
@@ -386,10 +385,10 @@ struct CrewPlanningView: View {
     }
 }
 
-// MARK: - Month calendar
+// MARK: - Monatskalender
 
-/// Month grid with a dot on every day that carries an appointment. SwiftUI's
-/// graphical `DatePicker` cannot annotate days, so the grid is drawn here.
+/// Monatsraster mit einem Punkt an Tagen mit Terminen. Da der grafische
+/// SwiftUI-DatePicker keine Tagesmarkierungen bietet, wird das Raster hier gezeichnet.
 struct CrewMonthCalendar: View {
     @Binding var selectedDate: Date
     let markedDays: Set<Date>
@@ -536,8 +535,8 @@ struct CrewMonthCalendar: View {
     }
 
     private var weekdaySymbols: [String] {
-        // `veryShortWeekdaySymbols` starts on Sunday; rotate to the calendar's
-        // own first weekday so the columns match the grid below.
+        // `veryShortWeekdaySymbols` beginnt mit Sonntag. Die Reihenfolge an den
+        // ersten Wochentag des Kalenders anpassen, damit die Spalten zum Raster passen.
         var symbols = calendar.shortWeekdaySymbols.map { String($0.prefix(2)).uppercased() }
         let shift = calendar.firstWeekday - 1
         if shift > 0 {
@@ -546,7 +545,7 @@ struct CrewMonthCalendar: View {
         return symbols
     }
 
-    /// Always six weeks so the calendar keeps its height when changing months.
+    /// Immer sechs Wochen zeigen, damit die Höhe beim Monatswechsel gleich bleibt.
     private var gridDays: [Date?] {
         guard let interval = calendar.dateInterval(of: .month, for: visibleMonth),
               let dayCount = calendar.range(of: .day, in: .month, for: visibleMonth)?.count else {

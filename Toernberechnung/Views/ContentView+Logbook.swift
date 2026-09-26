@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import MapKit
 import SwiftUI
 import UIKit

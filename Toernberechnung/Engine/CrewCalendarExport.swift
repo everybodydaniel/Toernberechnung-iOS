@@ -3,7 +3,7 @@ import CryptoKit
 import Foundation
 import UniformTypeIdentifiers
 
-/// Immutable snapshot: sharing never reads a SwiftData model off the main actor.
+/// Unveränderliche Kopie: Beim Teilen wird kein SwiftData-Modell außerhalb des MainActor gelesen.
 struct CrewCalendarExport: Identifiable, Sendable, Transferable {
     let id: String
     let title: String
@@ -46,8 +46,8 @@ struct CrewCalendarExport: Identifiable, Sendable, Transferable {
     }
 
     func writeFile() throws -> URL {
-        // A unique directory keeps concurrent shares from overwriting each other.
-        // The OS owns temporary-file cleanup; recipients may read after dismissal.
+        // Ein eigenes Verzeichnis verhindert, dass gleichzeitige Exporte einander überschreiben.
+        // Das Betriebssystem räumt temporäre Dateien auf; Empfänger können sie nach dem Schließen noch lesen.
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("TideNode-Calendar", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -57,7 +57,7 @@ struct CrewCalendarExport: Identifiable, Sendable, Transferable {
         return url
     }
 
-    /// RFC 5545: UTC instants, exclusive all-day end, escaped TEXT and folded UTF-8 lines.
+    /// RFC 5545: UTC-Zeitpunkte, exklusives Ende ganztägiger Termine, maskierter TEXT und umgebrochene UTF-8-Zeilen.
     func calendarText(generatedAt: Date = .now) -> String {
         let utc = DateFormatter()
         utc.locale = Locale(identifier: "en_US_POSIX")
@@ -87,7 +87,7 @@ struct CrewCalendarExport: Identifiable, Sendable, Transferable {
             lines.append("DTEND;VALUE=DATE:\(dateOnly.string(from: exclusiveEnd))")
         } else {
             lines.append("DTSTART:\(utc.string(from: startsAt))")
-            // A DATE-TIME end must be later than the start.
+            // Bei DATE-TIME muss das Ende nach dem Beginn liegen.
             let end = endsAt > startsAt ? endsAt : startsAt.addingTimeInterval(60)
             lines.append("DTEND:\(utc.string(from: end))")
         }
@@ -97,7 +97,7 @@ struct CrewCalendarExport: Identifiable, Sendable, Transferable {
 
         var description = [String]()
         if !notes.isEmpty { description.append(notes) }
-        // Crew names are descriptive only: no invitation/RSVP without email addresses.
+        // Crew-Namen dienen nur der Beschreibung.
         if !attendees.isEmpty { description.append("Crew: \(attendees.joined(separator: ", "))") }
         description.append("Geplant mit TideNode · Crewspace")
         lines.append("DESCRIPTION:\(Self.escape(description.joined(separator: "\n\n")))")

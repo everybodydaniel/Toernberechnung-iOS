@@ -1,28 +1,27 @@
 import Foundation
 
-// MARK: - Route Summary
+// MARK: - Routenzusammenfassung
 //
-// User-facing condensation of a `RouteCalculationResult`. The Dijkstra
-// fairway WPs (NauticalRouter) are *not* displayed individually — they
-// only contribute their depth values to the leg they belong to.
+// Zusammenfassung eines `RouteCalculationResult` für die Oberfläche.
+// Zusätzliche Dijkstra-Fahrwasserpunkte werden nicht einzeln angezeigt.
+// Ihre Tiefenwerte fließen in den jeweiligen Streckenabschnitt ein.
 //
-// A leg connects two **user-selected** harbours (start, intermediate
-// stops, destination). For each leg we report:
-//   - the departure harbour
-//   - the arrival harbour
-//   - cumulative ETA at the arrival harbour
-//   - the worst (smallest) WuK observed across the leg's fairway WPs
-//   - leg status: .go / .warning / .noGo / .incomplete
-//   - the WP name that triggered a failure (so the UI can say
-//     "Passage von Norderney nach Juist nicht möglich – Knoten
-//     `watt_nesskana` < Sicherheitsmarge").
+// Ein Abschnitt verbindet zwei gewählte Häfen: Start, Zwischenstopps oder Ziel.
+// Für jeden Abschnitt werden ausgegeben:
+//   - Abfahrtshafen
+//   - Ankunftshafen
+//   - Ankunftszeit am Ankunftshafen
+//   - kleinstes Wasser unter Kiel an den Fahrwasserpunkten des Abschnitts
+//   - Status: .go / .warning / .noGo / .incomplete
+//   - Name des Wegpunkts, der eine Einschränkung verursacht, damit die Oberfläche
+//     die betroffene Passage und die unterschrittene Sicherheitsgrenze nennen kann.
 
 struct RouteSummary: Equatable {
 
     struct Leg: Equatable, Identifiable {
-        /// Derived from the endpoint waypoints, not freshly generated, so a
-        /// recalculation keeps SwiftUI's per-leg state (e.g. an expanded
-        /// calculation table) instead of resetting it.
+        /// Aus den Endpunktkennungen abgeleitet, nicht neu erzeugt. So bleiben
+        /// SwiftUI-Zustände eines Abschnitts, etwa eine geöffnete Berechnungstabelle,
+        /// bei einer Neuberechnung erhalten.
         var id: String { "\(fromWaypointID.uuidString)-\(toWaypointID.uuidString)" }
         let fromWaypointID: UUID
         let toWaypointID: UUID
@@ -43,16 +42,16 @@ struct RouteSummary: Equatable {
 
 
 
-    // MARK: - Build
+    // MARK: - Aufbau
 
-    /// Build a leg-based summary from a calculation result.
+    /// Erstellt aus dem Berechnungsergebnis eine Zusammenfassung nach Streckenabschnitten.
     ///
     /// - Parameters:
-    ///   - result: the engine's per-WP calculation result.
-    ///   - userWaypointIDs: ordered IDs of the user-selected harbours
-    ///     (start, intermediate stops, destination).  Every WP whose ID
-    ///     is in this set is treated as a user harbour; everything else
-    ///     is a Dijkstra fairway WP and only contributes to the leg.
+    ///   - result: Berechnungsergebnis für jeden Wegpunkt.
+    ///   - userWaypointIDs: Geordnete Kennungen der gewählten Häfen
+    ///     (Start, Zwischenstopps, Ziel). Diese Punkte gelten als Nutzerhäfen.
+    ///     Alle übrigen Punkte gelten als Dijkstra-Fahrwasserpunkte und
+    ///     fließen nur in den zugehörigen Abschnitt ein.
     static func build(
         from result: RouteCalculationResult,
         userWaypointIDs: [UUID]
@@ -60,7 +59,7 @@ struct RouteSummary: Equatable {
         let userIDSet = Set(userWaypointIDs)
         let wpResults = result.waypointResults
 
-        // Indices of user WPs inside wpResults, in order.
+        // Indizes der gewählten Wegpunkte in wpResults, in ihrer Reihenfolge.
         let userIndices = wpResults.enumerated()
             .filter { userIDSet.contains($0.element.waypoint.id) }
             .map(\.offset)
@@ -71,7 +70,7 @@ struct RouteSummary: Equatable {
             let fromWP = wpResults[fromIdx]
             let toWP   = wpResults[toIdx]
 
-            // Worst WuK across all WPs in this leg (inclusive of `to`).
+            // Kleinstes Wasser unter Kiel an allen Punkten dieses Abschnitts, einschließlich `to`.
             let inLeg = Array(wpResults[(fromIdx + 1) ... toIdx])
             let valid = inLeg.compactMap { wp -> (WaypointCalculationResult, Double)? in
                 guard let v = wp.clearanceUnderKeelWuKMeters else { return nil }
@@ -81,7 +80,7 @@ struct RouteSummary: Equatable {
             let worstWuK = worst?.1
             let worstWP  = worst?.0.waypoint.name
 
-            // Leg distance / travel time = sum over the underlying legs.
+            // Strecke und Fahrtdauer des Abschnitts aus den enthaltenen Teilabschnitten summieren.
             let underlyingLegs = result.legResults.filter { leg in
                 let fromIDs = (fromIdx ..< toIdx).map { wpResults[$0].waypoint.id }
                 let toIDs   = ((fromIdx + 1) ... toIdx).map { wpResults[$0].waypoint.id }
@@ -91,11 +90,11 @@ struct RouteSummary: Equatable {
             let distance = underlyingLegs.reduce(0) { $0 + $1.leg.distanceNm }
             let travelHours = underlyingLegs.reduce(0) { $0 + $1.travelTimeHours }
 
-            // Leg status = worst status among the WPs in this leg (excluding
-            // the leg's departure WP which was scored by the previous leg).
+            // Abschnittsstatus aus dem ungünstigsten Wegpunktstatus bestimmen.
+            // Der Startpunkt zählt zum vorherigen Abschnitt und wird hier ausgelassen.
             let legStatus = legStatusFrom(inLeg.map(\.status))
 
-            // Failure detail.
+            // Angabe zur Ursache der Einschränkung.
             var failureReason: String?
             if legStatus == .noGo || legStatus == .invalid {
                 if let trigger = inLeg.first(where: { $0.status == .noGo || $0.status == .invalid }) {

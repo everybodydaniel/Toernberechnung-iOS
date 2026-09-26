@@ -24,6 +24,10 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TideNode verwendet das Mikrofon nur für deine Spracheingabe bei Nauti. Die Aufnahme wird lokal verarbeitet und nicht gespeichert.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>TideNode wandelt deine Spracheingabe bei Nauti lokal in Text um. Die erkannten Wörter kannst du vor dem Senden prüfen.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Die App benötigt Hintergrund-Ortung, um die GPS-Route eines aktiven Törns zuverlässig weiter aufzuzeichnen.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
